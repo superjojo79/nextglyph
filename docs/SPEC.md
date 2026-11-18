@@ -376,8 +376,8 @@ Défini par `IME_FLAG_NO_PERSONALIZED_LEARNING` ou forcé par l'utilisateur. Le 
 
 ### 10.1 Lexique
 
-- Structure : automate acyclique minimal (DAWG) ou FST, sur les formes normalisées.
-- Chaque nœud stocke la somme des fréquences de son sous-arbre ; chaque état final stocke la fréquence du mot et l'index de ses formes d'affichage.
+- Structure : trie compact (arbre radix) sur les formes normalisées ; choix, format et mesures dans `docs/DECISIONS.md` (2026-11-19).
+- Chaque nœud stocke la somme des fréquences de son sous-arbre et la fréquence maximale d'une forme du sous-arbre (complétions best-first) ; chaque nœud terminal stocke ses formes d'affichage avec leur fréquence.
 - Ainsi, `P(c | p)` et `P(fin | p)` se calculent en O(1) par lettre après la descente sur `p`.
 - Format binaire mappé en mémoire (`mmap`), construit hors ligne par `tools/`.
 - Ordre de grandeur : 300 000 à 600 000 formes fléchies pour le français, environ 150 000 à 250 000 pour l'anglais ; cible ≤ 8 Mo sur disque par langue.
