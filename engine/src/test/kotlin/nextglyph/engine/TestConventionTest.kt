@@ -1,5 +1,6 @@
 package nextglyph.engine
 
+import nextglyph.testing.TestConvention
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

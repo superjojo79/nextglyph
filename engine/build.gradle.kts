@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.pitest)
+    `java-test-fixtures`
 }
 
 // Le moteur est consommé par l'application Android : bytecode Java 17.
@@ -19,6 +20,10 @@ kotlin {
 }
 
 dependencies {
+    // Contrôle de convention de tests partagé avec les autres modules (tools, ...).
+    testFixturesImplementation(platform(libs.junit.bom))
+    testFixturesImplementation(libs.junit.jupiter)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)

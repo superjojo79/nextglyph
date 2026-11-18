@@ -1,4 +1,4 @@
-package nextglyph.engine
+package nextglyph.testing
 
 import org.junit.jupiter.api.Nested
 import org.junit.platform.commons.annotation.Testable
