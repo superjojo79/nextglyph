@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 rootProject.name = "nextglyph"
 
 include(":engine")
+include(":tools")

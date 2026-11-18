@@ -1,0 +1,49 @@
+{
+  "sources": [
+    {
+      "id": "lexique-4-10-fr",
+      "language": "fr",
+      "need": "a+b",
+      "url": "https://www.lexique.org/databases/Lexique/Lexique410.zip",
+      "sha256": "f85ce56620a6822a425556f5feffb0da134c21d8349dd89f0d8e0bc0d7404d54",
+      "size": 48903925,
+      "license": "CC BY-SA 4.0"
+    },
+    {
+      "id": "dicollecte-hunspell-7-7-fr",
+      "language": "fr",
+      "need": "a",
+      "url": "https://www.grammalecte.net/dic/hunspell-french-dictionaries-v7.7.zip",
+      "sha256": "44314d992f94b4658c31a86ef2351724a43067531b0af3643f91bf0220eee616",
+      "size": 1056913,
+      "license": "MPL-2.0"
+    },
+    {
+      "id": "scowl-hunspell-en-us-2026-02-25",
+      "language": "en",
+      "need": "a",
+      "url": "https://github.com/en-wl/wordlist/releases/download/rel-2026.02.25/hunspell-en_US-2026.02.25.zip",
+      "sha256": "ac8e73310e951d88c52c2cf2ba54ceaca34f8486a81630ac8a75dc5f931179f9",
+      "size": 187271,
+      "license": "SCOWL (MIT-like, permissive) + BSD pour le fichier .aff"
+    },
+    {
+      "id": "tatoeba-fra-sentences",
+      "language": "fr",
+      "need": "c",
+      "url": "https://downloads.tatoeba.org/exports/per_language/fra/fra_sentences.tsv.bz2",
+      "sha256": "102b245952878f647d101ce4b38fc60ffb9b289df22b0aeb59415c25e6341cc6",
+      "size": 9805546,
+      "license": "CC BY 2.0 FR"
+    },
+    {
+      "id": "tatoeba-eng-sentences",
+      "language": "en",
+      "need": "c",
+      "url": "https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences.tsv.bz2",
+      "sha256": "3b5b3ecfcac5037b09f81ef048fa16fedc4d24838db5b6fbeedca1dfab374cbf",
+      "size": 24947715,
+      "license": "CC BY 2.0 FR"
+    }
+  ]
+}
