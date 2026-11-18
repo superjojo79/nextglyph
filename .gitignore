@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.fleet/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets de signature : ne jamais versionner
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Divers
+*.log
