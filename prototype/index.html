@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Nextglyph — prototype du clavier</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <strong>Nextglyph</strong> <span class="muted">prototype</span>
+    <span class="spacer"></span>
+    <button id="btn-clear" type="button">Vider</button>
+    <button id="btn-settings" type="button" aria-expanded="false" aria-controls="settings">Réglages</button>
+  </header>
+
+  <main>
+    <div id="out" class="out" aria-live="polite" aria-label="Texte saisi"></div>
+    <div id="error" class="error" hidden></div>
+  </main>
+
+  <section id="settings" class="settings" hidden aria-label="Réglages">
+    <div id="settings-form"></div>
+    <div class="actions">
+      <button id="btn-export" type="button">Exporter le journal (JSON)</button>
+      <button id="btn-clearlog" type="button">Effacer le journal</button>
+      <button id="btn-reset" type="button">Réinitialiser les réglages</button>
+      <span id="log-count" class="muted"></span>
+    </div>
+    <p class="muted">Tout reste dans le navigateur : aucune donnée n'est envoyée sur le réseau.</p>
+  </section>
+
+  <footer class="dock">
+    <div id="debug" class="debug" hidden></div>
+    <div id="bar" class="bar" aria-label="Suggestions"></div>
+    <div id="kb" class="kb" aria-label="Clavier"></div>
+  </footer>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
