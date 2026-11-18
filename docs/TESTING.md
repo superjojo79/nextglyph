@@ -42,7 +42,7 @@ Si une unité n'a vraiment aucun cas d'erreur possible (fonction totale), le gro
 
 ## Contrôles automatiques
 
-1. **`TestConventionTest`** (exécuté par `./gradlew build`) : échoue si une classe de test `*Test` n'a pas ses trois groupes `@Nested` non vides.
+1. **`TestConventionTest`** (un par module, exécuté par `./gradlew build` ; le contrôle `TestConvention` est partagé via les test fixtures d'`engine`) : échoue si une classe de test `*Test` n'a pas ses trois groupes `@Nested` non vides.
 2. **PIT** (`./gradlew pitest`, exécuté en CI) : tests de mutation. Le build échoue si :
    - moins de **85 %** des mutants sont tués ;
    - moins de **90 %** des lignes sont couvertes.

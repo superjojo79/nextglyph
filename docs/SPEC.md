@@ -386,10 +386,10 @@ Défini par `IME_FLAG_NO_PERSONALIZED_LEARNING` ou forcé par l'utilisateur. Le 
 
 | Langue | Source | Usage | Licence |
 |---|---|---|---|
-| FR | Lexique 3 | Formes fléchies, fréquences | **À vérifier** |
-| FR | Dictionnaires Hunspell / Grammalecte | Couverture du vocabulaire | **À vérifier** |
-| EN | SCOWL / dictionnaires Hunspell anglais | Couverture du vocabulaire, variantes US/UK | **À vérifier** |
-| FR, EN | Listes de fréquences issues de sous-titres | Fréquences de la langue parlée | **À vérifier** |
+| FR | Lexique 4.10 (successeur de Lexique 3) | Formes fléchies, fréquences | CC BY-SA 4.0 (voir `DATA.md`) |
+| FR | Dictionnaires Hunspell Dicollecte | Couverture du vocabulaire | MPL-2.0 (voir `DATA.md`) |
+| EN | SCOWL (Hunspell en_US) | Couverture du vocabulaire | Permissive (voir `DATA.md`) |
+| FR | Fréquences de sous-titres (Lexique 4.10) ; EN : aucune source conversationnelle claire, repli sur Tatoeba | Fréquences | Voir `DATA.md` |
 | FR, EN | Dictionnaires AOSP / HeliBoard | Comparaison, bigrammes | **À vérifier** |
 
 Le code de Nextglyph est sous Apache-2.0. Règles pour les données :

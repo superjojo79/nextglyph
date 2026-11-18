@@ -4,4 +4,44 @@ Copyright 2026 The Nextglyph contributors
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 Third-party data (dictionaries, frequency lists) shipped with Nextglyph keeps
-its own license. Each source and its attribution will be listed below.
+its own license. Each source and its attribution is listed below.
+
+--------------------------------------------------------------------------------
+Lexique 4.10 (French word forms and subtitle frequencies)
+  New, B., Pallier, C., Schalchli, G., Bourgin, J., Gimenes, M. (2026).
+  Lexique 4. Behavior Research Methods. https://www.lexique.org/
+  License: Creative Commons Attribution-ShareAlike 4.0 International
+  https://creativecommons.org/licenses/by-sa/4.0/
+  Nextglyph distributes data derived from it (compiled binary lexicon) as a
+  separate data file that keeps this license. Changes: conversion to a binary
+  lexicon format.
+
+French spelling dictionaries v7.7 (Dicollecte / Grammalecte)
+  Olivier R. and contributors. https://grammalecte.net/
+  License: Mozilla Public License 2.0, https://www.mozilla.org/MPL/2.0/
+  Nextglyph distributes data derived from it as a separate data file that keeps
+  this license. Changes: conversion to a binary lexicon format.
+
+SCOWL / English Speller Database (en_US Hunspell dictionary, 2026.02.25)
+  https://wordlist.aspell.net/ , https://github.com/en-wl/wordlist
+  Copyright 2000-2026 by Kevin Atkinson
+
+  Permission to use, copy, modify, distribute, and sell any part of SCOWLv2, or
+  word lists created from it, is hereby granted without fee, provided that the
+  above copyright notice appears in all copies and that both the above
+  copyright notice and this notice appear in supporting documentation.  Kevin
+  Atkinson makes no representations about the suitability of this database for
+  any purpose.  It is provided "as is" without express or implied warranty.
+
+  SCOWL is derived from many sources, most of which are in the Public Domain.
+  Data from the Corpus of Contemporary American English (COCA) was also used.
+  The primary source of words comes from 12dicts and ENABLE2K (Public Domain),
+  with credit to Alan Beale. The affix file derives from Geoff Kuenning's
+  Ispell (BSD license, Copyright 1993 Geoff Kuenning).
+
+Tatoeba sentences (offline analysis only, not distributed in the application)
+  Sentences by the contributors of Tatoeba, https://tatoeba.org/
+  License: Creative Commons Attribution 2.0 France
+  https://creativecommons.org/licenses/by/2.0/fr/
+
+Details, URLs and checksums: docs/DATA.md and tools/data/sources.json.

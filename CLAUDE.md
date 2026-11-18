@@ -9,7 +9,8 @@ Documentation, noms de tests et messages d'erreur en français. Identifiants de 
 ## Structure
 
 - `engine/` : moteur en Kotlin pur (JVM, bytecode 17), sans dépendance Android. Package racine `nextglyph.engine`.
-- Modules à venir : `ime/` (application Android), `tools/` (construction des lexiques), `prototype/`.
+- `tools/` : outils hors ligne (JVM, package `nextglyph.tools`). `./gradlew :tools:fetchData` télécharge les données listées dans `tools/data/sources.json` (sources et licences : `docs/DATA.md`).
+- Modules à venir : `ime/` (application Android), `prototype/`.
 
 ## Commandes
 
@@ -22,8 +23,11 @@ Documentation, noms de tests et messages d'erreur en français. Identifiants de 
 
 Chaque classe de test contient trois classes `@Nested inner class` non vides : `HappyPath`, `ErrorCases`, `BoundaryValues` (détails dans `docs/TESTING.md`). `TestConventionTest` fait échouer le build sinon. Un mutant PIT qui survit se corrige par un test, jamais en baissant un seuil.
 
+Le contrôle `TestConvention` est partagé via les test fixtures d'`engine` (`engine/src/testFixtures`, package `nextglyph.testing`) ; chaque module a son `TestConventionTest`.
+
 ## Contraintes
 
 - Aucune dépendance GPL/LGPL/AGPL ni propriétaire (F-Droid), aucune permission réseau.
+- Données linguistiques : uniquement les sources classées OK dans `docs/DATA.md` (règle §10.2). Aucun fichier de données brut > 1 Mo dans git.
 - Les actions GitHub sont épinglées par SHA de commit, avec la version en commentaire.
 - Le compilateur Kotlin traite les avertissements comme des erreurs.
