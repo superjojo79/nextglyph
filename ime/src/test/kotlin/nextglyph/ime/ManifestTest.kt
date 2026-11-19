@@ -29,12 +29,20 @@ class ManifestTest {
             (0 until nodes.length).map { (nodes.item(it) as Element).getAttributeNS(android, "name") }
         }
 
-    private fun mergedManifest(): Document {
-        val path = checkNotNull(System.getProperty("nextglyph.mergedManifest")) {
-            "Propriété nextglyph.mergedManifest absente : le test doit tourner via Gradle."
+    private fun mergedManifest(variant: String? = null): Document {
+        val property = if (variant == null) "nextglyph.mergedManifest" else "nextglyph.mergedManifest.$variant"
+        val path = checkNotNull(System.getProperty(property)) {
+            "Propriété $property absente : le test doit tourner via Gradle."
         }
         return parse(File(path).readText())
     }
+
+    private fun activitiesOf(document: Document): List<String> {
+        val nodes = document.getElementsByTagName("activity")
+        return (0 until nodes.length).map { (nodes.item(it) as Element).getAttributeNS(android, "name") }
+    }
+
+    private val fieldTests = "nextglyph.ime.debug.FieldTestsActivity"
 
     @Nested
     inner class HappyPath {
@@ -58,6 +66,19 @@ class ManifestTest {
             assertThat(service.getAttributeNS(android, "name")).isEqualTo("nextglyph.ime.NextglyphInputMethodService")
             assertThat(service.getAttributeNS(android, "permission")).isEqualTo("android.permission.BIND_INPUT_METHOD")
             assertThat(service.getAttributeNS(android, "exported")).isEqualTo("true")
+        }
+
+        @Test
+        fun `le panel des champs de test est dans la variante debug`() {
+            assertThat(activitiesOf(mergedManifest("debug"))).contains(fieldTests, "nextglyph.ime.settings.SettingsActivity")
+        }
+
+        @Test
+        fun `le panel des champs de test n'est jamais dans la release`() {
+            val release = mergedManifest("release")
+
+            assertThat(activitiesOf(release)).containsExactly("nextglyph.ime.settings.SettingsActivity")
+            assertThat(activitiesOf(release)).noneMatch { it.contains(".debug.") }
         }
 
         @Test
@@ -94,6 +115,17 @@ class ManifestTest {
         }
 
         @Test
+        fun `le détecteur d'activités repère le panel dans un manifeste`() {
+            val document = parse(
+                """<manifest xmlns:android="$android"><application>
+                     <activity android:name="$fieldTests"/>
+                   </application></manifest>""",
+            )
+
+            assertThat(activitiesOf(document)).containsExactly(fieldTests)
+        }
+
+        @Test
         fun `un XML invalide est rejeté`() {
             assertThatThrownBy { parse("<manifest>") }.isInstanceOf(Exception::class.java)
         }
@@ -104,6 +136,11 @@ class ManifestTest {
         @Test
         fun `un manifeste sans permission donne une liste vide`() {
             assertThat(permissionsOf(parse("""<manifest xmlns:android="$android"/>"""))).isEmpty()
+        }
+
+        @Test
+        fun `un manifeste sans activité donne une liste vide`() {
+            assertThat(activitiesOf(parse("""<manifest xmlns:android="$android"><application/></manifest>"""))).isEmpty()
         }
 
         @Test

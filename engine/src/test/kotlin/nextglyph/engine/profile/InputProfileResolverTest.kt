@@ -108,6 +108,29 @@ class InputProfileResolverTest {
         }
 
         @Test
+        fun `la disposition classique d'un texte a la disposition et les règles du mot de passe`() {
+            val text = resolve(TEXT or C.TYPE_TEXT_FLAG_CAP_SENTENCES or C.TYPE_TEXT_FLAG_MULTI_LINE)
+            val password = resolve(TEXT or C.TYPE_TEXT_VARIATION_PASSWORD)
+
+            val classic = InputProfileResolver.classic(text)
+
+            assertThat(classic).isEqualTo(password.copy(type = ProfileType.TEXT, multiLine = true))
+        }
+
+        @Test
+        fun `la disposition classique garde le type et l'incognito du champ`() {
+            val email = resolve(TEXT or C.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, C.IME_FLAG_NO_PERSONALIZED_LEARNING)
+
+            val classic = InputProfileResolver.classic(email)
+
+            assertThat(classic.type).isEqualTo(ProfileType.EMAIL)
+            assertThat(classic.layout).isEqualTo(ProfileLayout.PASSWORD)
+            assertThat(classic.incognito).isTrue()
+            assertThat(classic.shortcutBar).isEqualTo(ShortcutBar.NONE)
+            assertThat(classic.multiLine).isFalse()
+        }
+
+        @Test
         fun `le code PIN a les règles du mot de passe`() {
             val pin = resolve(NUMBER or C.TYPE_NUMBER_VARIATION_PASSWORD)
             val password = resolve(TEXT or C.TYPE_TEXT_VARIATION_PASSWORD)
@@ -280,6 +303,19 @@ class InputProfileResolverTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `la disposition classique ne change ni un mot de passe ni un pavé`() {
+            val locked = listOf(
+                resolve(TEXT or C.TYPE_TEXT_VARIATION_PASSWORD),
+                resolve(NUMBER or C.TYPE_NUMBER_VARIATION_PASSWORD),
+                resolve(NUMBER or C.TYPE_NUMBER_FLAG_DECIMAL),
+                resolve(PHONE),
+                resolve(DATETIME),
+            )
+
+            for (profile in locked) assertThat(InputProfileResolver.classic(profile)).isSameAs(profile)
+        }
+
         @Test
         fun `la variation est lue sur 8 bits, pas plus`() {
             // Le bit 0x1000 appartient aux drapeaux, pas à la variation.

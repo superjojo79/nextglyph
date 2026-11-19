@@ -99,12 +99,13 @@ object SpecialLayouts {
     )
 
     /**
-     * Pavé numérique (§8.1). `−` seulement si [signed], séparateur ([decimalLabel], `,` en français)
-     * seulement si [decimal] ; sinon l'emplacement reste vide.
+     * Pavé numérique (§8.1). Signe moins seulement si [signed], séparateur ([decimalLabel], `,` en français)
+     * seulement si [decimal] ; sinon l'emplacement reste vide. Le signe moins est le trait d'union ASCII `-`
+     * (U+002D) : les champs numériques d'Android refusent le signe moins typographique `−` (U+2212).
      */
     fun number(signed: Boolean, decimal: Boolean, decimalLabel: Char = ','): KeyboardLayout =
         numberPad(
-            top = if (signed) Key.character('−', COLUMN_4) else Key.empty(COLUMN_4),
+            top = if (signed) Key.character('-', COLUMN_4) else Key.empty(COLUMN_4),
             second = if (decimal) Key(KeyKind.DECIMAL, decimalLabel.toString(), COLUMN_4) else Key.empty(COLUMN_4),
             role = LayoutRole.NUMBER,
         )

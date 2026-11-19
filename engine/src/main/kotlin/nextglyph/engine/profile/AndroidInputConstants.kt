@@ -125,6 +125,24 @@ object AndroidInputConstants {
     /** `EditorInfo.IME_MASK_ACTION`. */
     const val IME_MASK_ACTION: Int = 0x000000ff
 
+    /** `EditorInfo.IME_ACTION_GO`. */
+    const val IME_ACTION_GO: Int = 2
+
+    /** `EditorInfo.IME_ACTION_SEARCH`. */
+    const val IME_ACTION_SEARCH: Int = 3
+
+    /** `EditorInfo.IME_ACTION_SEND`. */
+    const val IME_ACTION_SEND: Int = 4
+
+    /** `EditorInfo.IME_ACTION_NEXT`. */
+    const val IME_ACTION_NEXT: Int = 5
+
+    /** `EditorInfo.IME_ACTION_DONE`. */
+    const val IME_ACTION_DONE: Int = 6
+
+    /** `EditorInfo.IME_ACTION_PREVIOUS`. */
+    const val IME_ACTION_PREVIOUS: Int = 7
+
     /** `EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING`. */
     const val IME_FLAG_NO_PERSONALIZED_LEARNING: Int = 0x01000000
 }

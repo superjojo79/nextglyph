@@ -24,23 +24,28 @@ import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyboardGeometry
 import nextglyph.engine.layout.KeyboardLayout
-import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.layout.KeyboardMetrics
 import nextglyph.engine.layout.LayoutKind
-import nextglyph.engine.layout.SpecialLayouts
 import nextglyph.engine.session.BarItem
 import nextglyph.engine.session.BarMode
+import nextglyph.engine.session.EnterKeyLabel
+import nextglyph.engine.session.FieldKeyboard
 import nextglyph.engine.session.KeyPopups
 import nextglyph.engine.session.KeyboardState
 import nextglyph.engine.session.PopupAction
 import nextglyph.engine.session.PopupItem
+import nextglyph.engine.session.SessionField
+import nextglyph.engine.session.SymbolsMenu
 import nextglyph.ime.R
 import java.util.Locale
 import kotlin.math.min
 
 /**
  * Clavier dessiné sur Canvas : barre (suggestions, ponctuation ou raccourcis, §5.4, §5.6, §9.1) puis
- * les rangées de la couche lettres (adaptée, §5.2) ou de la couche `?123` (au repos, §5.6).
+ * les rangées de la disposition du champ ([FieldKeyboard] : compacte adaptée §5.2, mot de passe §7.1,
+ * pavés §8) ou de sa couche `?123` (au repos). Les pavés n'ont ni barre ni couche ; le mot de passe n'a
+ * pas de barre. Une couche plus courte que la disposition principale est alignée en bas (`ABC` à la place
+ * de `?123`).
  *
  * - **Adaptation** : largeurs, opacités et échelles de libellé des lettres viennent d'[AdaptiveKeyboard],
  *   alimenté par la source de distributions bilingue de la session (§10.6). Gel tant qu'un doigt est posé.
@@ -66,18 +71,8 @@ class KeyboardView(context: Context) : View(context) {
 
     var listener: Listener? = null
 
-    var layoutKind: LayoutKind = LayoutKind.QWERTY
-        set(value) {
-            if (field == value) return
-            field = value
-            lettersLayout = KeyboardLayouts.of(value)
-            symbolsLayout = SpecialLayouts.textSymbols(value)
-            letters = createLetters()
-            symbols = createSymbols()
-            prepareLabels()
-            rebuildGeometry()
-            invalidate()
-        }
+    private var fieldKeyboard: FieldKeyboard = FieldKeyboard.of(SessionField.DEFAULT.profile, LayoutKind.QWERTY)
+    private var enterLabel: String = EnterKeyLabel.ENTER
 
     /** Adaptation permise par le champ de saisie (faux : disposition au repos). */
     var adaptationAllowed: Boolean = true
@@ -91,25 +86,28 @@ class KeyboardView(context: Context) : View(context) {
     /** Langues actives (menu de l'espace). */
     var languages: List<String> = emptyList()
 
-    private var lettersLayout: KeyboardLayout = KeyboardLayouts.of(layoutKind)
-    private var symbolsLayout: KeyboardLayout = SpecialLayouts.textSymbols(layoutKind)
+    private var lettersLayout: KeyboardLayout = fieldKeyboard.main
+    private var symbolsLayout: KeyboardLayout? = fieldKeyboard.symbols
     private var source: DistributionSource? = null
     private var prefix: String? = null
     private var touchExploration = false
     private var animatorScale = 1f
     private var letters: AdaptiveKeyboard = createLetters()
-    private var symbols: AdaptiveKeyboard = createSymbols()
+    private var symbols: AdaptiveKeyboard? = createSymbols()
     private var symbolsShown = false
 
-    private val keyboardLayout: KeyboardLayout get() = if (symbolsShown) symbolsLayout else lettersLayout
-    private val keyboard: AdaptiveKeyboard get() = if (symbolsShown) symbols else letters
+    private val keyboardLayout: KeyboardLayout get() = if (symbolsShown) symbolsLayout ?: lettersLayout else lettersLayout
+    private val keyboard: AdaptiveKeyboard get() = if (symbolsShown) symbols ?: letters else letters
 
     private var restGeometry: KeyboardGeometry? = null
     private var displayedGeometry: KeyboardGeometry? = null
 
     private val density = resources.displayMetrics.density
-    private val barPx = KeyboardMetrics.SUGGESTION_BAR_DP * density
-    private val rowHeightPx = KeyboardMetrics.DEFAULT_ROW_HEIGHT_DP * density
+    private var barPx = KeyboardMetrics.SUGGESTION_BAR_DP * density
+    private var rowHeightPx = fieldKeyboard.rowHeightDp * density
+
+    /** Haut de la première rangée de la couche affichée : sous la barre, couche courte alignée en bas. */
+    private var layerTopPx = barPx
     private val rowGapPx = KeyboardMetrics.ROW_GAP_DP * density
     private val keyInsetPx = KEY_INSET_DP * density
     private val cornerPx = KEY_CORNER_DP * density
@@ -189,7 +187,7 @@ class KeyboardView(context: Context) : View(context) {
         created.setRestOnly(restOnly(), now())
     }
 
-    private fun createSymbols() = AdaptiveKeyboard(symbolsLayout).also { it.setRestOnly(true, now()) }
+    private fun createSymbols() = symbolsLayout?.let { layout -> AdaptiveKeyboard(layout).also { it.setRestOnly(true, now()) } }
 
     private fun restOnly() = touchExploration || !adaptationAllowed
 
@@ -209,11 +207,51 @@ class KeyboardView(context: Context) : View(context) {
     private fun baselineOffset(paint: Paint): Float = -(paint.ascent() + paint.descent()) / 2f
 
     private fun prepareLabels() {
-        lowerLabels = lettersLayout.rows.map { row -> row.keys.map { it.label }.toTypedArray() }.toTypedArray()
-        upperLabels = lettersLayout.rows.map { row ->
-            row.keys.map { if (it.kind == KeyKind.LETTER) it.label.uppercase(Locale.ROOT) else it.label }.toTypedArray()
+        lowerLabels = labels(lettersLayout, upper = false)
+        upperLabels = labels(lettersLayout, upper = true)
+        symbolLabels = symbolsLayout?.let { labels(it, upper = false) } ?: emptyArray()
+    }
+
+    private fun labels(layout: KeyboardLayout, upper: Boolean): Array<Array<String>> = layout.rows.map { row ->
+        row.keys.map { key ->
+            when {
+                key.kind == KeyKind.ENTER -> enterLabel
+                upper && key.kind == KeyKind.LETTER -> key.label.uppercase(Locale.ROOT)
+                else -> key.label
+            }
         }.toTypedArray()
-        symbolLabels = symbolsLayout.rows.map { row -> row.keys.map { it.label }.toTypedArray() }.toTypedArray()
+    }.toTypedArray()
+
+    /**
+     * Clavier du champ (disposition, couche `?123`, hauteur des rangées, barre, menu de `?123`) et libellé de
+     * `↵` (§5.1). Les dispositions ne sont reconstruites que si elles changent ([FieldKeyboard.id]).
+     */
+    fun setKeyboard(keyboard: FieldKeyboard, enterLabel: String) {
+        val layoutsChanged = keyboard.id != fieldKeyboard.id
+        val labelChanged = enterLabel != this.enterLabel
+        fieldKeyboard = keyboard
+        this.enterLabel = enterLabel
+        if (layoutsChanged) {
+            closePopup()
+            cancelPendingPopup()
+            letters.cancelPointers(now())
+            symbols?.cancelPointers(now())
+            symbolsShown = false
+            lettersLayout = keyboard.main
+            symbolsLayout = keyboard.symbols
+            letters = createLetters()
+            symbols = createSymbols()
+        }
+        if (layoutsChanged || labelChanged) prepareLabels()
+        val newBar = if (keyboard.showsBar) KeyboardMetrics.SUGGESTION_BAR_DP * density else 0f
+        val newRow = keyboard.rowHeightDp * density
+        if (newBar != barPx || newRow != rowHeightPx || layoutsChanged) {
+            barPx = newBar
+            rowHeightPx = newRow
+            rebuildGeometry()
+            requestLayout()
+        }
+        invalidate()
     }
 
     /** Installe (ou retire) la source des distributions de l'adaptation (§5.2, §10.6). */
@@ -258,7 +296,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun showSymbols(shown: Boolean) {
-        if (symbolsShown == shown) return
+        if (symbolsShown == shown || (shown && symbolsLayout == null)) return
         keyboard.cancelPointers(now())
         symbolsShown = shown
         rebuildGeometry()
@@ -292,7 +330,7 @@ class KeyboardView(context: Context) : View(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         // Le padding bas réserve la place de la barre de navigation (fenêtre bord à bord).
-        val height = (KeyboardMetrics.totalHeightDp(lettersLayout.rows.size) * density).toInt() + paddingBottom
+        val height = (barPx + keysHeightPx(lettersLayout.rows.size)).toInt() + paddingBottom
         setMeasuredDimension(getDefaultSize(suggestedMinimumWidth, widthMeasureSpec), height)
     }
 
@@ -315,12 +353,15 @@ class KeyboardView(context: Context) : View(context) {
         measureBar()
     }
 
+    private fun keysHeightPx(rows: Int): Float = rows * rowHeightPx + (rows - 1) * rowGapPx
+
     private fun rebuildGeometry() {
         pressedRow.fill(NONE)
         pressedKey.fill(NONE)
         displayedGeometry = null
         keyboard.cancelPointers(now())
         letters.keyboardWidthDp = if (width > 0) width / density else 0f
+        layerTopPx = barPx + keysHeightPx(lettersLayout.rows.size) - keysHeightPx(keyboardLayout.rows.size)
         restGeometry = if (width > 0) KeyboardGeometry.compute(keyboardLayout, width.toFloat(), rowHeightPx, rowGapPx) else null
     }
 
@@ -337,7 +378,7 @@ class KeyboardView(context: Context) : View(context) {
         for (r in 0 until rows.size) {
             val row = rows[r]
             val keys = row.keys
-            val top = barPx + r * (rowHeightPx + rowGapPx)
+            val top = layerTopPx + r * (rowHeightPx + rowGapPx)
             var edge = row.leadingInset
             for (k in 0 until keys.size) {
                 val left = edge * unit
@@ -389,10 +430,15 @@ class KeyboardView(context: Context) : View(context) {
         opacity: Float,
         labelScale: Float,
     ) {
+        // Emplacement vide d'un pavé : rien n'est dessiné (§8.1).
+        if (key.kind == KeyKind.EMPTY) return
         keyRect.set(left + keyInsetPx, top, right - keyInsetPx, top + rowHeightPx)
-        val isLetterLike = key.kind == KeyKind.LETTER || key.kind == KeyKind.SPACE || key.kind == KeyKind.CHARACTER
+        val isLetterLike = key.kind == KeyKind.LETTER || key.kind == KeyKind.SPACE || key.kind == KeyKind.CHARACTER ||
+            key.kind == KeyKind.DECIMAL
         val color = when {
             isHeld(row, index) -> pressedColor
+            // Majuscule active ou verrouillée : `⇧` toujours visible (§7.1).
+            key.kind == KeyKind.SHIFT && shift != ShiftState.OFF -> pressedColor
             isLetterLike -> keyColor
             else -> functionKeyColor
         }
@@ -405,13 +451,17 @@ class KeyboardView(context: Context) : View(context) {
             return
         }
         val label = when {
+            key.kind == KeyKind.SHIFT && shift == ShiftState.LOCKED -> CAPS_LOCK
             symbolsShown -> symbolLabels[row][index]
             shift != ShiftState.OFF -> upperLabels[row][index]
             else -> lowerLabels[row][index]
         }
         if (label.isEmpty()) return
         val letter = key.kind == KeyKind.LETTER
-        val paint = if (letter || key.kind == KeyKind.CHARACTER) letterPaint else functionPaint
+        // `⇧` et les libellés d'action de `↵` (flèches) restent lisibles à la taille des lettres.
+        val large = letter || key.kind == KeyKind.CHARACTER || key.kind == KeyKind.DECIMAL || key.kind == KeyKind.SHIFT ||
+            key.kind == KeyKind.ENTER
+        val paint = if (large) letterPaint else functionPaint
         // Seul le libellé des lettres change d'échelle ; la ligne de base suit la taille du texte.
         val scale = if (letter) labelScale else 1f
         val baseline = (if (paint === letterPaint) letterBaseline else functionBaseline) * scale
@@ -455,8 +505,12 @@ class KeyboardView(context: Context) : View(context) {
             val label = popupItems[i].label
             val paint = if (label.length <= 2) letterPaint else functionPaint
             paint.textSize = if (paint === letterPaint) letterTextPx else functionTextPx
+            // Libellé long (« Classique ») : réduit pour tenir dans la case.
+            val available = keyRect.width() - 2 * SMALL_MARGIN_DP * density
+            val measured = paint.measureText(label)
+            if (measured > available) paint.textSize *= maxOf(MIN_BAR_SCALE, available / measured)
             paint.alpha = Color.alpha(labelColor)
-            canvas.drawText(label, keyRect.centerX(), keyRect.centerY() + (if (paint === letterPaint) letterBaseline else functionBaseline), paint)
+            canvas.drawText(label, keyRect.centerX(), keyRect.centerY() + baselineOffset(paint), paint)
         }
     }
 
@@ -476,7 +530,7 @@ class KeyboardView(context: Context) : View(context) {
                 val id = event.getPointerId(index)
                 val x = event.getX(index)
                 val y = event.getY(index)
-                if (y < barPx && popupItems.isEmpty()) {
+                if (y < barPx && popupItems.isEmpty() && fieldKeyboard.showsBar) {
                     if (id < MAX_POINTERS && barTexts.isNotEmpty()) {
                         barPointer = id
                         barPressed = (x / (width.toFloat() / barTexts.size)).toInt().coerceIn(0, barTexts.size - 1)
@@ -586,7 +640,12 @@ class KeyboardView(context: Context) : View(context) {
     private fun movedTooFar(x: Float, y: Float): Boolean =
         kotlin.math.abs(x - longPressX) > touchSlop * 2 || kotlin.math.abs(y - longPressY) > touchSlop * 2
 
-    private fun popupFor(key: Key): List<PopupItem> = KeyPopups.forKey(key, shift != ShiftState.OFF, languages)
+    private fun popupFor(key: Key): List<PopupItem> {
+        // Pas de menu d'appui long sur les pavés (aucune couche) ; menu des langues seulement avec la barre.
+        if (fieldKeyboard.symbols == null) return emptyList()
+        val menu = if (symbolsShown) SymbolsMenu.NONE else fieldKeyboard.symbolsMenu
+        return KeyPopups.forKey(key, shift != ShiftState.OFF, if (fieldKeyboard.showsBar) languages else emptyList(), menu)
+    }
 
     private fun openPopup() {
         val key = longPressKey ?: return
@@ -599,7 +658,7 @@ class KeyboardView(context: Context) : View(context) {
         // La première case sous le doigt : un appui long relâché sans glisser choisit la variante la plus courante.
         popupLeft = KeyPopups.popupLeft(longPressX + (items.size - 1) * popupItemWidth / 2f, popupItemWidth, items.size, width.toFloat())
         val row = rowOf(longPressY)
-        popupTop = maxOf(0f, barPx + row * (rowHeightPx + rowGapPx) - rowHeightPx - rowGapPx)
+        popupTop = maxOf(0f, layerTopPx + row * (rowHeightPx + rowGapPx) - rowHeightPx - rowGapPx)
         popupSelected = KeyPopups.indexAt(longPressX, popupLeft, popupItemWidth, items.size)
         longPressPointer = NONE
         longPressKey = null
@@ -608,7 +667,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun rowOf(y: Float): Int =
-        ((y - barPx) / (rowHeightPx + rowGapPx)).toInt().coerceIn(0, keyboardLayout.rows.size - 1)
+        ((y - layerTopPx) / (rowHeightPx + rowGapPx)).toInt().coerceIn(0, keyboardLayout.rows.size - 1)
 
     private fun commitPopup() {
         val selected = popupItems.getOrNull(popupSelected)
@@ -630,7 +689,7 @@ class KeyboardView(context: Context) : View(context) {
     /** Résultat du décodage au point `(x, y)` de la vue (tampon réutilisé), ou `null` hors du clavier. */
     private fun decode(x: Float, y: Float, rest: KeyboardGeometry): TapDecoding? {
         val displayed = displayedGeometry ?: return null
-        return keyboard.decode(x, y - barPx, displayed, rest)
+        return keyboard.decode(x, y - layerTopPx, displayed, rest)
     }
 
     /** Touche décodée au relèvement, ou à défaut la dernière touche enfoncée par ce pointeur. */
