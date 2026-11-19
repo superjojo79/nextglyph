@@ -33,14 +33,16 @@ class KeyDispatcher(private val editor: EditorGateway) {
     /** Appui validé sur [key]. La touche `?123` n'a pas encore d'effet (couche symboles à venir). */
     fun onKey(key: Key, enter: EnterBehavior) {
         when (key.kind) {
-            KeyKind.LETTER, KeyKind.SPACE -> editor.commitText(checkNotNull(key.text))
+            KeyKind.LETTER, KeyKind.SPACE, KeyKind.CHARACTER -> editor.commitText(checkNotNull(key.text))
             KeyKind.BACKSPACE -> editor.deleteBackward()
             KeyKind.ENTER -> when (enter) {
                 EnterBehavior.NewLine -> editor.commitText("\n")
                 is EnterBehavior.EditorAction -> editor.performEditorAction(enter.actionId)
                 EnterBehavior.EnterKey -> editor.sendEnterKey()
             }
-            KeyKind.SYMBOLS -> Unit
+            // Bascules de couche, majuscule, séparateur décimal (décidé par DecimalSeparatorPolicy) et
+            // emplacements vides : gérés par l'appelant, sans effet direct sur l'éditeur.
+            KeyKind.SYMBOLS, KeyKind.SHIFT, KeyKind.LETTERS, KeyKind.DECIMAL, KeyKind.EMPTY -> Unit
         }
     }
 }

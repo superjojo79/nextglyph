@@ -34,6 +34,24 @@ class KeyTest {
         }
 
         @Test
+        fun `une touche de caractère insère son libellé`() {
+            val key = Key.character('€', 0.9f)
+
+            assertThat(key.kind).isEqualTo(KeyKind.CHARACTER)
+            assertThat(key.text).isEqualTo("€")
+            assertThat(key.restWidth).isEqualTo(0.9f)
+        }
+
+        @Test
+        fun `majuscule, retour aux lettres, séparateur décimal et emplacement vide n'insèrent pas de texte littéral`() {
+            assertThat(Key(KeyKind.SHIFT, "⇧", 1f).text).isNull()
+            assertThat(Key(KeyKind.LETTERS, "ABC", 1f).text).isNull()
+            assertThat(Key(KeyKind.DECIMAL, ",", 1f).text).isNull()
+            assertThat(Key.empty(2.5f).kind).isEqualTo(KeyKind.EMPTY)
+            assertThat(Key.empty(2.5f).text).isNull()
+        }
+
+        @Test
         fun `la largeur d'une lettre peut être précisée`() {
             assertThat(Key.letter('w', 0.85f).restWidth).isEqualTo(0.85f)
         }
@@ -47,6 +65,13 @@ class KeyTest {
             assertThatThrownBy { Key(KeyKind.SPACE, "", width) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("largeur")
+        }
+
+        @Test
+        fun `rejette une touche de caractère sans libellé`() {
+            assertThatThrownBy { Key(KeyKind.CHARACTER, "", 1f) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("caractère")
         }
 
         @ParameterizedTest

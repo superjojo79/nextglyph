@@ -301,3 +301,25 @@ Détail dans `docs/analysis/M2-engine.md` (`./gradlew :tools:analyzeEngine`, éc
 - **Élision complétée même quand le mot élidé est complet** (`dautre` → `d'autres`) : même travers que la complétion d'un mot tapé en entier, écarté par le cas 1.
 - **Distance 2 sur le mot complet** (§10.4) : non nécessaire pour l'objectif de 3 %, coûteuse ; reportée.
 - **Annulation après ponctuation** : l'annulation reste réservée au ⌫ immédiatement après l'espace ; après un signe, le ⌫ efface le signe.
+
+---
+
+## 2026-11-19 — M3 (moteur) : profils de saisie, dispositions spécialisées, séparateur décimal
+
+**Contexte.** Le §4 ordonne les profils, le §7.1 et le §8 décrivent les dispositions, sans fixer tous les détails de géométrie ni de résolution.
+
+**Décision.**
+
+- **Résolution** (`nextglyph.engine.profile.InputProfileResolver`, pure et totale). Les constantes Android sont recopiées dans `AndroidInputConstants` (valeurs vérifiées une à une, exhaustivité vérifiée par réflexion). Seule `TYPE_CLASS_TEXT` lit variations et drapeaux de texte ; `TYPE_NULL` et les classes inconnues donnent le texte ordinaire ; les drapeaux d'une classe n'ont aucun effet dans les autres (combinaisons contradictoires couvertes par un balayage de 16 classes × 256 variations × 5 jeux de drapeaux × incognito). `privateImeOptions` est accepté et ignoré (aucune option privée en V1).
+- **`InputProfile`** encode les tableaux du §7.2, §8, §9 : pavés et mot de passe = pas d'adaptation, de suggestions, de lecture du texte, d'apprentissage, de majuscules ni de typographie, `λ = 0`, pas d'aperçu ; e-mail et URL = adaptation et lecture actives (§9.1), mais ni suggestions de mots (barre de raccourcis à la place), ni majuscules, ni typographie ; texte et nom de personne = tout actif (suggestions coupées par `NO_SUGGESTIONS`, majuscules selon `CAP_*`). L'incognito se lit partout et force `learning = false`. Précédence des `CAP_*` : caractères, mots, phrases. L'apprentissage reste actif pour e-mail et URL hors incognito (modificateur « tous profils texte »). L'IME actuel ne lit pas le texte ni n'adapte en e-mail/URL (`AdaptationPolicy`) : choix provisoire de l'IME ; le profil suit le §9.1 (lexique des domaines à venir).
+- **Dispositions** (`SpecialLayouts`, `ProfileLayouts`). `KeyKind` gagne `CHARACTER` (chiffre, symbole), `SHIFT`, `LETTERS` (`ABC`), `DECIMAL` (texte décidé par la politique) et `EMPTY` (emplacement vide, position fixe) ; `KeyboardLayout` gagne un `role` (`LayoutRole`, `TEXT` par défaut) pour distinguer lettres, symboles, mot de passe et pavés, sans toucher à `LayoutKind` (choix AZERTY/QWERTY de l'utilisateur, sans objet pour les pavés). Les chiffres et symboles ne sont pas des `LETTER`, pour rester hors du poids des lettres, du solveur et du décodeur. Géométrie : mot de passe en 10 u par rangée (rangée 4 QWERTY : retrait 0,5 u et lettres de 19/18 u) ; pavés numérique, PIN et date/heure en 4 colonnes de 2,5 u ; téléphone en 5 colonnes de 2 u (le §8.2 énumère cinq touches de plus que ne porte une colonne de 4 rangées, d'où deux colonnes) ; touches de pavé de 44 dp (`KeyboardMetrics.PAD_ROW_HEIGHT_DP`). Aucune touche réelle sous 32 dp à 360 dp (la plus étroite : 0,9 u = 32,4 dp, rangée 3 de la couche `?123`).
+- **Couche `?123` du texte** : elle n'existait sur aucune branche (`origin/main`, `origin/engine/predict`, `origin/engine/edit`). Ajoutée en 3 rangées de 10 u (§5.1) ; `*`, `"`, `;`, `=`, `[` `]` n'y figurent pas en V1 (disponibles dans la disposition classique). Couche `?123` du mot de passe ajoutée aussi (§7.1).
+- **Séparateur décimal** (`DecimalSeparatorPolicy`, §8.1) : essai de `,` puis repli sur `.`, mémoire volatile bornée (256 champs, LRU) par (paquet, id). Le refus se lit à `getTextBeforeCursor` avant/après ; on n'apprend pas quand le nombre en cours a déjà un séparateur (le refus peut venir du second séparateur), ni sans accès au texte.
+- **`KeyDispatcher`** : `CHARACTER` insère son libellé ; `SHIFT`, `LETTERS`, `DECIMAL`, `EMPTY` n'ont pas d'effet direct (gérés par l'appelant). L'IME n'est pas modifié dans cette tâche.
+
+### Alternatives écartées
+
+- **Chiffres et symboles en `KeyKind.LETTER`** : les poids, le solveur et le décodeur les traiteraient comme des lettres du lexique.
+- **Valeurs `LayoutKind` supplémentaires pour chaque pavé** : mélange le choix de l'utilisateur et le rôle de la disposition.
+- **Pavé téléphone à 4 colonnes** : ne porte pas `+ , ;`, `⌫` et `↵` sans perdre la position fixe des chiffres.
+- **Conclure au refus du séparateur sans regarder le nombre en cours** : mémoriserait `.` à tort dès qu'un second séparateur est refusé.

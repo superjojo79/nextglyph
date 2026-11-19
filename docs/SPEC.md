@@ -91,6 +91,8 @@ Modificateurs applicables à tous les profils texte :
 | `TYPE_TEXT_FLAG_CAP_*` | Règles de majuscules automatiques (§5.7). |
 | `TYPE_TEXT_FLAG_MULTI_LINE` | La touche ↵ insère un saut de ligne. |
 
+**Précisions de résolution.** Seule la classe `TYPE_CLASS_TEXT` lit les variations et drapeaux de texte ; `TYPE_NULL` et toute classe inconnue donnent le profil Texte ordinaire (variation et drapeaux ignorés). À l'inverse, les drapeaux d'une classe sont ignorés dans les autres (`NO_SUGGESTIONS`, `CAP_*`, `MULTI_LINE` n'ont aucun effet sur un nombre ; `SIGNED` et `DECIMAL` n'en ont aucun sur un texte). `TYPE_NUMBER_VARIATION_PASSWORD` est testé avant les drapeaux : un code PIN n'a jamais ni `−` ni séparateur. Plusieurs drapeaux `CAP_*` : caractères, puis mots, puis phrases (ordre de `TextUtils.getCapsMode`). Les majuscules automatiques ne s'appliquent qu'aux profils Texte et Nom de personne (§9.1). `privateImeOptions` est réservé et ignoré en V1. L'incognito se lit sur tous les profils.
+
 **Échappatoire manuelle.** Dans tout profil texte, un appui long sur `?123` propose « Disposition classique », pour basculer vers la disposition du profil mot de passe sans adaptation (champs web mal typés, saisie de code, etc.).
 
 ---
@@ -126,6 +128,16 @@ Rangée 3 : ?123 | z x c v b n m | espace | ⌫                           1 + 7 
 | Rangée de touches | 38 dp (réglable 34–46 dp) |
 | Espacement vertical | 4 dp |
 | **Total** | **~ 160 dp** maximum à la hauteur par défaut |
+
+**Couche `?123` (symboles).** Trois rangées de 10 u, même répartition de la rangée 3 que les lettres AZERTY :
+
+```
+Rangée 1 : 1 2 3 4 5 6 7 8 9 0                                         10 u
+Rangée 2 : @ # € % & - + ( ) /                                         10 u
+Rangée 3 : ABC | , . ! ? ' : | espace | ↵ | ⌫                          1 + 6 × 0,9 + 1,6 + 1 + 1 = 10 u
+```
+
+`ABC` ramène aux lettres. Les caractères moins courants (`* " ; = [ ]`, etc.) ne sont pas sur cette couche en V1 : ils sont sur la disposition classique (§7.1), accessible par l'échappatoire du §4.
 
 La touche `↵` est contextuelle d'après `imeOptions` : envoyer, rechercher, aller, suivant, terminé, ou saut de ligne si le champ est multiligne et n'a pas d'action.
 
@@ -315,6 +327,9 @@ Rangée 5 : ⇧ w x c v b n ⌫
 Rangée 6 : ?123 , espace . ↵
 ```
 
+- QWERTY : mêmes rangées 1 et 2 ; rangée 3 `q w e r t y u i o p`, rangée 4 `a s d f g h j k l` (retrait de 0,5 u, lettres de 19/18 u pour tenir 10 u), rangée 5 `⇧ z x c v b n m ⌫` (`⇧` et `⌫` à 1,5 u).
+- AZERTY, rangée 5 : `⇧` 2 u, 6 lettres de 1 u, `⌫` 2 u. Rangée 6 : `?123` 1,5 u, `,` 1 u, espace 4,5 u, `.` 1 u, `↵` 2 u. Toutes les touches font au moins 1 u (36 dp à 360 dp, §13).
+- Couche `?123` du mot de passe, 3 rangées : `[ ] { } < > ^ ~ | \`, `/ + = ' " ; : € £` suivi d'un accent grave, puis `ABC` (1,5 u), `( ) § ° ¥ ¢`, `⌫` (2,5 u).
 - Hauteur indicative : ~ 230 dp. La compacité passe ici après la fiabilité.
 - `⇧` explicite : un appui = une majuscule, double appui = verrouillage. État toujours visible.
 - `?123` donne accès aux symboles restants (`[ ] { } < > ^ ~ | \ / + = ' " ; : €  £`, etc.).
@@ -352,18 +367,20 @@ Règle commune : **seuls les caractères acceptés par le champ sont proposés.*
 - `−` n'apparaît qu'avec `TYPE_NUMBER_FLAG_SIGNED`.
 - Le séparateur décimal n'apparaît qu'avec `TYPE_NUMBER_FLAG_DECIMAL`. Il affiche le séparateur de la locale (`,` en français). **Stratégie d'insertion :** on insère `,` ; si `getTextBeforeCursor` montre que le champ l'a rejeté, on insère `.` et on mémorise ce choix pour ce champ (paquet + id du champ). À valider sur un panel d'applications.
 - Les emplacements des touches absentes restent vides : la position des chiffres ne change jamais.
+- Géométrie : 4 colonnes de 2,5 u, 4 rangées de 44 dp. Rangée 4 : emplacement vide, `0`, emplacement vide, `↵`. `−` est en colonne 4 rangée 1, le séparateur en colonne 4 rangée 2, `⌫` en colonne 4 rangée 3.
+- **Insertion du séparateur** (`DecimalSeparatorPolicy`) : on tente `,` ; le refus se lit au texte avant le curseur (inchangé, ou ne finissant pas par le caractère). On ne conclut au refus que si le nombre en cours n'a pas déjà de séparateur (sinon c'est peut-être le second séparateur qui est refusé) ; sans accès au texte, l'insertion est supposée réussie. Si les deux sont refusés, rien n'est inséré. La mémoire (paquet + id du champ) est volatile et bornée à 256 champs ; un champ mémorisé sur `.` qui accepte de nouveau `,` est oublié.
 
 ### 8.2 Téléphone (`TYPE_CLASS_PHONE`)
 
-Pavé 3 × 4 standard (`1`–`9`, `*`, `0`, `#`), plus une colonne `+` (aussi via appui long sur `0`), `,` (pause), `;` (attente), `⌫`, `↵`.
+Pavé 3 × 4 standard (`1`–`9`, `*`, `0`, `#`), plus deux colonnes (5 colonnes de 2 u au total) : `+` (aussi via appui long sur `0`), `,` (pause), `;` (attente) en colonne 4, rangées 1 à 3 ; `⌫` en colonne 5 rangée 1 ; `↵` en colonne 5 rangée 4 ; emplacements vides ailleurs.
 
 ### 8.3 Date / heure (`TYPE_CLASS_DATETIME`)
 
-Pavé 3 × 4 avec, selon la variation : `/` et `-` (date), `:` (heure), ou les trois (date et heure).
+Pavé 3 × 4 (mêmes positions que le §8.1) avec, selon la variation : `/` (colonne 4 rangée 1) et `-` (colonne 4 rangée 2) pour la date, `:` (colonne 3 rangée 4) pour l'heure, ou les trois (date et heure, variation normale) ; `⌫` colonne 4 rangée 3, `↵` colonne 4 rangée 4. Les séparateurs hors variation laissent un emplacement vide.
 
 ### 8.4 Code PIN (`TYPE_NUMBER_VARIATION_PASSWORD`)
 
-Pavé du §8.1 sans `−` ni séparateur, avec toutes les règles du profil mot de passe (§7.2).
+Pavé du §8.1 sans `−` ni séparateur, avec toutes les règles du profil mot de passe (§7.2). Aperçu de touche désactivé sur tous les pavés (les touches font 90 dp de large).
 
 ---
 

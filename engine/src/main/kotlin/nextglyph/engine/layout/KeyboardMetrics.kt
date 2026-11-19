@@ -9,6 +9,9 @@ object KeyboardMetrics {
     /** Hauteur par défaut d'une rangée de touches (réglable de 34 à 46 dp, §13). */
     const val DEFAULT_ROW_HEIGHT_DP: Float = 38f
 
+    /** Hauteur d'une touche des pavés numériques, téléphone, date/heure et PIN (§8). */
+    const val PAD_ROW_HEIGHT_DP: Float = 44f
+
     /** Espacement vertical entre deux rangées. */
     const val ROW_GAP_DP: Float = 4f
 

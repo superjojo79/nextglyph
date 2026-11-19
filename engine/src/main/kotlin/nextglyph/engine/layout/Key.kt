@@ -16,6 +16,21 @@ enum class KeyKind {
 
     /** Effacement arrière (`⌫`). */
     BACKSPACE,
+
+    /** Touche à texte littéral qui n'est pas une lettre du lexique : chiffre, symbole, ponctuation (§7.1, §8). */
+    CHARACTER,
+
+    /** Majuscule explicite `⇧` du profil mot de passe (§7.1). */
+    SHIFT,
+
+    /** Retour aux lettres (`ABC`) depuis une couche de symboles. */
+    LETTERS,
+
+    /** Séparateur décimal du pavé numérique (§8.1) : le caractère inséré est décidé par `DecimalSeparatorPolicy`. */
+    DECIMAL,
+
+    /** Emplacement vide d'un pavé : réserve la position, ne réagit pas (§8.1). */
+    EMPTY,
 }
 
 /**
@@ -32,6 +47,7 @@ data class Key(val kind: KeyKind, val label: String, val restWidth: Float) {
         require(kind != KeyKind.LETTER || label.length == 1) {
             "Une touche lettre porte exactement un caractère : \"$label\"."
         }
+        require(kind != KeyKind.CHARACTER || label.isNotEmpty()) { "Une touche de caractère porte un libellé non vide." }
     }
 
     /** Texte littéral inséré par la touche, ou `null` si elle ne fait pas qu'insérer du texte. */
@@ -39,7 +55,8 @@ data class Key(val kind: KeyKind, val label: String, val restWidth: Float) {
         get() = when (kind) {
             KeyKind.LETTER -> label
             KeyKind.SPACE -> " "
-            KeyKind.SYMBOLS, KeyKind.ENTER, KeyKind.BACKSPACE -> null
+            KeyKind.CHARACTER -> label
+            KeyKind.SYMBOLS, KeyKind.ENTER, KeyKind.BACKSPACE, KeyKind.SHIFT, KeyKind.LETTERS, KeyKind.DECIMAL, KeyKind.EMPTY -> null
         }
 
     companion object {
@@ -47,5 +64,11 @@ data class Key(val kind: KeyKind, val label: String, val restWidth: Float) {
         const val LETTER_WIDTH: Float = 1f
 
         fun letter(letter: Char, restWidth: Float = LETTER_WIDTH): Key = Key(KeyKind.LETTER, letter.toString(), restWidth)
+
+        /** Touche de caractère littéral (chiffre, symbole). */
+        fun character(character: Char, restWidth: Float = LETTER_WIDTH): Key = Key(KeyKind.CHARACTER, character.toString(), restWidth)
+
+        /** Emplacement vide de largeur [restWidth]. */
+        fun empty(restWidth: Float): Key = Key(KeyKind.EMPTY, "", restWidth)
     }
 }
