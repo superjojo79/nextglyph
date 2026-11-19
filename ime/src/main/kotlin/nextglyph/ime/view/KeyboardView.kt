@@ -6,11 +6,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowInsets
 import android.view.accessibility.AccessibilityManager
 import nextglyph.engine.adapt.AdaptiveKeyboard
 import nextglyph.engine.adapt.TapDecoding
@@ -178,8 +180,24 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val height = (KeyboardMetrics.totalHeightDp(keyboardLayout.rows.size) * density).toInt()
+        // Le padding bas réserve la place de la barre de navigation (fenêtre bord à bord) :
+        // les touches sont dessinées depuis le haut et ne passent jamais dessous.
+        val height = (KeyboardMetrics.totalHeightDp(keyboardLayout.rows.size) * density).toInt() + paddingBottom
         setMeasuredDimension(getDefaultSize(suggestedMinimumWidth, widthMeasureSpec), height)
+    }
+
+    override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+        val bottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            insets.getInsets(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout()).bottom
+        } else {
+            @Suppress("DEPRECATION")
+            insets.systemWindowInsetBottom
+        }
+        if (bottom != paddingBottom) {
+            setPadding(paddingLeft, paddingTop, paddingRight, bottom)
+            requestLayout()
+        }
+        return insets
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
