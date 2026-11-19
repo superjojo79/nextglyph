@@ -2,7 +2,8 @@
 <!-- Variante debug uniquement : panel « Champs de test » (spec §15.3). ManifestTest vérifie son absence en release. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <application>
+    <!-- Répète allowBackup=false du manifeste principal (alerte CodeQL backup-enabled sur ce fichier). -->
+    <application android:allowBackup="false">
         <activity
             android:name=".debug.FieldTestsActivity"
             android:exported="true"
