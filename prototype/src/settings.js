@@ -15,7 +15,7 @@ export const SCHEMA = [
   { key: 'decode.lambda', group: 'Décodage', type: 'number', min: 0, max: 2, step: 0.05, def: 0.6, label: 'λ (poids du modèle de langue)' },
   { key: 'decode.sigma', group: 'Décodage', type: 'number', min: 0.15, max: 1.2, step: 0.05, def: 0.3, label: 'σ (u)' },
   { key: 'autocommit.enabled', group: 'Validation', type: 'boolean', def: true, label: 'Validation par espace' },
-  { key: 'autocommit.minProb', group: 'Validation', type: 'number', min: 0, max: 1, step: 0.05, def: 0.6, label: 'Probabilité minimale' },
+  { key: 'autocommit.minProb', group: 'Validation', type: 'number', min: 0, max: 1, step: 0.05, def: 0.7, label: 'Probabilité minimale' },
   { key: 'autocommit.minRatio', group: 'Validation', type: 'number', min: 1, max: 10, step: 0.1, def: 2, label: 'Ratio minimal 1er / 2e' },
   { key: 'autocommit.rejectLimit', group: 'Validation', type: 'number', min: 1, max: 5, step: 1, def: 2, label: 'Annulations avant abandon' },
   { key: 'typo.french', group: 'Texte', type: 'boolean', def: true, label: 'Typographie française' },
@@ -24,7 +24,7 @@ export const SCHEMA = [
   { key: 'lang.active', group: 'Langues', type: 'enum', options: ['both', 'fr', 'en'], def: 'both', label: 'Langues actives' },
   { key: 'lang.preferred', group: 'Langues', type: 'enum', options: ['fr', 'en'], def: 'fr', label: 'Langue préférée de départ' },
   { key: 'lang.lock', group: 'Langues', type: 'enum', options: ['auto', 'fr', 'en'], def: 'auto', label: 'Verrouillage de la langue' },
-  { key: 'lang.window', group: 'Langues', type: 'number', min: 1, max: 20, step: 1, def: 8, label: 'Fenêtre du score (mots)' },
+  { key: 'lang.window', group: 'Langues', type: 'number', min: 1, max: 20, step: 1, def: 4, label: 'Fenêtre du score (mots)' },
   { key: 'ui.debug', group: 'Débogage', type: 'boolean', def: false, label: 'Afficher r(c), P(fin), langue' },
 ];
 

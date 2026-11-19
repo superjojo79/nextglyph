@@ -12,10 +12,10 @@ describe('HappyPath', () => {
     assert.equal(d['adapt.fastTypingMs'], 120);
     assert.equal(d['decode.alpha'], 0.5);
     assert.equal(d['decode.lambda'], 0.6);
-    assert.equal(d['autocommit.minProb'], 0.6);
+    assert.equal(d['autocommit.minProb'], 0.7);
     assert.equal(d['autocommit.minRatio'], 2);
     assert.equal(d['autocommit.rejectLimit'], 2);
-    assert.equal(d['lang.window'], 8);
+    assert.equal(d['lang.window'], 4);
   });
 
   it('chaque réglage du schéma a un défaut valide', () => {
