@@ -49,6 +49,17 @@ object InputProfileResolver {
         }
     }
 
+    /**
+     * Échappatoire « Disposition classique » (§4) : le profil texte [profile] passe sur la disposition du
+     * mot de passe, avec ses règles (§7.2) : ni adaptation, ni suggestions, ni lecture du texte, ni
+     * apprentissage, ni majuscules automatiques. Le type, l'incognito et le multiligne du champ sont conservés.
+     * Un profil qui n'utilise pas la disposition compacte (mot de passe, pavés) est rendu tel quel.
+     */
+    fun classic(profile: InputProfile): InputProfile {
+        if (profile.layout != ProfileLayout.COMPACT) return profile
+        return locked(profile.type, ProfileLayout.PASSWORD, profile.incognito).copy(multiLine = profile.multiLine)
+    }
+
     /** Profils sans texte libre : pavés et mot de passe (§7.2, §8). Aucune lecture, aucun apprentissage. */
     private fun locked(
         type: ProfileType,

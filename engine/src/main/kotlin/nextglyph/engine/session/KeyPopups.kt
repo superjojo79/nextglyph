@@ -14,6 +14,24 @@ sealed interface PopupAction {
 
     /** Verrouille ou déverrouille la majuscule (`⇪`, §5.7). */
     data object CapsLock : PopupAction
+
+    /** Échappatoire du §4 : passe sur la disposition classique si [enabled], revient à la disposition du champ sinon. */
+    data class ClassicLayout(val enabled: Boolean) : PopupAction
+}
+
+/** Menu de l'appui long sur `?123`, selon la disposition affichée (§4, §5.6, §7.1). */
+enum class SymbolsMenu {
+    /** Ponctuation rapide seule. */
+    QUICK_PUNCTUATION,
+
+    /** Profil texte : ponctuation rapide, puis « Classique » (échappatoire du §4). */
+    QUICK_PUNCTUATION_AND_CLASSIC,
+
+    /** Disposition classique choisie par l'échappatoire : retour à la disposition du champ. */
+    BACK_FROM_CLASSIC,
+
+    /** Pas de menu (profil mot de passe : tous les symboles sont sur la disposition). */
+    NONE,
 }
 
 /** Une case de menu : libellé affiché et effet. */
@@ -23,7 +41,7 @@ data class PopupItem(val label: String, val action: PopupAction)
  * Menus d'appui long (spec §5.6, §5.8, §5.9, §10.6) et leur géométrie, sans Android :
  *
  * - voyelle ou `c` : variantes accentuées (`é è ê ë`, `ç`...), en majuscules si la majuscule est active ;
- * - `?123` : ponctuation rapide `- ( ) " ; @ #` ;
+ * - `?123` : ponctuation rapide `- ( ) " ; @ #`, et l'échappatoire « Classique » du §4 selon [SymbolsMenu] ;
  * - espace : verrouiller une langue ou revenir au mode automatique ;
  * - certains symboles de la couche `?123` : symboles voisins (`-` → `_ – —`...), pour compléter
  *   les trois rangées ;
@@ -66,6 +84,12 @@ object KeyPopups {
     /** Libellé de la majuscule verrouillée. */
     const val CAPS_LOCK_LABEL: String = "⇪"
 
+    /** Libellé de la case qui passe sur la disposition classique (§4). */
+    const val CLASSIC_LABEL: String = "Classique"
+
+    /** Libellé de la case qui revient de la disposition classique à la disposition du champ (§4). */
+    const val ADAPTIVE_LABEL: String = "Adaptative"
+
     /** Libellé de la case « mode automatique » du menu des langues. */
     const val AUTOMATIC_LABEL: String = "Auto"
 
@@ -74,13 +98,19 @@ object KeyPopups {
      *
      * @param upper la prochaine lettre sera une majuscule (variantes en majuscules).
      * @param languages langues actives (menu de l'espace seulement s'il y en a plusieurs).
+     * @param symbolsMenu contenu du menu de `?123`.
      */
-    fun forKey(key: Key, upper: Boolean, languages: List<String>): List<PopupItem> = when (key.kind) {
+    fun forKey(
+        key: Key,
+        upper: Boolean,
+        languages: List<String>,
+        symbolsMenu: SymbolsMenu = SymbolsMenu.QUICK_PUNCTUATION,
+    ): List<PopupItem> = when (key.kind) {
         KeyKind.LETTER -> ACCENTS[key.label[0]].orEmpty().map { variant ->
             val text = if (upper) variant.uppercase(Locale.ROOT) else variant
             PopupItem(text, PopupAction.Text(text))
         }
-        KeyKind.SYMBOLS -> QUICK_PUNCTUATION.map { PopupItem(it, PopupAction.Text(it)) }
+        KeyKind.SYMBOLS -> symbolsMenu(symbolsMenu)
         KeyKind.SPACE -> if (languages.size < 2) {
             emptyList()
         } else {
@@ -91,6 +121,15 @@ object KeyPopups {
         KeyKind.LETTERS -> listOf(PopupItem(CAPS_LOCK_LABEL, PopupAction.CapsLock))
         else -> emptyList()
     }
+
+    private fun symbolsMenu(menu: SymbolsMenu): List<PopupItem> = when (menu) {
+        SymbolsMenu.QUICK_PUNCTUATION -> quickPunctuation()
+        SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC -> quickPunctuation() + PopupItem(CLASSIC_LABEL, PopupAction.ClassicLayout(true))
+        SymbolsMenu.BACK_FROM_CLASSIC -> listOf(PopupItem(ADAPTIVE_LABEL, PopupAction.ClassicLayout(false)))
+        SymbolsMenu.NONE -> emptyList()
+    }
+
+    private fun quickPunctuation(): List<PopupItem> = QUICK_PUNCTUATION.map { PopupItem(it, PopupAction.Text(it)) }
 
     /**
      * Bord gauche d'un menu de [count] cases de largeur [itemWidth], centré sur [anchorX] et

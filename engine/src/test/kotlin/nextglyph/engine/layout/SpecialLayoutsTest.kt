@@ -103,7 +103,7 @@ class SpecialLayoutsTest {
 
             assertThat(layout.role).isEqualTo(LayoutRole.NUMBER)
             assertThat(layout.grid()).containsExactly(
-                listOf("1", "2", "3", "−"),
+                listOf("1", "2", "3", "-"),
                 listOf("4", "5", "6", ","),
                 listOf("7", "8", "9", "⌫"),
                 listOf("_", "0", "_", "↵"),
@@ -201,7 +201,7 @@ class SpecialLayoutsTest {
         fun `un pavé numérique sans signe ni séparateur ne propose ni l'un ni l'autre`() {
             val keys = SpecialLayouts.number(signed = false, decimal = false).rows.flatMap { it.keys }
 
-            assertThat(keys.none { it.label == "−" || it.kind == KeyKind.DECIMAL }).isTrue()
+            assertThat(keys.none { it.label == "-" || it.kind == KeyKind.DECIMAL }).isTrue()
         }
 
         @Test

@@ -42,7 +42,7 @@ class ProfileLayoutsTest {
             val plain = ProfileLayouts.of(profile(C.TYPE_CLASS_NUMBER), LayoutKind.AZERTY)
 
             assertThat(signedDecimal.role).isEqualTo(LayoutRole.NUMBER)
-            assertThat(signedDecimal.rows[0].keys[3].label).isEqualTo("−")
+            assertThat(signedDecimal.rows[0].keys[3].label).isEqualTo("-")
             assertThat(signedDecimal.rows[1].keys[3].label).isEqualTo(",")
             assertThat(plain.rows[0].keys[3].label).isEmpty()
             assertThat(ProfileLayouts.of(profile(C.TYPE_CLASS_NUMBER or C.TYPE_NUMBER_VARIATION_PASSWORD), LayoutKind.QWERTY).role).isEqualTo(LayoutRole.PIN)

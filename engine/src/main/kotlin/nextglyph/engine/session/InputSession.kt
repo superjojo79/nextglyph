@@ -22,6 +22,9 @@ import nextglyph.engine.predict.Predictor
 import nextglyph.engine.predict.SpaceCase
 import nextglyph.engine.predict.Suggestion
 import nextglyph.engine.predict.UndoToken
+import nextglyph.engine.profile.DecimalSeparatorPolicy
+import nextglyph.engine.profile.FieldKey
+import nextglyph.engine.profile.SeparatorEditor
 import nextglyph.engine.text.WordPrefix
 import java.util.Locale
 import kotlin.math.abs
@@ -77,6 +80,7 @@ class InputSession(
     private var undo: PendingUndo? = null
     private var manualShift = ShiftState.OFF
     private var languageVersion = 0
+    private var lastShiftTapMs: Long? = null
 
     private var cursor = UNKNOWN
     private var selectionLength = 0
@@ -107,6 +111,7 @@ class InputSession(
         editState = EditState.INITIAL
         undo = null
         manualShift = ShiftState.OFF
+        lastShiftTapMs = null
         pending.clear()
         cursor = if (selStart >= 0 && selEnd >= 0) minOf(selStart, selEnd) else UNKNOWN
         selectionLength = if (cursor == UNKNOWN) 0 else abs(selEnd - selStart)
@@ -238,11 +243,22 @@ class InputSession(
         refresh()
     }
 
-    /** ⌫ : annulation d'une validation automatique (§5.5), sinon effacement d'un caractère. */
+    /**
+     * ⌫ : annulation d'une validation automatique (§5.5), sinon effacement d'un caractère. Dans un champ
+     * qui ne lit pas le texte (mot de passe, pavés, §7.2), la touche Retour arrière est envoyée telle
+     * quelle, sans rien lire du champ.
+     */
     fun onBackspace() {
         val pendingUndo = undo
         undo = null
         editState = EditState.INITIAL
+        if (!field.readsText) {
+            target.sendBackspaceKey()
+            cursor = UNKNOWN
+            selectionLength = 0
+            refresh()
+            return
+        }
         val predictor = predictor
         if (pendingUndo != null && predictor != null) {
             val edit = predictor.undo(target.textBeforeCursor(LOOKBACK), pendingUndo.token, field.prediction)
@@ -337,6 +353,48 @@ class InputSession(
     fun toggleShift() {
         manualShift = if (manualShift == ShiftState.OFF) ShiftState.ONCE else ShiftState.OFF
         refresh()
+    }
+
+    /**
+     * Touche `⇧` explicite (§7.1) à l'instant [nowMs] : un appui = une majuscule, un second appui dans les
+     * [doubleTapMs] millisecondes = verrouillage ; un appui sur la majuscule active ou verrouillée l'annule.
+     */
+    fun onShiftKey(nowMs: Long, doubleTapMs: Long = DOUBLE_TAP_MS) {
+        require(doubleTapMs >= 0) { "Le délai du double appui doit être positif ou nul : $doubleTapMs." }
+        val last = lastShiftTapMs
+        val doubleTap = manualShift == ShiftState.ONCE && last != null && nowMs - last in 0..doubleTapMs
+        manualShift = when {
+            doubleTap -> ShiftState.LOCKED
+            manualShift == ShiftState.OFF -> ShiftState.ONCE
+            else -> ShiftState.OFF
+        }
+        lastShiftTapMs = if (manualShift == ShiftState.ONCE) nowMs else null
+        refresh()
+    }
+
+    /**
+     * Touche du séparateur décimal du pavé numérique (§8.1) : [policy] insère `,` ou `.` selon ce que le champ
+     * [fieldKey] accepte (vérification par le texte avant le curseur, seule lecture faite dans un pavé).
+     *
+     * @return le caractère inséré, ou `null` si le champ a refusé les deux.
+     */
+    fun onDecimalSeparator(policy: DecimalSeparatorPolicy, fieldKey: FieldKey): Char? {
+        undo = null
+        editState = EditState.INITIAL
+        // Pavé numérique : jamais de mot en composition, rien à valider avant.
+        val inserted = policy.insert(
+            fieldKey,
+            object : SeparatorEditor {
+                override fun textBeforeCursor(): String? = target.textBeforeCursor(DECIMAL_LOOKBACK)?.toString()
+
+                override fun commitText(text: String) = target.commitText(text)
+            },
+        )
+        // Le champ a pu filtrer l'insertion : la position du curseur n'est plus connue.
+        cursor = UNKNOWN
+        selectionLength = 0
+        refresh()
+        return inserted
     }
 
     /**
@@ -559,6 +617,12 @@ class InputSession(
         const val SPACE_SYMBOL: String = "␣"
 
         private const val UNKNOWN = -1
+
+        /** Délai maximal entre les deux appuis du verrouillage de `⇧` (§7.1), valeur par défaut d'Android. */
+        const val DOUBLE_TAP_MS: Long = 300L
+
+        /** Caractères lus pour vérifier l'insertion du séparateur décimal (§8.1). */
+        private const val DECIMAL_LOOKBACK = 32
         private const val MAX_PENDING = 32
         private const val JOINERS = "'’-‑"
         private const val SENTENCE_END = ".?!…"

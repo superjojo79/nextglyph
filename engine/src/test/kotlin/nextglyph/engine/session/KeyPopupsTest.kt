@@ -35,6 +35,36 @@ class KeyPopupsTest {
         }
 
         @Test
+        fun `profil texte - la ponctuation rapide puis l'échappatoire Classique en dernière case`() {
+            val items = KeyPopups.forKey(Key(KeyKind.SYMBOLS, "?123", 1f), false, bilingual, SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC)
+
+            assertThat(items).hasSize(8)
+            assertThat(items.last()).isEqualTo(PopupItem("Classique", PopupAction.ClassicLayout(true)))
+            assertThat(items.dropLast(1).map { it.label }).containsExactly("-", "(", ")", "\"", ";", "@", "#")
+        }
+
+        @Test
+        fun `tables des menus et contenu des actions`() {
+            val classic = KeyPopups.forKey(Key(KeyKind.SYMBOLS, "?123", 1f), false, bilingual, SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC)
+            val back = KeyPopups.forKey(Key(KeyKind.SYMBOLS, "?123", 1f), false, bilingual, SymbolsMenu.BACK_FROM_CLASSIC)
+
+            assertThat((classic.last().action as PopupAction.ClassicLayout).enabled).isTrue()
+            assertThat((back.single().action as PopupAction.ClassicLayout).enabled).isFalse()
+            assertThat((classic.first().action as PopupAction.Text).text).isEqualTo("-")
+            assertThat(PopupAction.LockLanguage("fr").language).isEqualTo("fr")
+            assertThat(KeyPopups.ACCENTS).containsKey('e')
+            assertThat(KeyPopups.QUICK_PUNCTUATION).hasSize(7)
+            assertThat(KeyPopups.SYMBOLS).containsKey("-")
+        }
+
+        @Test
+        fun `disposition classique - une seule case pour revenir`() {
+            val items = KeyPopups.forKey(Key(KeyKind.SYMBOLS, "?123", 1.5f), false, bilingual, SymbolsMenu.BACK_FROM_CLASSIC)
+
+            assertThat(items).containsExactly(PopupItem("Adaptative", PopupAction.ClassicLayout(false)))
+        }
+
+        @Test
         fun `appui long sur l'espace - verrouiller une langue ou mode automatique`() {
             val items = KeyPopups.forKey(Key(KeyKind.SPACE, "", 1.6f), false, bilingual)
 
@@ -77,6 +107,11 @@ class KeyPopupsTest {
         }
 
         @Test
+        fun `disposition du mot de passe - pas de menu sur la touche des symboles`() {
+            assertThat(KeyPopups.forKey(Key(KeyKind.SYMBOLS, "?123", 1.5f), false, bilingual, SymbolsMenu.NONE)).isEmpty()
+        }
+
+        @Test
         fun `menu vide - aucune case visée`() {
             assertThat(KeyPopups.indexAt(10f, 0f, 20f, 0)).isEqualTo(-1)
         }
@@ -87,6 +122,14 @@ class KeyPopupsTest {
         @Test
         fun `une seule langue - pas de menu sur l'espace`() {
             assertThat(KeyPopups.forKey(Key(KeyKind.SPACE, "", 1.6f), false, listOf("fr"))).isEmpty()
+        }
+
+        @Test
+        fun `le menu de la touche des symboles ne concerne pas les autres touches`() {
+            for (menu in SymbolsMenu.entries) {
+                assertThat(KeyPopups.forKey(Key.letter('e'), false, bilingual, menu)).hasSize(4)
+                assertThat(KeyPopups.forKey(Key(KeyKind.ENTER, "↵", 1f), false, bilingual, menu)).isEmpty()
+            }
         }
 
         @Test

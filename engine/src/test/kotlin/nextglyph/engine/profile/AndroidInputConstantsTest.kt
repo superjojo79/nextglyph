@@ -49,6 +49,12 @@ class AndroidInputConstantsTest {
         "TYPE_DATETIME_VARIATION_DATE" to 16,
         "TYPE_DATETIME_VARIATION_TIME" to 32,
         "IME_MASK_ACTION" to 255,
+        "IME_ACTION_GO" to 2,
+        "IME_ACTION_SEARCH" to 3,
+        "IME_ACTION_SEND" to 4,
+        "IME_ACTION_NEXT" to 5,
+        "IME_ACTION_DONE" to 6,
+        "IME_ACTION_PREVIOUS" to 7,
         "IME_FLAG_NO_PERSONALIZED_LEARNING" to 16777216,
     )
 
