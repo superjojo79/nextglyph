@@ -1,6 +1,7 @@
 import com.android.build.api.artifact.SingleArtifact
 import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import javax.inject.Inject
 
 plugins {
     alias(libs.plugins.android.application)
@@ -41,6 +42,11 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    // Les lexiques sont lus par mmap directement dans l'APK : ils ne doivent pas être compressés.
+    androidResources {
+        noCompress += "nglx"
+    }
 }
 
 kotlin {
@@ -50,8 +56,18 @@ kotlin {
     }
 }
 
+// Lexiques binaires produits par :tools:buildLexicons (configuration sortante « lexiconElements »).
+val lexicons: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named<Usage>("nextglyph-lexicons"))
+    }
+}
+
 dependencies {
     implementation(project(":engine"))
+    lexicons(project(":tools"))
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
@@ -88,5 +104,38 @@ androidComponents {
                 jvmArgumentProviders.add(args)
             }
         }
+    }
+}
+
+// Copie fr.nglx et en.nglx dans les assets de chaque variante. Les entrées viennent de la
+// configuration « lexicons » : Gradle construit donc :tools:buildLexicons au besoin, sans copie manuelle.
+abstract class CopyLexiconsTask : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val lexicons: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Inject
+    abstract val fileSystem: FileSystemOperations
+
+    @TaskAction
+    fun copy() {
+        fileSystem.sync {
+            from(lexicons.asFileTree.matching { include("*.nglx") })
+            into(outputDir)
+        }
+        val missing = listOf("fr.nglx", "en.nglx").filterNot { outputDir.file(it).get().asFile.isFile }
+        check(missing.isEmpty()) { "Lexiques absents de la sortie de :tools:buildLexicons : $missing" }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val copyLexicons = tasks.register<CopyLexiconsTask>("copy${variant.name.replaceFirstChar { it.uppercase() }}Lexicons") {
+            lexicons.from(configurations.named("lexicons"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(copyLexicons, CopyLexiconsTask::outputDir)
     }
 }

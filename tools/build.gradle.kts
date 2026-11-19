@@ -109,7 +109,22 @@ tasks.register<JavaExec>("buildLexicons") {
         layout.buildDirectory.dir("corpus").get().asFile.path,
         layout.buildDirectory.dir("lexicons").get().asFile.path,
     )
-    outputs.upToDateWhen { false }
+    // Entrées et sorties déclarées (au lieu de « toujours exécutée ») : le module ime consomme
+    // build/lexicons/*.nglx comme assets, la tâche ne doit pas être refaite sans changement des listes.
+    inputs.dir(layout.buildDirectory.dir("wordlists"))
+    inputs.files(layout.buildDirectory.dir("corpus").map { it.asFileTree.matching { include("*-test.txt") } })
+    outputs.dir(layout.buildDirectory.dir("lexicons"))
+}
+
+// Lexiques binaires exposés aux autres modules (ime : assets de l'APK) sans copie manuelle :
+// configuration sortante portant un attribut d'usage propre, construite par buildLexicons.
+configurations.consumable("lexiconElements") {
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named<Usage>("nextglyph-lexicons"))
+    }
+    outgoing.artifact(layout.buildDirectory.dir("lexicons")) {
+        builtBy("buildLexicons")
+    }
 }
 
 // prototype/data/fr.json et en.json (non versionnés), limités aux N formes les plus fréquentes.
