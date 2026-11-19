@@ -13,6 +13,7 @@ import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import nextglyph.engine.adapt.AdaptiveKeyboard
 import nextglyph.engine.adapt.TapDecoding
@@ -182,22 +183,33 @@ class KeyboardView(context: Context) : View(context) {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         // Le padding bas réserve la place de la barre de navigation (fenêtre bord à bord) :
         // les touches sont dessinées depuis le haut et ne passent jamais dessous.
-        val height = (KeyboardMetrics.totalHeightDp(keyboardLayout.rows.size) * density).toInt() + paddingBottom
+        // La valeur est relue à chaque mesure (et pas seulement à la réception des marges),
+        // sinon le premier affichage peut encore chevaucher la barre.
+        val bottom = maxOf(bottomInset(rootWindowInsets), windowMetricsBottomInset())
+        if (bottom != paddingBottom) setPadding(paddingLeft, paddingTop, paddingRight, bottom)
+        val height = (KeyboardMetrics.totalHeightDp(keyboardLayout.rows.size) * density).toInt() + bottom
         setMeasuredDimension(getDefaultSize(suggestedMinimumWidth, widthMeasureSpec), height)
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
-        val bottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (bottomInset(insets) != paddingBottom) requestLayout()
+        return insets
+    }
+
+    private fun bottomInset(insets: WindowInsets?): Int = when {
+        insets == null -> 0
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
             insets.getInsets(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout()).bottom
-        } else {
+        else -> {
             @Suppress("DEPRECATION")
             insets.systemWindowInsetBottom
         }
-        if (bottom != paddingBottom) {
-            setPadding(paddingLeft, paddingTop, paddingRight, bottom)
-            requestLayout()
-        }
-        return insets
+    }
+
+    private fun windowMetricsBottomInset(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
+        val metrics = context.getSystemService(WindowManager::class.java)?.currentWindowMetrics ?: return 0
+        return metrics.windowInsets.getInsets(WindowInsets.Type.navigationBars()).bottom
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
