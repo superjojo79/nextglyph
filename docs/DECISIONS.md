@@ -359,7 +359,7 @@ Détail dans `docs/analysis/M2-engine.md` (`./gradlew :tools:analyzeEngine`, éc
 
 ---
 
-## 2026-11-21 — Apprentissage local et contacts dans le moteur (M4)
+## 2026-11-19 — Apprentissage local et contacts dans le moteur (M4)
 
 ### Contexte
 
