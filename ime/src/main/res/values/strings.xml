@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nextglyph</string>
+    <string name="ime_name">Nextglyph keyboard</string>
+    <string name="subtype_fr">French</string>
+    <string name="subtype_en">English</string>
+    <string name="keyboard_content_description">Nextglyph keyboard</string>
+
+    <string name="settings_intro">Nextglyph is an adaptive, open source keyboard. It works entirely on your device and has no network access.</string>
+    <string name="settings_status_title">Status</string>
+    <string name="settings_status_enabled">The keyboard is enabled.</string>
+    <string name="settings_status_disabled">The keyboard is not enabled yet.</string>
+    <string name="settings_steps_title">How to activate it</string>
+    <string name="settings_step_1">1. Tap \"Open keyboard settings\" and turn on Nextglyph.</string>
+    <string name="settings_step_2">2. Come back here and tap \"Choose keyboard\", then select Nextglyph.</string>
+    <string name="settings_open_settings">Open keyboard settings</string>
+    <string name="settings_choose_keyboard">Choose keyboard</string>
+</resources>

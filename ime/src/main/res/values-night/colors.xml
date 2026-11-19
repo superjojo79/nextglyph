@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Thème sombre. Contraste libellé/touche >= 4,5:1 (spec §13). -->
+    <color name="keyboard_background">#17181B</color>
+    <color name="key_background">#3C3F46</color>
+    <color name="key_function_background">#2A2C31</color>
+    <color name="key_pressed_background">#5A6070</color>
+    <color name="key_label">#F1F1F5</color>
+</resources>

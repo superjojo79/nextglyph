@@ -1,5 +1,6 @@
 [versions]
 kotlin = "2.4.21"
+agp = "9.5.1"
 junit = "6.1.3"
 assertj = "3.27.7"
 gson = "2.13.2"
@@ -18,4 +19,5 @@ commons-compress = { module = "org.apache.commons:commons-compress", version.ref
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+android-application = { id = "com.android.application", version.ref = "agp" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitest-gradle" }

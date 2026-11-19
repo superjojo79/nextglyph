@@ -1,0 +1,21 @@
+name: SDK Android
+description: Installe les composants du SDK Android manquants (compileSdk 37, build-tools 37.0.0) et écrit local.properties.
+
+runs:
+  using: composite
+  steps:
+    - name: Installer les composants du SDK Android manquants
+      shell: bash
+      run: |
+        set -euo pipefail
+        sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+        [ -n "$sdk" ] || { echo "SDK Android introuvable sur le runner" >&2; exit 1; }
+        sdkmanager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+        packages=()
+        [ -d "$sdk/platforms/android-37.0" ] || [ -d "$sdk/platforms/android-37" ] || packages+=("platforms;android-37.0")
+        [ -d "$sdk/build-tools/37.0.0" ] || packages+=("build-tools;37.0.0")
+        if [ "${#packages[@]}" -gt 0 ]; then
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" "${packages[@]}"
+        fi
+        echo "sdk.dir=$sdk" > local.properties

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nextglyph</string>
+    <string name="ime_name">Clavier Nextglyph</string>
+    <string name="subtype_fr">Français</string>
+    <string name="subtype_en">Anglais</string>
+    <string name="keyboard_content_description">Clavier Nextglyph</string>
+
+    <string name="settings_intro">Nextglyph est un clavier adaptatif open source. Il fonctionne entièrement sur votre appareil et n\'a aucun accès au réseau.</string>
+    <string name="settings_status_title">État</string>
+    <string name="settings_status_enabled">Le clavier est activé.</string>
+    <string name="settings_status_disabled">Le clavier n\'est pas encore activé.</string>
+    <string name="settings_steps_title">Comment l\'activer</string>
+    <string name="settings_step_1">1. Touchez « Ouvrir les réglages du clavier » et activez Nextglyph.</string>
+    <string name="settings_step_2">2. Revenez ici, touchez « Choisir le clavier », puis sélectionnez Nextglyph.</string>
+    <string name="settings_open_settings">Ouvrir les réglages du clavier</string>
+    <string name="settings_choose_keyboard">Choisir le clavier</string>
+</resources>
