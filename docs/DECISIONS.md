@@ -394,3 +394,31 @@ Le dictionnaire personnel vide ne change rien : `sets` renvoie les lexiques d'or
 - **Bonus de contexte continu** (une constante multiplicative par appel) : exigerait de reconstruire un lexique à chaque frappe ou de modifier le calcul des candidats ; trois niveaux préconstruits suffisent.
 - **Interdire tout nom de contact au niveau 0** : priverait la barre de suggestions des noms.
 - **Persister les frappes en attente** : elles n'ont de sens que dans le mot en cours.
+
+---
+
+## 2026-11-19 — M3 dans l'IME : profils, dispositions spécialisées, panel de champs de test
+
+### Contexte
+
+Le moteur fournissait depuis M3 (moteur) `InputProfileResolver`, `SpecialLayouts` et `DecimalSeparatorPolicy`, mais l'IME affichait toujours la disposition compacte, et ⌫ lisait deux caractères du champ même dans un mot de passe.
+
+### Décision
+
+- **Clavier du champ** (`nextglyph.engine.session.FieldKeyboard`, pur) : à chaque `onStartInputView`, le profil résolu donne la disposition principale, la couche `?123` (absente des pavés), la hauteur des rangées (44 dp pour les pavés), la barre (profils à disposition compacte seulement) et le menu de `?123`. La vue (`KeyboardView.setKeyboard`) ne reconstruit ses dispositions que si l'identifiant change. Une couche plus courte que la disposition principale (couche `?123` du mot de passe) est alignée en bas, pour que `ABC` tombe à la place de `?123` ; la hauteur du clavier ne change pas d'une couche à l'autre.
+- **Mot de passe, code PIN, pavés, disposition classique : aucune lecture du champ.** `InputSession.onBackspace` envoie `KEYCODE_DEL` sans lire le texte (au lieu de lire deux caractères pour effacer un point de code entier) ; aucun autre chemin ne lit le champ dans ces profils (vérifié par un éditeur simulé qui compte les lectures). La session ne retient rien du texte tapé (ni composition, ni prédiction, ni barre).
+- **`⇧` explicite** (`InputSession.onShiftKey`) : appui = majuscule simple, second appui dans le délai de double appui du système (`ViewConfiguration.getDoubleTapTimeout`, 300 ms) = verrouillage, appui sur une majuscule active = annulation. La touche est surlignée tant que la majuscule est active, libellée `⇪` quand elle est verrouillée.
+- **Séparateur décimal** (`InputSession.onDecimalSeparator`) : `DecimalSeparatorPolicy` avec le séparateur de la locale (ramené à `,` ou `.`) ; c'est la seule lecture du champ dans un pavé. Le curseur est ensuite tenu pour inconnu (le champ a pu filtrer l'insertion). Quand le repli sur `.` est appris, la touche affiche `.` aussitôt. **Constat sur Android 16 (`fr-FR`) : un `EditText` `numberDecimal` refuse la virgule** ; le repli est donc le cas courant des champs natifs, et la mémoire par champ évite de tâtonner à chaque séparateur.
+- **Signe moins des pavés** : la touche insère `-` (U+002D). Le libellé `−` (U+2212) du §8.1 était inséré tel quel et refusé par les champs signés d'Android (constaté sur l'émulateur).
+- **Échappatoire « Disposition classique »** (§4) : case « Classique » en dernière position du menu de `?123` des profils à disposition compacte ; profil `InputProfileResolver.classic` = disposition et règles du mot de passe, type, incognito et multiligne conservés. Retour par « Adaptative » dans le menu de `?123` de la disposition classique. Le choix est oublié au champ suivant, gardé si le même champ redémarre.
+- **Libellé de `↵`** (`EnterKeyLabel`) : un symbole par action d'`imeOptions` (`➤ ⌕ ➔ ⇥ ⇤ ✓`), `↵` sinon. `⇧` et `↵` sont dessinés à la taille des lettres (les flèches étaient illisibles à la taille des touches de fonction).
+- **Aperçu agrandi** : l'IME n'a pas encore d'aperçu de touche ; le profil le désactive déjà (`keyPreview = false`) pour le jour où il existera. Rien à couper.
+- **Panel « Champs de test »** (§15.3) dans le source set `debug` du module `ime` : activité `nextglyph.ime.debug.FieldTestsActivity` (icône de lancement « Champs de test » en debug), 25 champs, écho du texte exact et de la dernière action. `ManifestTest` lit les manifestes fusionnés des deux variantes et échoue si l'activité apparaît en release.
+- **Test instrumenté** `PasswordStorageTest` (AndroidX Test et UI Automator, Apache-2.0, `androidTest` uniquement) : active Nextglyph, tape dans le champ mot de passe du panel par coordonnées (géométrie calculée par le moteur) et compare l'état de `dataDir` avant et après. JUnit 4 n'a pas de `@Nested` : classes imbriquées avec le lanceur `Enclosed`, noms sans espaces (DEX des API < 30). Non ajouté à la CI : un émulateur sur GitHub demande à lui seul plusieurs minutes de démarrage, au-delà du budget de 10 minutes du job ; lancement local décrit dans `docs/FIELD-TESTS.md`.
+
+### Alternatives écartées
+
+- **`deleteSurroundingText(1, 0)` dans le mot de passe** : sans lecture, il couperait une paire de substitution (émoji) ; `KEYCODE_DEL` laisse l'éditeur effacer un caractère entier.
+- **Couche `?123` du mot de passe étirée sur six rangées** : touches de plus de 80 dp de haut, sans intérêt ; alignée en haut, `ABC` serait loin de `?123`.
+- **Libellé « Disposition classique » en entier** : ne tient pas dans une case du menu (8 cases sur 360 dp) ; « Classique » est réduit si besoin pour tenir.
+- **Garder la disposition classique pour tous les champs de l'application** : un champ correctement typé retomberait sur une disposition sans adaptation sans que la personne le demande.

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Variante debug uniquement : panel « Champs de test » (spec §15.3). ManifestTest vérifie son absence en release. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".debug.FieldTestsActivity"
+            android:exported="true"
+            android:label="@string/field_tests_title"
+            android:taskAffinity="io.github.superjojo79.nextglyph.fieldtests"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

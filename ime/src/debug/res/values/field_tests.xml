@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Panel « Champs de test » (spec §15.3) : variante debug uniquement. -->
+<resources>
+    <string name="field_tests_title" translatable="false">Champs de test</string>
+
+    <item name="field_tests_root" type="id" />
+    <item name="field_text" type="id" />
+    <item name="field_multiline" type="id" />
+    <item name="field_person_name" type="id" />
+    <item name="field_email" type="id" />
+    <item name="field_url" type="id" />
+    <item name="field_password" type="id" />
+    <item name="field_visible_password" type="id" />
+    <item name="field_web_password" type="id" />
+    <item name="field_number" type="id" />
+    <item name="field_number_signed" type="id" />
+    <item name="field_number_decimal" type="id" />
+    <item name="field_number_signed_decimal" type="id" />
+    <item name="field_number_decimal_point" type="id" />
+    <item name="field_pin" type="id" />
+    <item name="field_phone" type="id" />
+    <item name="field_date" type="id" />
+    <item name="field_time" type="id" />
+    <item name="field_date_time" type="id" />
+    <item name="field_no_suggestions" type="id" />
+    <item name="field_incognito" type="id" />
+    <item name="field_action_send" type="id" />
+    <item name="field_action_search" type="id" />
+    <item name="field_action_go" type="id" />
+    <item name="field_action_next" type="id" />
+    <item name="field_action_done" type="id" />
+</resources>

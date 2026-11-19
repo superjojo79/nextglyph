@@ -10,7 +10,7 @@ Suivi tenu par l'orchestrateur. Jalons définis au §16 de la [spécification](S
 | M0 — données, lexique, analyse, prototype | Terminé (2026-11-19) |
 | M1 — premier IME Android | Terminé (2026-11-19) |
 | M2 — saisie complète (validation, ponctuation, bilinguisme) | En cours |
-| M3 | À faire |
+| M3 — profils de saisie (mot de passe, pavés, e-mail, URL, disposition classique) | En cours |
 | M4 | À faire |
 | M5 | Hors périmètre autonome : validation de l'utilisateur requise |
 
@@ -45,6 +45,18 @@ Vérifié sur émulateur Android 16 (AZERTY et QWERTY) : adaptation visible apr�
 | Édition : ponctuation, typographie française, majuscules (`nextglyph.engine.edit`) | En cours | — |
 | Intégration IME : session de saisie (`nextglyph.engine.session`), barre de suggestions et de ponctuation, libellé de l'espace, bilinguisme, couche `?123`, accents, profils texte | Fait (vérifié sur émulateur) | — |
 | Séparation de `fr.nglx` par licence (`fr-lexique.nglx`, `fr-dicollecte.nglx`) | Fait | — |
+
+## M3 — tâches
+
+| Tâche | État | PR |
+|---|---|---|
+| Moteur : `InputProfileResolver`, `SpecialLayouts`, `DecimalSeparatorPolicy` (`nextglyph.engine.profile`) | Fait | #15 |
+| IME : profils à chaque champ (`FieldKeyboard`), mot de passe sans lecture du champ (`⇧` explicite, `KEYCODE_DEL`), pavés numérique / téléphone / date-heure / PIN, séparateur décimal vérifié, disposition classique (§4), libellé de `↵` | Fait (vérifié sur émulateur) | — |
+| Panel « Champs de test » (debug) et `docs/FIELD-TESTS.md` | Fait (25 cas sur Android 16) | — |
+| Test instrumenté : aucune écriture après une saisie en mot de passe (§15.2) | Fait (local, hors CI) | — |
+| Panel d'applications tierces et de pages web (§15.3) | À faire | — |
+
+Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr-FR` (repli sur le point, appris par champ) ; les champs signés refusent le signe moins U+2212 (la touche insère `-`).
 
 ## Problèmes ouverts
 

@@ -18,6 +18,8 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        // Tests instrumentés (AndroidX Test, Apache-2.0) : `./gradlew :ime:connectedDebugAndroidTest`, voir docs/FIELD-TESTS.md.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -74,6 +76,11 @@ dependencies {
     testImplementation(libs.assertj.core)
     testImplementation(testFixtures(project(":engine")))
     testRuntimeOnly(libs.junit.platform.launcher)
+
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.uiautomator)
 }
 
 tasks.withType<Test>().configureEach {
@@ -86,22 +93,39 @@ tasks.withType<Test>().configureEach {
 
 // Fournit le manifeste fusionné de chaque variante aux tests unitaires : ManifestTest échoue
 // si une dépendance ou le manifeste source introduit la permission INTERNET (spec §2.7, §12).
+// Chaque tâche de test reçoit aussi les manifestes de toutes les variantes
+// (`nextglyph.mergedManifest.<variante>`) : le panel de test (§15.3) doit être absent de la release.
 abstract class MergedManifestArgs : CommandLineArgumentProvider {
+    @get:Input
+    abstract val property: Property<String>
+
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val manifest: RegularFileProperty
 
-    override fun asArguments(): Iterable<String> = listOf("-Dnextglyph.mergedManifest=${manifest.get().asFile.absolutePath}")
+    override fun asArguments(): Iterable<String> = listOf("-D${property.get()}=${manifest.get().asFile.absolutePath}")
 }
 
 androidComponents {
     onVariants { variant ->
         val unitTestName = "test${variant.name.replaceFirstChar { it.uppercase() }}UnitTest"
+        val manifest = variant.artifacts.get(SingleArtifact.MERGED_MANIFEST)
         tasks.withType<Test>().configureEach {
+            if (name.endsWith("UnitTest")) {
+                jvmArgumentProviders.add(
+                    objects.newInstance<MergedManifestArgs>().also {
+                        it.property.set("nextglyph.mergedManifest.${variant.name}")
+                        it.manifest.set(manifest)
+                    },
+                )
+            }
             if (name == unitTestName) {
-                val args = objects.newInstance<MergedManifestArgs>()
-                args.manifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
-                jvmArgumentProviders.add(args)
+                jvmArgumentProviders.add(
+                    objects.newInstance<MergedManifestArgs>().also {
+                        it.property.set("nextglyph.mergedManifest")
+                        it.manifest.set(manifest)
+                    },
+                )
             }
         }
     }

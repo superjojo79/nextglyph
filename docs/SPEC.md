@@ -93,7 +93,7 @@ Modificateurs applicables à tous les profils texte :
 
 **Précisions de résolution.** Seule la classe `TYPE_CLASS_TEXT` lit les variations et drapeaux de texte ; `TYPE_NULL` et toute classe inconnue donnent le profil Texte ordinaire (variation et drapeaux ignorés). À l'inverse, les drapeaux d'une classe sont ignorés dans les autres (`NO_SUGGESTIONS`, `CAP_*`, `MULTI_LINE` n'ont aucun effet sur un nombre ; `SIGNED` et `DECIMAL` n'en ont aucun sur un texte). `TYPE_NUMBER_VARIATION_PASSWORD` est testé avant les drapeaux : un code PIN n'a jamais ni `−` ni séparateur. Plusieurs drapeaux `CAP_*` : caractères, puis mots, puis phrases (ordre de `TextUtils.getCapsMode`). Les majuscules automatiques ne s'appliquent qu'aux profils Texte et Nom de personne (§9.1). `privateImeOptions` est réservé et ignoré en V1. L'incognito se lit sur tous les profils.
 
-**Échappatoire manuelle.** Dans tout profil texte, un appui long sur `?123` propose « Disposition classique », pour basculer vers la disposition du profil mot de passe sans adaptation (champs web mal typés, saisie de code, etc.).
+**Échappatoire manuelle.** Dans tout profil texte, un appui long sur `?123` propose « Disposition classique », pour basculer vers la disposition du profil mot de passe sans adaptation (champs web mal typés, saisie de code, etc.). La case s'intitule « Classique » et vient en dernier, après la ponctuation rapide. La disposition classique applique aussi les règles du mot de passe (§7.2 : ni lecture du champ, ni suggestions, ni majuscules automatiques, ni apprentissage) ; le type du champ, l'incognito et le multiligne sont conservés. Dans la disposition classique, l'appui long sur `?123` propose « Adaptative », qui ramène à la disposition du champ. Le choix vaut pour le champ courant : un nouveau champ repart de son profil ; un champ redémarré (même champ, même type) le garde.
 
 ---
 
@@ -139,7 +139,7 @@ Rangée 3 : ABC | , . ! ? ' : | espace | ↵ | ⌫                          1 + 
 
 `ABC` ramène aux lettres. Les caractères moins courants (`* " ; = [ ]`, etc.) ne sont pas sur cette couche en V1 : ils sont sur la disposition classique (§7.1), accessible par l'échappatoire du §4, et dans les menus d'appui long de la couche (symboles voisins : `-` → `_ – —`, `+` → `= * × ÷`, `(` → `[ { <`, `)` → `] } >`, `/` → `\ |`, `€` → `$ £ ¥`, `%` → `‰ ^ ~`, `&` → `§ °`, `'` → `" « » ’`, `,` et `:` → `;`, `.` → `… ·`, `?` → `¿`, `!` → `¡`). Appui long sur `ABC` : majuscule verrouillée `⇪` (§5.7).
 
-La touche `↵` est contextuelle d'après `imeOptions` : envoyer, rechercher, aller, suivant, terminé, ou saut de ligne si le champ est multiligne et n'a pas d'action.
+La touche `↵` est contextuelle d'après `imeOptions` : envoyer, rechercher, aller, suivant, terminé, ou saut de ligne si le champ est multiligne et n'a pas d'action. Libellés : `➤` envoyer, `⌕` rechercher, `➔` aller, `⇥` suivant, `⇤` précédent, `✓` terminé, `↵` saut de ligne, touche Entrée ou action inconnue (`EnterKeyLabel`). Même règle sur toutes les dispositions (mot de passe, pavés).
 
 ### 5.2 Adaptation visuelle
 
@@ -334,7 +334,9 @@ Rangée 6 : ?123 , espace . ↵
 - AZERTY, rangée 5 : `⇧` 2 u, 6 lettres de 1 u, `⌫` 2 u. Rangée 6 : `?123` 1,5 u, `,` 1 u, espace 4,5 u, `.` 1 u, `↵` 2 u. Toutes les touches font au moins 1 u (36 dp à 360 dp, §13).
 - Couche `?123` du mot de passe, 3 rangées : `[ ] { } < > ^ ~ | \`, `/ + = ' " ; : € £` suivi d'un accent grave, puis `ABC` (1,5 u), `( ) § ° ¥ ¢`, `⌫` (2,5 u).
 - Hauteur indicative : ~ 230 dp. La compacité passe ici après la fiabilité.
-- `⇧` explicite : un appui = une majuscule, double appui = verrouillage. État toujours visible.
+- `⇧` explicite : un appui = une majuscule, double appui = verrouillage (second appui dans le délai de double appui du système, 300 ms par défaut), un appui sur la majuscule active ou verrouillée l'annule. État toujours visible : touche `⇧` surlignée quand la majuscule est active, libellé `⇪` quand elle est verrouillée, lettres affichées en majuscules.
+- Pas de barre au-dessus des touches (ni suggestions ni ponctuation à proposer) ; la couche `?123`, plus courte, est alignée en bas (`ABC` à la place de `?123`). Pas de menu d'appui long sur `?123` (tous les symboles sont sur la disposition ou sa couche).
+- `⌫` envoie la touche Retour arrière (`KEYCODE_DEL`) sans lire le champ.
 - `?123` donne accès aux symboles restants (`[ ] { } < > ^ ~ | \ / + = ' " ; : €  £`, etc.).
 
 ### 7.2 Comportements
@@ -350,7 +352,7 @@ Rangée 6 : ?123 , espace . ↵
 | Historique de presse-papiers | Non alimenté |
 | Retour haptique | Conservé |
 
-Aucune donnée tapée dans ce profil n'est conservée en mémoire au-delà de la frappe, ni journalisée.
+Aucune donnée tapée dans ce profil n'est conservée en mémoire au-delà de la frappe, ni journalisée. Le clavier ne lit jamais le texte du champ (ni avant ni après le curseur) : chaque touche est transmise telle quelle (`commitText`, `KEYCODE_DEL`, action de l'éditeur). Vérifié par test instrumenté : aucune écriture dans le stockage de l'application après une saisie (§15.2).
 
 ---
 
@@ -367,8 +369,8 @@ Règle commune : **seuls les caractères acceptés par le champ sont proposés.*
   0    ↵
 ```
 
-- `−` n'apparaît qu'avec `TYPE_NUMBER_FLAG_SIGNED`.
-- Le séparateur décimal n'apparaît qu'avec `TYPE_NUMBER_FLAG_DECIMAL`. Il affiche le séparateur de la locale (`,` en français). **Stratégie d'insertion :** on insère `,` ; si `getTextBeforeCursor` montre que le champ l'a rejeté, on insère `.` et on mémorise ce choix pour ce champ (paquet + id du champ). À valider sur un panel d'applications.
+- `−` n'apparaît qu'avec `TYPE_NUMBER_FLAG_SIGNED`. La touche insère le trait d'union ASCII `-` (U+002D) : les champs numériques d'Android refusent le signe moins typographique U+2212 (constaté sur Android 16).
+- Le séparateur décimal n'apparaît qu'avec `TYPE_NUMBER_FLAG_DECIMAL`. Il affiche le séparateur de la locale (`,` en français). **Stratégie d'insertion :** on insère `,` ; si `getTextBeforeCursor` montre que le champ l'a rejeté, on insère `.` et on mémorise ce choix pour ce champ (paquet + id du champ) ; la touche affiche alors `.`. Constat sur Android 16 en `fr-FR` : un `EditText` `numberDecimal` refuse `,` (filtre `DigitsKeyListener` sans locale) ; le repli sur `.` est donc le cas courant des champs natifs. À valider sur un panel d'applications.
 - Les emplacements des touches absentes restent vides : la position des chiffres ne change jamais.
 - Géométrie : 4 colonnes de 2,5 u, 4 rangées de 44 dp. Rangée 4 : emplacement vide, `0`, emplacement vide, `↵`. `−` est en colonne 4 rangée 1, le séparateur en colonne 4 rangée 2, `⌫` en colonne 4 rangée 3.
 - **Insertion du séparateur** (`DecimalSeparatorPolicy`) : on tente `,` ; le refus se lit au texte avant le curseur (inchangé, ou ne finissant pas par le caractère). On ne conclut au refus que si le nombre en cours n'a pas déjà de séparateur (sinon c'est peut-être le second séparateur qui est refusé) ; sans accès au texte, l'insertion est supposée réussie. Si les deux sont refusés, rien n'est inséré. La mémoire (paquet + id du champ) est volatile et bornée à 256 champs ; un champ mémorisé sur `.` qui accepte de nouveau `,` est oublié.
@@ -384,6 +386,8 @@ Pavé 3 × 4 (mêmes positions que le §8.1) avec, selon la variation : `/` (col
 ### 8.4 Code PIN (`TYPE_NUMBER_VARIATION_PASSWORD`)
 
 Pavé du §8.1 sans `−` ni séparateur, avec toutes les règles du profil mot de passe (§7.2). Aperçu de touche désactivé sur tous les pavés (les touches font 90 dp de large).
+
+Tous les pavés : ni barre au-dessus des touches, ni menu d'appui long, ni couche `?123` ; les emplacements vides ne sont pas dessinés et ne réagissent pas. Aucune lecture du champ, sauf la vérification du séparateur décimal (§8.1).
 
 ---
 
@@ -568,6 +572,8 @@ Ces résultats fixent les valeurs par défaut du §5.2 et du §5.5. Méthode, r�
 ### 15.3 Panel de test des champs
 
 Liste d'applications et de pages web couvrant : champs numériques décimaux, téléphone, date, code PIN, mot de passe natif et web, e-mail, URL, recherche, messagerie multiligne, champs sans suggestions.
+
+**Panel intégré.** La variante debug de l'IME contient une activité « Champs de test » (`nextglyph.ime.debug.FieldTestsActivity`, absente de la release, vérifié par `ManifestTest`) : un `EditText` par profil, drapeau et action de `↵`, chacun suivi d'un écho du texte exact (points de code hors ASCII en clair) et de la dernière action d'éditeur reçue. Cas, résultats attendus et observés : `docs/FIELD-TESTS.md`.
 
 ---
 
