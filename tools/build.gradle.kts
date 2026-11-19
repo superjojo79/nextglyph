@@ -89,3 +89,49 @@ pitest {
     timestampedReports.set(false)
     threads.set(Runtime.getRuntime().availableProcessors())
 }
+
+// ---------------------------------------------------------------------------
+// Lexiques binaires et export du prototype (package nextglyph.tools.lexicons).
+// Bloc indépendant : n'altère pas les tâches ci-dessus.
+// ---------------------------------------------------------------------------
+
+// build/lexicons/<lang>.nglx (LexiconBuilder, politique SKIP) et build/lexicons/report.md
+// (nombre de clés et de formes, taille, chargement, latence de `distribution`, budgets §11.3).
+tasks.register<JavaExec>("buildLexicons") {
+    group = "data"
+    description = "Construit les lexiques binaires FR/EN (build/lexicons/*.nglx) et leur rapport."
+    dependsOn("buildWordLists")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.lexicons.BuildLexiconsMainKt")
+    maxHeapSize = "1g"
+    args(
+        layout.buildDirectory.dir("wordlists").get().asFile.path,
+        layout.buildDirectory.dir("corpus").get().asFile.path,
+        layout.buildDirectory.dir("lexicons").get().asFile.path,
+    )
+    outputs.upToDateWhen { false }
+}
+
+// prototype/data/fr.json et en.json (non versionnés), limités aux N formes les plus fréquentes.
+// N : -PprototypeWords=<N> (défaut 100000).
+tasks.register<JavaExec>("exportPrototypeData") {
+    group = "data"
+    description = "Exporte les N formes les plus fréquentes vers prototype/data/<lang>.json (-PprototypeWords=N)."
+    dependsOn("buildWordLists")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.lexicons.ExportPrototypeDataMainKt")
+    args(
+        layout.buildDirectory.dir("wordlists").get().asFile.path,
+        rootProject.layout.projectDirectory.dir("prototype/data").asFile.path,
+        providers.gradleProperty("prototypeWords").orElse("100000").get(),
+    )
+    outputs.upToDateWhen { false }
+}
+
+// Points d'entrée sans logique, comme ceux des blocs précédents.
+pitest {
+    excludedClasses.addAll(
+        "nextglyph.tools.lexicons.BuildLexiconsMainKt",
+        "nextglyph.tools.lexicons.ExportPrototypeDataMainKt",
+    )
+}
