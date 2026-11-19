@@ -12,9 +12,10 @@ Lexique 4.10 (French word forms and subtitle frequencies)
   Lexique 4. Behavior Research Methods. https://www.lexique.org/
   License: Creative Commons Attribution-ShareAlike 4.0 International
   https://creativecommons.org/licenses/by-sa/4.0/
-  Nextglyph distributes data derived from it (compiled binary lexicon) as a
-  separate data file that keeps this license. Changes: conversion to a binary
-  lexicon format.
+  Nextglyph distributes data derived from it in a separate data file,
+  fr-lexique.nglx, that keeps this license and contains no data from any other
+  source. Changes: word forms lowercased, frequencies per million scaled to
+  integers (x100), conversion to a binary lexicon format.
 
 French spelling dictionaries v7.7 (Dicollecte / Grammalecte)
   Olivier R. and contributors. https://grammalecte.net/
@@ -42,8 +43,14 @@ SCOWL / English Speller Database (en_US Hunspell dictionary, 2026.02.25)
 French inflected forms lexicon v7.7 (Dicollecte / Grammalecte)
   Olivier R. and contributors. https://grammalecte.net/
   License: Mozilla Public License 2.0, https://www.mozilla.org/MPL/2.0/
-  Same project and license as the French spelling dictionaries above; the same
-  conditions apply to data derived from it.
+  Same project and license as the French spelling dictionaries above.
+  Nextglyph distributes the word forms in a separate data file,
+  fr-dicollecte.nglx, that keeps this license and contains no data from any
+  other source (every form has the same floor frequency). Changes: conversion
+  to a binary lexicon format. Source: https://www.grammalecte.net/dic/
+
+Tatoeba-derived English frequencies are distributed in en.nglx together with
+the SCOWL word list (see the Tatoeba entry below).
 
 SCOWL 2020.12.07 (pre-expanded word lists, sizes 10 to 70 used)
   https://wordlist.aspell.net/ , https://sourceforge.net/projects/wordlist/
@@ -53,7 +60,8 @@ SCOWL 2020.12.07 (pre-expanded word lists, sizes 10 to 70 used)
   copies and that both that copyright notice and this permission notice appear
   in supporting documentation").
 
-Tatoeba sentences (offline analysis only, not distributed in the application)
+Tatoeba sentences (not distributed; English frequency counts derived from them
+are part of en.nglx)
   Sentences by the contributors of Tatoeba, https://tatoeba.org/
   License: Creative Commons Attribution 2.0 France
   https://creativecommons.org/licenses/by/2.0/fr/

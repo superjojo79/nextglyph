@@ -1,6 +1,5 @@
 package nextglyph.ime.lexicon
 
-import nextglyph.engine.lexicon.Lexicon
 import java.util.concurrent.Executor
 
 /**
@@ -8,7 +7,8 @@ import java.util.concurrent.Executor
  * l'ouverture du clavier ne soit jamais bloquée (le clavier reste neutre tant que le lexique n'est
  * pas prêt, spec §11.3).
  *
- * M1 : une seule langue active à la fois. Un résultat périmé (langue changée entre-temps) est
+ * [T] : un lexique, ou l'ensemble des lexiques des langues actives (M2 : français et anglais,
+ * demandés sous une seule clé). Un résultat périmé (demande changée entre-temps) est
  * ignoré ; un échec de chargement est livré comme `null` (clavier neutre) et ne fait jamais planter
  * le service. À utiliser depuis le fil principal uniquement.
  *
@@ -16,8 +16,8 @@ import java.util.concurrent.Executor
  * @param background exécute le chargement.
  * @param main exécute les rappels (fil principal).
  */
-class LexiconLoader(
-    private val open: (String) -> Lexicon,
+class LexiconLoader<T>(
+    private val open: (String) -> T,
     private val background: Executor,
     private val main: Executor,
 ) {
@@ -29,7 +29,7 @@ class LexiconLoader(
      * Demande le lexique de [language] ; [onLoaded] reçoit la langue et le lexique (ou `null` en cas
      * d'échec) sur le fil principal. Sans effet si cette langue est déjà demandée.
      */
-    fun load(language: String, onLoaded: (String, Lexicon?) -> Unit) {
+    fun load(language: String, onLoaded: (String, T?) -> Unit) {
         if (language == requested) return
         requested = language
         val mine = ++generation

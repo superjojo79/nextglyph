@@ -35,8 +35,15 @@ class AdaptiveKeyboard(
     private var prefix: String? = null
     private var computed = false
 
-    /** Lexique de la langue active, ou `null` tant qu'il n'est pas chargé. */
+    /** Lexique de la langue active, ou `null` tant qu'il n'est pas chargé (ou si une autre source est installée). */
     var lexicon: Lexicon? = null
+        private set
+
+    /**
+     * Source des distributions (lexique, ou mélange bilingue `Predictor.distribution`, §10.6), ou
+     * `null` : clavier neutre.
+     */
+    var source: DistributionSource? = null
         private set
 
     /**
@@ -72,7 +79,18 @@ class AdaptiveKeyboard(
 
     /** Installe (ou retire) le lexique de la langue active et recalcule la disposition à [nowMs]. */
     fun setLexicon(lexicon: Lexicon?, nowMs: Long) {
+        setSource(lexicon?.let { DistributionSource(it::distribution) }, nowMs)
         this.lexicon = lexicon
+    }
+
+    /**
+     * Installe (ou retire) la source des distributions et recalcule la disposition à [nowMs] ;
+     * à rappeler quand la source change de contenu sans que le préfixe change (nouvel état de
+     * langue, par exemple).
+     */
+    fun setSource(source: DistributionSource?, nowMs: Long) {
+        this.source = source
+        lexicon = null
         computed = false
         refresh(nowMs)
     }
@@ -134,12 +152,12 @@ class AdaptiveKeyboard(
     private fun refresh(nowMs: Long) {
         if (computed) return
         computed = true
-        val lexicon = lexicon
+        val source = source
         val prefix = prefix
-        if (restOnly || lexicon == null || prefix == null) {
+        if (restOnly || source == null || prefix == null) {
             weights.setNeutral()
         } else {
-            calculator.compute(prefix, lexicon, weights)
+            calculator.compute(prefix, source.distribution(prefix), source, weights)
         }
         if (restOnly) return
         solver.solve(weights, target)

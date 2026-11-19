@@ -108,3 +108,20 @@ Programme `PredictionBenchmark` (`Predictor.predict` après chaque lettre : extr
 - Échantillon de 5 % (environ 7 minutes d'analyse) : la variance est de l'ordre de 0,1 à 0,2 point sur les taux de fausses validations.
 - Les mesures des §3 et §4 supposent un utilisateur qui tape systématiquement sans séparateur ni accent ; un utilisateur réel mélange les deux.
 - Distance d'édition 2 (§10.4) non implémentée.
+
+## 8. Français séparé par licence (fichiers fusionnés à la lecture)
+
+Depuis la séparation de `fr.nglx` (`docs/DECISIONS.md`, 2026-11-20), le moteur lit le français en deux fichiers fusionnés (`fr-lexique`, sans casse, et `fr-dicollecte`). `./gradlew :tools:analyzeEngine` lit les fichiers séparés, comme l'application ; `-PanalysisCombined` relit la liste unique `fr.tsv` (non distribuée) et redonne exactement les chiffres des §2 à §5. Même échantillon, moteur seul, réglage Normale :
+
+| Mesure | Liste unique | Fichiers séparés |
+|---|---|---|
+| FR, fausses validations, 0 / 2 / 5 % de fautes | 0,66 / 1,10 / 2,17 % | 0,72 / 1,16 / 2,26 % |
+| FR, complétées ou corrigées, 0 / 2 / 5 % | 17,18 / 18,82 / 20,70 % | 17,12 / 18,78 / 20,64 % |
+| FR, pire cas toutes prudences (5 %, Audacieuse) | 2,76 % | 2,74 % |
+| Élisions restituées / fausses | 68,6 / 2,1 % | 68,6 / 2,1 % |
+| Accents restitués / faux (français seul) | 58,6 / 0,23 % | 58,5 / 0,20 % |
+| Corpus mixte, 0 / 2 % de fautes | 0,36 / 0,69 % | 0,36 / 0,68 % |
+| Langue de la phrase correcte | 96,7 % | 96,7 % |
+| Anglais | — | identique au centième |
+
+Les prédictions sont équivalentes : écarts de 0,02 à 0,09 point (quelques validations sur environ 4 800), dans la variance de l'échantillon et loin de l'objectif de 3 %. Ils viennent du seul écart de données : une forme présente dans les deux sources compte en plus le plancher de Dicollecte (1, soit 0,01 occurrence par million), ce qui déplace à la marge quelques rapports `P(w)` proches des seuils.
