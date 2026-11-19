@@ -183,9 +183,9 @@ class KeyWeightCalculatorTest {
 
             val weights = compute("xa", AdaptationConfig(correctionAdjacencySigma = 0.8f), lex = lex)
 
-            // x → c : même rangée, 0,85 u ; x → s : rangée au-dessus, (0,775 u ; 1 u).
-            val toC = exp(-(0.85 * 0.85) / (2 * 0.64))
-            val toS = exp(-(0.775 * 0.775 + 1) / (2 * 0.64))
+            // x → c : même rangée, 0,9 u ; x → s : rangée au-dessus, (0,85 u ; 1 u).
+            val toC = exp(-(0.9 * 0.9) / (2 * 0.64))
+            val toS = exp(-(0.85 * 0.85 + 1) / (2 * 0.64))
             assertThat(weights.r('b')).isEqualTo(1f)
             assertThat(weights.r('c').toDouble()).isCloseTo(toS / toC, Offset.offset(1e-4))
         }

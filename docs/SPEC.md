@@ -108,14 +108,14 @@ Rangée 2 : q s d f g h j k l m                                         10 u
 Rangée 3 : ?123 | w x c v b n | espace | ↵ | ⌫                         10 u (cf. ci-dessous)
 ```
 
-Rangée 3, répartition au repos : `?123` 1 u, 6 lettres à 0,85 u (5,1 u), espace 1,9 u, `↵` 1 u, `⌫` 1 u = 10 u. **Décision :** les lettres de la rangée 3 sont légèrement plus étroites, plutôt que de déplacer `↵` dans la barre.
+Rangée 3, répartition au repos : `?123` 1 u, 6 lettres à 0,9 u (5,4 u), espace 1,6 u, `↵` 1 u, `⌫` 1 u = 10 u. **Décision :** les lettres de la rangée 3 sont légèrement plus étroites (0,9 u, soit 32,4 dp à 360 dp, au-dessus du minimum de 32 dp du §13), plutôt que de déplacer `↵` dans la barre ; l'espace absorbe la différence et continue de grandir avec P(fin) (§5.2).
 
 **Variante QWERTY.** La rangée 3 QWERTY compte 7 lettres au lieu de 6. Pour garder une espace assez large, `↵` passe au bout de la rangée 2, à l'emplacement de la touche Entrée d'un clavier physique :
 
 ```
 Rangée 1 : q w e r t y u i o p                                         10 u
 Rangée 2 : (0,3 u) a s d f g h j k l | ↵                               0,3 + 9 × 0,95 + 1,15 = 10 u
-Rangée 3 : ?123 | z x c v b n m | espace | ⌫                           1 + 7 × 0,85 + 2,05 + 1 = 10 u
+Rangée 3 : ?123 | z x c v b n m | espace | ⌫                           1 + 7 × 0,9 + 1,7 + 1 = 10 u
 ```
 
 **Choix de la disposition.** La disposition (AZERTY ou QWERTY) est un réglage indépendant de la langue saisie. Par défaut : AZERTY si la locale système est française, QWERTY sinon. Une personne francophone qui écrit en anglais garde son AZERTY.
@@ -563,7 +563,7 @@ Ensuite (V2) : bigrammes et prédiction du mot suivant, saisie par glissement, d
 | Licence | Apache-2.0 (règles pour les données au §10.2) |
 | Langues V1 | Français et anglais, actifs simultanément (§10.6) |
 | minSdk | 26 (Android 8.0) |
-| Rangée 3 | Lettres à 0,85 u ; en QWERTY, `↵` au bout de la rangée 2 (§5.1) |
+| Rangée 3 | Lettres à 0,9 u (32,4 dp à 360 dp) ; en QWERTY, `↵` au bout de la rangée 2 (§5.1) |
 | Saisie par glissement | Après la V1 |
 | Hébergement | GitHub |
 | Distribution | F-Droid et Google Play (§18) |

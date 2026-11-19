@@ -41,6 +41,6 @@ Chiffres clés : `fr.nglx` 5,97 Mio (454 057 clés), `en.nglx` 1,31 Mio (130 735
 - **Licence de `fr.nglx`** : Lexique (CC BY-SA 4.0) et Dicollecte (MPL-2.0) sont incompatibles dans un même fichier. Piste : un fichier par source, fusionnés à l'exécution par le moteur (M2). À trancher avant M5.
 - **Instantané des données Tatoeba** : les exports changent chaque semaine ; il faut un instantané figé pour une recette F-Droid reproductible (avant M5).
 - **Fréquences anglaises** : tirées de Tatoeba (biais « Tom », « Mary ») ; chercher une meilleure source à licence compatible.
-- **Taille des touches** : à 360 dp de large, les lettres de la rangée 3 (0,85 u) font moins de 32 dp (§13). À vérifier sur émulateur et à arbitrer en M1.
+- **Taille des touches** : à 360 dp de large, les lettres de la rangée 3 passent à 0,9 u (32,4 dp à 360 dp) pour respecter le §13 (DECISIONS.md, 2026-11-19). À vérifier sur émulateur.
 - **Prototype** : n'implémente pas encore la correction des préfixes connus du §5.5 révisé ; ses valeurs par défaut sont alignées sur la spec.
 - **SCOWL** : mention de données COCA dans son README, à relire avant publication.

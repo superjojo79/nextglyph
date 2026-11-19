@@ -37,7 +37,7 @@ class KeyboardLayoutsTest {
                 KeyKind.SYMBOLS, KeyKind.LETTER, KeyKind.LETTER, KeyKind.LETTER, KeyKind.LETTER, KeyKind.LETTER, KeyKind.LETTER,
                 KeyKind.SPACE, KeyKind.ENTER, KeyKind.BACKSPACE,
             )
-            assertThat(row.restWidths).containsExactly(1f, 0.85f, 0.85f, 0.85f, 0.85f, 0.85f, 0.85f, 1.9f, 1f, 1f)
+            assertThat(row.restWidths).containsExactly(1f, 0.9f, 0.9f, 0.9f, 0.9f, 0.9f, 0.9f, 1.6f, 1f, 1f)
             assertThat(row.leadingInset).isZero()
         }
 
@@ -56,7 +56,7 @@ class KeyboardLayoutsTest {
 
             assertThat(row.keys.map { it.kind }.distinct()).containsExactly(KeyKind.SYMBOLS, KeyKind.LETTER, KeyKind.SPACE, KeyKind.BACKSPACE)
             assertThat(row.restWidths.last()).isEqualTo(1f)
-            assertThat(row.restWidths[row.restWidths.size - 2]).isEqualTo(2.05f)
+            assertThat(row.restWidths[row.restWidths.size - 2]).isEqualTo(1.7f)
             assertThat(row.labels()).isEqualTo("|zxcvbnm||")
         }
 

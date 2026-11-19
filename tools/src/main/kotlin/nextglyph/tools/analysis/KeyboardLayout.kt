@@ -12,8 +12,8 @@ internal class LetterRow(val letters: String, val start: Double, val keyWidth: D
  * (1 u = largeur d'une lettre des rangées 1 et 2 ; une rangée = 1 u de haut, approximation d'une
  * touche de 38 dp sur un écran de 360 dp).
  *
- * - AZERTY : rangées 1 et 2 alignées (10 u), rangée 3 = `?123` (1 u) puis 6 lettres de 0,85 u.
- * - QWERTY : rangée 2 décalée de 0,3 u avec des lettres de 0,95 u, rangée 3 = `?123` puis 7 lettres de 0,85 u.
+ * - AZERTY : rangées 1 et 2 alignées (10 u), rangée 3 = `?123` (1 u) puis 6 lettres de 0,9 u.
+ * - QWERTY : rangée 2 décalée de 0,3 u avec des lettres de 0,95 u, rangée 3 = `?123` puis 7 lettres de 0,9 u.
  *
  * Deux lettres sont **voisines** si la distance entre leurs centres est au plus
  * [NEIGHBOR_DISTANCE] (1,5 u) : les deux voisines de rangée et, sur les rangées adjacentes, les
@@ -25,14 +25,14 @@ enum class KeyboardLayout(rows: List<LetterRow>) {
         listOf(
             LetterRow("azertyuiop", 0.0, 1.0),
             LetterRow("qsdfghjklm", 0.0, 1.0),
-            LetterRow("wxcvbn", 1.0, 0.85),
+            LetterRow("wxcvbn", 1.0, 0.9),
         ),
     ),
     QWERTY(
         listOf(
             LetterRow("qwertyuiop", 0.0, 1.0),
             LetterRow("asdfghjkl", 0.3, 0.95),
-            LetterRow("zxcvbnm", 1.0, 0.85),
+            LetterRow("zxcvbnm", 1.0, 0.9),
         ),
     ),
     ;

@@ -3,7 +3,7 @@ package nextglyph.engine.layout
 /** Dispositions au repos du profil Texte (spec §5.1). */
 object KeyboardLayouts {
 
-    private const val ROW3_LETTER = 0.85f
+    private const val ROW3_LETTER = 0.9f
 
     val AZERTY: KeyboardLayout = KeyboardLayout(
         LayoutKind.AZERTY,
@@ -14,7 +14,7 @@ object KeyboardLayouts {
                 listOf(Key(KeyKind.SYMBOLS, "?123", 1f)) +
                     letters("wxcvbn", ROW3_LETTER).keys +
                     listOf(
-                        Key(KeyKind.SPACE, "", 1.9f),
+                        Key(KeyKind.SPACE, "", 1.6f),
                         Key(KeyKind.ENTER, "↵", 1f),
                         Key(KeyKind.BACKSPACE, "⌫", 1f),
                     ),
@@ -34,7 +34,7 @@ object KeyboardLayouts {
                 listOf(Key(KeyKind.SYMBOLS, "?123", 1f)) +
                     letters("zxcvbnm", ROW3_LETTER).keys +
                     listOf(
-                        Key(KeyKind.SPACE, "", 2.05f),
+                        Key(KeyKind.SPACE, "", 1.7f),
                         Key(KeyKind.BACKSPACE, "⌫", 1f),
                     ),
             ),

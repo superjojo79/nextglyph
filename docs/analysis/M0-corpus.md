@@ -44,7 +44,7 @@ Pour chaque mot du test et chaque position `i` (1 à 8, les positions suivantes 
 - Deux variantes : correction **seulement si `t` est un préfixe inconnu** (lecture littérale du §5.2), ou correction **aussi si `t` est un préfixe connu qui n'est pas un mot** (une faute forme souvent un autre préfixe valide : `ke` pour `le`).
 - Non mesuré : distance 2 sur le mot complet (§10.4), élisions et contractions comme candidats spéciaux, restitution des accents (on compare des clés), modèle de bigrammes.
 
-**Adjacence** (`KeyboardLayout`) : centres des 26 lettres de la disposition compacte au repos du §5.1 (AZERTY : rangées 1 et 2 alignées, rangée 3 décalée de 1 u et lettres de 0,85 u ; QWERTY : rangée 2 décalée de 0,3 u à 0,95 u, rangée 3 à 0,85 u ; une rangée = 1 u de haut). Deux lettres sont voisines si leurs centres sont à 1,5 u au plus (1 à 6 voisines par lettre ; en QWERTY, `p` n'a que `o`).
+**Adjacence** (`KeyboardLayout`) : centres des 26 lettres de la disposition compacte au repos du §5.1 (AZERTY : rangées 1 et 2 alignées, rangée 3 décalée de 1 u et lettres de 0,9 u ; QWERTY : rangée 2 décalée de 0,3 u à 0,95 u, rangée 3 à 0,9 u ; une rangée = 1 u de haut). Deux lettres sont voisines si leurs centres sont à 1,5 u au plus (1 à 6 voisines par lettre ; en QWERTY, `p` n'a que `o`).
 
 **Fautes simulées** (`TypoModel`) : chaque lettre est remplacée, avec une probabilité de 2 % ou 5 %, par une voisine tirée uniformément (AZERTY pour le français, QWERTY pour l'anglais) ; `'` et `-` ne sont jamais modifiés. Ni omission, ni insertion, ni inversion : le modèle de fautes est **plus favorable** à la correction que la réalité (il ne produit que des fautes que la correction sait traiter).
 

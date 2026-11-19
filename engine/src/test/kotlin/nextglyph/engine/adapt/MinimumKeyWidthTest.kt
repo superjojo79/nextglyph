@@ -61,11 +61,19 @@ class MinimumKeyWidthTest {
 
         @ParameterizedTest(name = "{0} dp")
         @ValueSource(floats = [360f, 411f])
-        fun `en Calme renforcé, la rangée 3 ne descend jamais sous 32 dp ni sous son repos`(widthDp: Float) {
+        fun `en Calme renforcé, la rangée 3 garde 32 dp`(widthDp: Float) {
             for (layout in LAYOUTS) {
                 val smallest = smallestLetterDp(layout, widthDp, AdaptationConfig(), 2)
 
-                assertThat(smallest).isGreaterThanOrEqualTo(min(32f, restLetterDp(layout, widthDp, 2)) - 0.01f)
+                assertThat(smallest).`as`("${layout.kind} rangée 3 à $widthDp dp").isGreaterThanOrEqualTo(32f - 0.01f)
+            }
+        }
+
+        @ParameterizedTest(name = "{0} dp")
+        @ValueSource(floats = [360f, 411f])
+        fun `au repos, toutes les lettres font au moins 32 dp`(widthDp: Float) {
+            for (layout in LAYOUTS) for (row in 0..2) {
+                assertThat(restLetterDp(layout, widthDp, row)).`as`("${layout.kind} rangée $row à $widthDp dp").isGreaterThanOrEqualTo(32f)
             }
         }
 

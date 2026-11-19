@@ -124,8 +124,8 @@ class LayoutSolverTest {
             val out = solve(weights, config)
 
             // AZERTY rangée 3 : ?123 w x c v b n espace ↵ ⌫
-            assertThat(out.width(2, 7)).isCloseTo(1.9f + 0.6f, eps)
-            assertThat(out.width(2, 1)).isCloseTo(0.85f - 0.1f, eps)
+            assertThat(out.width(2, 7)).isCloseTo(1.6f + 0.6f, eps)
+            assertThat(out.width(2, 1)).isCloseTo(0.9f - 0.1f, eps)
             assertThat(out.width(2, 0)).isEqualTo(1f)
             assertThat(out.width(2, 8)).isEqualTo(1f)
             assertThat(out.width(2, 9)).isEqualTo(1f)
@@ -261,7 +261,7 @@ class LayoutSolverTest {
 
             // Lettres au minimum (largeur de repos) : l'espace ne peut pas grandir.
             assertInvariants(out, config, 1f)
-            assertThat(out.width(2, 7)).isCloseTo(1.9f, eps)
+            assertThat(out.width(2, 7)).isCloseTo(1.6f, eps)
         }
     }
 
@@ -394,7 +394,7 @@ class LayoutSolverTest {
 
             val out = solve(weights, AdaptationConfig(mode = AdaptationMode.ELASTIC, maxDisplacement = 1f))
 
-            assertThat(out.width(2, 7)).isEqualTo(1.9f)
+            assertThat(out.width(2, 7)).isEqualTo(1.6f)
             assertThat(KeyboardLayouts.AZERTY.rows[2].keys[7].kind).isEqualTo(KeyKind.SPACE)
         }
 
