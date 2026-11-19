@@ -33,10 +33,19 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
-      # `build` compile aussi le module ime : il lui faut le SDK Android.
+      # Données linguistiques (~100 Mo, :tools:fetchData) : le cache évite de les retélécharger à chaque
+      # exécution ; la clé change dès que sources.json change. Les lexiques (assets de l'APK) sont
+      # reconstruits à partir de ces données par :tools:buildLexicons, dont dépend l'application.
+      - name: Restaurer les données linguistiques
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/build/data
+          key: lexicon-data-${{ hashFiles('tools/data/sources.json') }}
+
+      # `build` compile aussi le module ime : il lui faut le SDK Android et les lexiques (assets).
       - uses: ./.github/actions/android-sdk
 
-      - name: Compiler, tester et contrôler la convention de tests
+      - name: Compiler, tester et contrôler la convention de tests (construit les lexiques)
         run: ./gradlew build --console=plain
 
       - name: Publier les rapports de tests
@@ -93,10 +102,17 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
+      # Mêmes données linguistiques que le job « Build et tests » (cache partagé par la clé).
+      - name: Restaurer les données linguistiques
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/build/data
+          key: lexicon-data-${{ hashFiles('tools/data/sources.json') }}
+
       # Le runner fournit un SDK Android ; on ne télécharge que ce qui manque.
       - uses: ./.github/actions/android-sdk
 
-      - name: Lint, tests unitaires et APK de debug
+      - name: Lint, tests unitaires et APK de debug (construit les lexiques)
         run: ./gradlew :ime:lintDebug :ime:testDebugUnitTest :ime:assembleDebug --console=plain
 
       - name: Publier l'APK de debug
