@@ -186,3 +186,38 @@ Indication de calibrage : des taps tirés uniformément dans la touche visée so
 - **Formule de décodage seule, sans noyau** : ne garantit pas le §5.3 quand le centre affiché s'écarte du centre de repos ; il faudrait `σ` très petit ou `λ` faible, au détriment de la correction en périphérie.
 - **Laisser le décodeur convertir une lettre en espace (ou l'inverse)** près des frontières : imprévisible, et l'espace valide un mot (§5.5) ; une erreur coûterait cher.
 - **Transposition dans la correction du préfixe** : relève de la distance 2 (§10.4), à la validation du mot.
+
+---
+
+## 2026-11-19 — Cœur adaptatif dans l'IME : lexiques embarqués, mot en cours, taille minimale des touches
+
+### Contexte
+
+Fin du périmètre M1 : l'IME charge les lexiques, suit le mot en cours, adapte la disposition affichée et décode les taps avec `TapDecoder`. Le §13 impose des zones de tap d'au moins 32 × 32 dp après adaptation (hors mode Élastique) ; or le solveur ne bornait les largeurs que par rapport au repos (`adapt.minWidth` = 0,6 u).
+
+### Décision
+
+**Lexiques.** `fr.nglx` et `en.nglx`, produits par `:tools:buildLexicons`, sont des assets non compressés (`noCompress`) projetés en mémoire (`AssetFileDescriptor` + `FileChannel.map`) en arrière-plan par `LexiconLoader` ; tant que le chargement n'est pas terminé, ou s'il échoue, le clavier est neutre (repos, `λ = 0`). Une seule langue est active (M1), choisie d'après le sous-type de méthode de saisie courant, puis la locale système, puis l'anglais (`LexiconLanguage`). Côté Gradle, `tools` expose `build/lexicons` par une configuration sortante (`lexiconElements`, attribut d'usage `nextglyph-lexicons`) et `ime` la consomme par une configuration résolvable ; la tâche `copy<Variante>Lexicons` alimente les assets, donc `:ime:assemble*`, `lint*` et `build` construisent les lexiques sans copie manuelle (compatible cache de configuration). Modification de `tools/build.gradle.kts` indispensable : `buildLexicons` ne déclarait ni entrées ni sorties (« toujours exécutée ») et n'exposait rien ; elle déclare maintenant ses entrées (listes de mots, corpus de test) et sa sortie, si bien qu'un second assemblage la trouve à jour. `fetchData` et `buildWordLists` restent inchangées.
+
+**Mot en cours.** `WordPrefix.of(textBeforeCursor, selectionLength, language)` (engine, pur) : dernière suite de lettres avant le curseur, apostrophe et trait d'union entre lettres compris, normalisée par `TextNormalizer`. Une élision française (`l'`, `qu'`...) est un mot à part entière (§5.8, comme dans le découpage des lexiques) : le préfixe repart de vide. Chiffre, caractère hors de l'alphabet du lexique, plus de 64 caractères ou texte indisponible : `null`, clavier neutre. Une sélection donne le préfixe vide (la frappe suivante la remplace). L'IME relit le texte (66 caractères) après chaque frappe et à chaque `onUpdateSelection` ; `AdaptiveKeyboard.onPrefix` ignore un préfixe inchangé, si bien que les deux appels ne comptent qu'une frappe. Pas de lecture du texte, ni d'adaptation, dans les champs mot de passe, e-mail, adresse web, numériques, téléphone et date/heure (`AdaptationPolicy`, §2.8, §12).
+
+**Rendu et accessibilité.** `AdaptiveKeyboard` (engine) assemble poids, solveur, `AdaptiveLayoutState` et décodeur ; `KeyboardView` lui transmet les pointeurs réels et l'horloge (`SystemClock.uptimeMillis`), lit `ANIMATOR_DURATION_SCALE` et dessine l'image courante sans allocation (`postInvalidateOnAnimation` pendant l'animation, `postInvalidateDelayed` jusqu'à l'échéance d'une mise à jour différée, aucun redessin pendant le gel). Mode par défaut : Calme renforcé. Avec TalkBack (exploration tactile), disposition au repos et décodage purement spatial. L'opacité du libellé ne descend pas sous 0,55 (`KeyStyle`) : à l'opacité de la touche seule (0,30 en Élastique, 0,44 en Calme renforcé pour une lettre de poids nul), le contraste clair tombe sous 3:1 ; avec ce plancher il reste supérieur à 3:1 sur les deux thèmes, ce que `KeyStyleTest` calcule à partir des couleurs des ressources.
+
+**Taille minimale des touches (§13).** Mesure sur AZERTY et QWERTY, 300 000 préfixes réels (FR et EN, lexiques de production) et 20 000 jeux de poids aléatoires, avant correction :
+
+| Largeur de l'écran | Lettre de la rangée 3 au repos | Plus petite lettre après adaptation (Calme renforcé, comme Élastique) |
+|---|---|---|
+| 360 dp | 30,6 dp | 18,4 dp (rangée 3) ; 21,6 dp (rangées 1 et 2) ; 20,5 dp (rangée 2 QWERTY) |
+| 411 dp | 34,9 dp | 21,0 dp (rangée 3) ; 24,7 dp (rangées 1 et 2) ; 23,4 dp (rangée 2 QWERTY) |
+
+La contrainte de 32 dp était donc violée, à l'écran de 360 dp déjà au repos pour la rangée 3, et après adaptation partout, y compris en Calme renforcé (le plafond de déplacement du centre limite le décalage, pas la largeur). Solution retenue : **largeur minimale en dp dans le solveur**. `AdaptationConfig.minKeyWidthDp` (32) et `LayoutSolver.keyboardWidthDp` (renseignée par la vue) donnent un plancher `min(repos, 32 dp)` aux lettres, en plus de `minWidth × repos` ; la disposition au repos reste admissible, donc les garanties du solveur (topologie, rangées de 10 u, plafond de déplacement) sont inchangées. Le mode Élastique, explicitement choisi, en est exempté (§13). Après correction : 32 dp au minimum pour les lettres des rangées 1 et 2, aux deux largeurs ; rangée 3 : 32 dp à 411 dp, et à 360 dp la largeur de repos (30,6 dp) qu'aucune adaptation ne réduit. Vérifié par `MinimumKeyWidthTest`.
+
+Reste ouvert : au repos, la rangée 3 fait 30,6 dp à 360 dp (0,85 u du §5.1), 1,4 dp sous la contrainte du §13 ; aucune adaptation n'y change rien. Un correctif demande de modifier le §5.1 (lettres à 0,9 u, espace à 1,6 u en AZERTY et 1,7 u en QWERTY, soit 32,4 dp à 360 dp) et donc `KeyboardLayouts`, le prototype et l'analyse M0, ce qui sort de ce périmètre ; à trancher.
+
+### Alternatives écartées
+
+- **Plancher exprimé en unités relatives seulement** (relever `adapt.minWidth` à 0,9) : supprime presque toute l'adaptation de largeur, et reste insuffisant sur un écran étroit.
+- **Plancher appliqué aussi en mode Élastique** : contredit le §13 (« sauf mode élastique explicitement choisi »).
+- **Copie manuelle des lexiques dans `ime/src/main/assets`** : fichiers de plusieurs Mo dans git ou étape à la main, non reproductible.
+- **Lexiques compressés dans l'APK puis copiés au démarrage** : lecture complète à chaque installation, `mmap` direct impossible.
+- **Calcul du préfixe par état tenu dans l'IME** (ajout et retrait de lettres) : se désynchronise à chaque déplacement du curseur ou édition par l'application ; relire le texte avant le curseur est plus robuste et reste sous le budget.

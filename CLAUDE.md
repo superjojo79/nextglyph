@@ -10,7 +10,7 @@ Documentation, noms de tests et messages d'erreur en français. Identifiants de 
 
 - `engine/` : moteur en Kotlin pur (JVM, bytecode 17), sans dépendance Android. Package racine `nextglyph.engine`.
 - `tools/` : outils hors ligne (JVM, package `nextglyph.tools`). `./gradlew :tools:fetchData` télécharge les données listées dans `tools/data/sources.json` (sources et licences : `docs/DATA.md`).
-- `ime/` : application Android (`InputMethodService`, `KeyboardView`, activité de réglages), package `nextglyph.ime`. Nécessite le SDK Android (`local.properties` avec `sdk.dir`, ignoré par git). `./gradlew :ime:lintDebug :ime:testDebugUnitTest :ime:assembleDebug`.
+- `ime/` : application Android (`InputMethodService`, `KeyboardView`, activité de réglages), package `nextglyph.ime`. Nécessite le SDK Android (`local.properties` avec `sdk.dir`, ignoré par git). `./gradlew :ime:lintDebug :ime:testDebugUnitTest :ime:assembleDebug`. L'APK embarque `fr.nglx` et `en.nglx` : leur assemblage lance `:tools:buildLexicons` (donc `fetchData` ; ~100 Mo en cache dans `tools/build/data`).
 - `prototype/` : prototype web (HTML + JS sans build), tests `node --test` dans `prototype/`.
 
 ## Commandes
