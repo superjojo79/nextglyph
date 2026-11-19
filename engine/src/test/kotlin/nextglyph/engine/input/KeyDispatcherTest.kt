@@ -47,6 +47,14 @@ class KeyDispatcherTest {
         }
 
         @Test
+        fun `un chiffre ou un symbole est inséré`() {
+            dispatcher.onKey(Key.character('7'), EnterBehavior.EnterKey)
+            dispatcher.onKey(Key.character('€'), EnterBehavior.EnterKey)
+
+            assertThat(editor.calls).containsExactly("commit:7", "commit:€")
+        }
+
+        @Test
         fun `Entrée selon le comportement`() {
             dispatcher.onKey(enter, EnterBehavior.NewLine)
             dispatcher.onKey(enter, EnterBehavior.EditorAction(3))
@@ -61,6 +69,16 @@ class KeyDispatcherTest {
         @Test
         fun `la touche symboles n'a pas encore d'effet et ne lève rien`() {
             dispatcher.onKey(Key(KeyKind.SYMBOLS, "?123", 1f), EnterBehavior.NewLine)
+
+            assertThat(editor.calls).isEmpty()
+        }
+
+        @Test
+        fun `majuscule, retour aux lettres, séparateur décimal et emplacement vide sont sans effet direct`() {
+            dispatcher.onKey(Key(KeyKind.SHIFT, "⇧", 1f), EnterBehavior.NewLine)
+            dispatcher.onKey(Key(KeyKind.LETTERS, "ABC", 1f), EnterBehavior.NewLine)
+            dispatcher.onKey(Key(KeyKind.DECIMAL, ",", 1f), EnterBehavior.NewLine)
+            dispatcher.onKey(Key.empty(1f), EnterBehavior.NewLine)
 
             assertThat(editor.calls).isEmpty()
         }
