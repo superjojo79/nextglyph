@@ -137,3 +137,52 @@ Les fausses validations du corpus mixte dépendent peu de la fenêtre (< 0,02 po
 
 - **Fenêtre de 2 ou 3 mots** : légèrement meilleure sur ce corpus (+1,1 à +1,5 point), mais le corpus mixte change de langue tous les 34 mots en moyenne, ce qui favorise la réactivité, et la stabilité sur un long texte monolingue n'est pas mesurée ; une fenêtre de 2 mots bascule sur un seul mot ambigu, contraire à l'exigence « pas de bascule brutale » du §10.6. À réévaluer sur des textes réels (M5).
 - **Appartenance aux lexiques** : les mots courts communs (`a`, `on`, `son`, `plus`) tirent le score vers 50/50 ; moins précise à toutes les tailles de fenêtre.
+
+## 2026-11-19 — Cœur adaptatif du moteur : poids, solveur, animation, décodeur
+
+### Contexte
+
+Le profil Texte adapte la disposition après chaque frappe (spec §5.2) et décode les taps avec le modèle de langue (§5.3), sous les invariants du §2 (topologie immuable, déplacement plafonné, gel pendant le toucher, atténuer sans désactiver) et en moins de 1 ms par frappe (§11.3). Le package `nextglyph.engine.adapt` (Kotlin pur) fournit ce cœur à l'IME.
+
+### Décision
+
+**API.** Tampons mutables réutilisables, sans allocation dans les chemins appelés à chaque frappe : `KeyWeightCalculator` remplit des `KeyWeights` (`r(c)`, `P(fin)`, intensité, origine), `LayoutSolver` en déduit une `AdaptedLayout` (largeur, opacité, échelle du libellé par touche ; `widthsByRow()` se passe à `KeyboardGeometry.compute`), `AdaptiveLayoutState` applique gel, report et animation, `TapDecoder` remplit une `TapDecoding`. Toutes les constantes réglables sont dans `AdaptationConfig` / `TapDecoderConfig` (immuables), pour qu'une recalibration ne touche qu'un endroit.
+
+**Poids.** `r(c) = P(c | p) / max`, le maximum étant pris sur les lettres de la disposition (l'apostrophe et le trait d'union ne sont pas des touches du profil Texte). Début de mot : intensité 0,5. Préfixe inconnu : correction à distance d'édition 1 (substitution par une touche voisine pondérée par `exp(−d² / 2σ²)` sur la distance entre centres au repos, lettre en trop, lettre manquante), des positions proches de l'endroit où le préfixe devient inconnu vers le début, au plus 96 candidats ; la distribution retenue mélange celles des candidats connus, pondérées par poids d'édition × masse ; intensité 0,5 ; sans candidat, état neutre. La transposition (distance 2 au sens de Levenshtein) n'est pas tentée.
+
+**Solveur.** Les largeurs cibles suivent les formules du §5.2, normalisées sur les lettres de la rangée (les touches de fonction gardent leur largeur ; l'espace vise `repos + spaceGain · P(fin)` et ne descend jamais sous son repos), puis sont mélangées avec le repos selon l'intensité. Le respect des contraintes est exact et en O(n) : chaque bord intérieur d'une rangée est une variable ; une passe de droite à gauche calcule l'intervalle des positions admissibles de chaque bord (largeur minimale, largeur fixe, somme des deux bords bornée par le plafond de déplacement du centre) ; la disposition au repos est toujours admissible, donc aucun intervalle n'est vide ; une passe de gauche à droite place chaque bord au plus près de sa cible dans son intervalle. Le plafond est appliqué avec une marge de 10⁻⁵ u, si bien qu'il tient aussi pour les centres recalculés à partir des largeurs `Float` (testé sans tolérance sur 3 000 distributions aléatoires).
+
+**Modes.** Le plafond est par touche, en fraction de sa propre largeur au repos (0,5 × 0,85 u pour une lettre de la rangée 3). Calme : opacité seule. Calme renforcé (défaut) : opacité, libellé, plafond 0,15. Élastique : tout, plafond `adapt.maxDisplacement` = 0,5.
+
+**Décodeur : règles de frontière.**
+- La nature de la touche est celle de la touche *affichée* sous le doigt : un tap sur espace, ⌫, ↵ ou `?123` produit toujours cette touche, et un tap sur une lettre produit toujours une lettre, même tout près de l'espace. Le décodage probabiliste ne départage que des lettres. Une faute « lettre au lieu d'espace » relève de la correction à la validation (§10.4), pas du décodeur.
+- **Noyau garanti** : un tap dans la moitié centrale (en largeur et en hauteur) d'une lettre affichée produit cette lettre, quel que soit `λ`. Avec le mélange de gaussiennes, le centre *affiché* d'une lettre atténuée peut être à 0,5 u de son centre de repos en mode Élastique, et la formule seule ne garantit plus le §5.3 (« un tap franchement au centre d'une touche atténuée doit produire cette lettre ») ; le noyau le garantit dans tous les modes et rend le clavier prévisible (§2.5). Le modèle de langue n'agit qu'en périphérie des touches.
+- `P(c | p)` est remplacé par `max(r(c), 0,05)` : même ordre des scores, et une lettre de poids nul reste décodable hors du noyau.
+
+**Animation et gel.** Interpolation linéaire après une courbe `1 − (1 − t)²` ; toute image intermédiaire entre deux dispositions valides est valide (les centres dépendent linéairement des largeurs). L'animation est gelée, image comprise, tant qu'un pointeur est posé, et reprend au relâchement du dernier. En saisie rapide (intervalle < 120 ms), la disposition attend 120 ms sans frappe.
+
+**Valeurs choisies** (non fixées par la spec, à recalibrer par l'analyse de corpus) : `adapt.gain` 0,4 ; `adapt.spaceGain` 0,6 u ; plafond du Calme renforcé 0,15 ; libellé minimal 0,7 ; intensités d'opacité 0,5 / 0,8 / 1 et de libellé 0 / 0,4 / 1 (Calme / Calme renforcé / Élastique) ; intensité après correction 0,5 ; voisinage de correction 1,5 u, σ 1,0 u, poids de suppression et d'insertion 0,3, 96 candidats ; décodeur `σ` 0,35 largeur de touche, plancher d'a priori 0,05, noyau 0,5 ; courbe ease-out d'exposant 2.
+
+### Mesures
+
+Programme `AdaptationBenchmark.kt`, lexique français réel (`tools/build/lexicons/fr.nglx`, 454 057 clés), AZERTY, 81 097 frappes issues de 20 000 mots tirés selon leur fréquence, puis 20 000 préfixes avec une faute de touche voisine (10 601 inconnus du lexique). Poste de développement Windows 11, JDK 25 (HotSpot).
+
+| Mesure (µs) | moyenne | médiane | p99 | p99,9 |
+|---|---|---|---|---|
+| Poids, préfixes corrects | 2,0 | 1,8 | 4,0 | 8,4 |
+| Solveur | 0,44 | 0,40 | 0,60 | 1,9 |
+| Décodage | 0,64 | 0,60 | 1,0 | 3,0 |
+| **Total poids + solveur + décodage**, préfixes corrects | 3,1 | 2,9 | 5,5 | 12 |
+| **Total**, préfixes avec faute (correction) | 75 | 76 | 259 | 453 |
+
+Mêmes ordres de grandeur en mode Élastique. Les maxima isolés de 2 ms correspondent à des pauses du ramasse-miettes ou du compilateur JIT (cf. entrée précédente). Le budget de 1 ms est tenu avec une marge d'environ 180× au p99 sur les préfixes corrects et de 4× sur les préfixes à corriger ; ces mesures restent à refaire sur un téléphone de milieu de gamme.
+
+Indication de calibrage : des taps tirés uniformément dans la touche visée sont décodés sur cette lettre dans 95,8 % des cas en Calme renforcé et 92,9 % en Élastique ; les autres sont attirés hors du noyau par une voisine plus probable. `λ`, `σ` et le noyau sont à recalibrer avec des données de frappe réelles.
+
+### Alternatives écartées
+
+- **Mise à l'échelle uniforme de l'écart au repos** (plus grand `t ≤ 1` tel que `repos + t · (cible − repos)` respecte le plafond) : exacte et simple, mais une seule touche contrainte écrase l'adaptation de toute la rangée.
+- **Projection par moindres carrés** (programme quadratique, ou projections alternées) : optimale mais itérative, au coût et à la précision variables ; la méthode par intervalles admissibles est exacte, déterministe et en O(n).
+- **Formule de décodage seule, sans noyau** : ne garantit pas le §5.3 quand le centre affiché s'écarte du centre de repos ; il faudrait `σ` très petit ou `λ` faible, au détriment de la correction en périphérie.
+- **Laisser le décodeur convertir une lettre en espace (ou l'inverse)** près des frontières : imprévisible, et l'espace valide un mot (§5.5) ; une erreur coûterait cher.
+- **Transposition dans la correction du préfixe** : relève de la distance 2 (§10.4), à la validation du mot.
