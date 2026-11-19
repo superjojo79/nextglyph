@@ -1,6 +1,6 @@
 # M2 — Validation par espace et bilinguisme avec le moteur
 
-Ce document rejoue l'analyse de validation de M0 (`docs/analysis/M0-corpus.md`, parties 2 et 3) avec l'implémentation du moteur (`nextglyph.engine.predict.Predictor`), mesure ce que M0 ne mesurait pas (apostrophes et traits d'union omis, accents) et le coût par frappe. Décisions : `docs/DECISIONS.md` (2026-11-20).
+Ce document rejoue l'analyse de validation de M0 (`docs/analysis/M0-corpus.md`, parties 2 et 3) avec l'implémentation du moteur (`nextglyph.engine.predict.Predictor`), mesure ce que M0 ne mesurait pas (apostrophes et traits d'union omis, accents) et le coût par frappe. Décisions : `docs/DECISIONS.md` (2026-11-19).
 
 ```sh
 ./gradlew :tools:buildLexicons                       # listes de mots, corpus, lexiques (si absents)
@@ -111,7 +111,7 @@ Programme `PredictionBenchmark` (`Predictor.predict` après chaque lettre : extr
 
 ## 8. Français séparé par licence (fichiers fusionnés à la lecture)
 
-Depuis la séparation de `fr.nglx` (`docs/DECISIONS.md`, 2026-11-20), le moteur lit le français en deux fichiers fusionnés (`fr-lexique`, sans casse, et `fr-dicollecte`). `./gradlew :tools:analyzeEngine` lit les fichiers séparés, comme l'application ; `-PanalysisCombined` relit la liste unique `fr.tsv` (non distribuée) et redonne exactement les chiffres des §2 à §5. Même échantillon, moteur seul, réglage Normale :
+Depuis la séparation de `fr.nglx` (`docs/DECISIONS.md`, 2026-11-19), le moteur lit le français en deux fichiers fusionnés (`fr-lexique`, sans casse, et `fr-dicollecte`). `./gradlew :tools:analyzeEngine` lit les fichiers séparés, comme l'application ; `-PanalysisCombined` relit la liste unique `fr.tsv` (non distribuée) et redonne exactement les chiffres des §2 à §5. Même échantillon, moteur seul, réglage Normale :
 
 | Mesure | Liste unique | Fichiers séparés |
 |---|---|---|

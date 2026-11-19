@@ -260,7 +260,7 @@ Package `nextglyph.engine.edit` (pur, sans Android) : `TextEditor` (`onWordCommi
 
 ---
 
-## 2026-11-20 — Prédiction, validation par espace et bilinguisme dans le moteur (M2)
+## 2026-11-19 — Prédiction, validation par espace et bilinguisme dans le moteur (M2)
 
 ### Contexte
 
@@ -326,7 +326,7 @@ Détail dans `docs/analysis/M2-engine.md` (`./gradlew :tools:analyzeEngine`, éc
 
 ---
 
-## 2026-11-20 — Français séparé par licence ; saisie complète de M2 dans l'IME
+## 2026-11-19 — Français séparé par licence ; saisie complète de M2 dans l'IME
 
 ### Contexte
 

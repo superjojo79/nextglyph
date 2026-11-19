@@ -4,7 +4,7 @@
 |---|---|
 | Projet | Nextglyph, clavier adaptatif open source |
 | Statut | Brouillon v0.2 |
-| Date | 2026-11-20 |
+| Date | 2026-11-19 |
 | Licence | Apache-2.0 |
 | Plateforme cible | Android, minSdk 26 (Android 8.0) |
 | Langues V1 | Français et anglais |
@@ -404,7 +404,7 @@ Défini par `IME_FLAG_NO_PERSONALIZED_LEARNING` ou forcé par l'utilisateur. Le 
 ### 10.1 Lexique
 
 - Structure : trie compact (arbre radix) sur les formes normalisées ; choix, format et mesures dans `docs/DECISIONS.md` (2026-11-19).
-- Un lexique peut être réparti en plusieurs fichiers d'une même langue (sources sous licences différentes, dictionnaire personnel, contacts), fusionnés à la lecture sans copie : les fréquences d'une même forme s'additionnent, comme les masses des préfixes (`LexiconSet`, `docs/DECISIONS.md`, 2026-11-20). Le français est livré en deux fichiers, un par licence : `fr-lexique.nglx` (Lexique 4.10, orthographes sans casse et fréquences) et `fr-dicollecte.nglx` (formes de Dicollecte, fréquence plancher). Un membre « sans casse » donne la fréquence d'une orthographe : elle va à la forme minuscule des autres membres si elle existe, sinon à leurs variantes de casse (`docs/DATA.md`).
+- Un lexique peut être réparti en plusieurs fichiers d'une même langue (sources sous licences différentes, dictionnaire personnel, contacts), fusionnés à la lecture sans copie : les fréquences d'une même forme s'additionnent, comme les masses des préfixes (`LexiconSet`, `docs/DECISIONS.md`, 2026-11-19). Le français est livré en deux fichiers, un par licence : `fr-lexique.nglx` (Lexique 4.10, orthographes sans casse et fréquences) et `fr-dicollecte.nglx` (formes de Dicollecte, fréquence plancher). Un membre « sans casse » donne la fréquence d'une orthographe : elle va à la forme minuscule des autres membres si elle existe, sinon à leurs variantes de casse (`docs/DATA.md`).
 - Chaque nœud stocke la somme des fréquences de son sous-arbre et la fréquence maximale d'une forme du sous-arbre (complétions best-first) ; chaque nœud terminal stocke ses formes d'affichage avec leur fréquence.
 - Ainsi, `P(c | p)` et `P(fin | p)` se calculent en O(1) par lettre après la descente sur `p`.
 - Format binaire mappé en mémoire (`mmap`), construit hors ligne par `tools/`.
