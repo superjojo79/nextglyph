@@ -30,6 +30,9 @@ import java.util.Locale
  * @param lexicons lexiques actifs par code de langue (`fr`, `en`) ; l'ordre est celui des langues
  *   du [LanguageState] attendu.
  * @param layout disposition courante (adjacence des touches pour la correction).
+ * @param blockedAutocommit clés qui ne peuvent jamais être insérées par complétion ou correction (cas 2
+ *   du §5.5) : noms de contacts hors du contexte qui les justifie (§5.5, §6.3). Elles restent proposées
+ *   dans la barre ; sans effet sur un mot tapé qui est déjà un mot (cas 1).
  * @param cacheSize nombre de textes tapés dont les candidats sont gardés en mémoire, par langue
  *   (0 : aucun cache). Les candidats d'une langue ne dépendent que du texte tapé : un cache évite de
  *   les recalculer après ⌫ ou dans les simulations. Avec un cache, l'instance n'est pas thread-safe.
@@ -40,6 +43,7 @@ class Predictor(
     val config: PredictionConfig = PredictionConfig(),
     private val rejections: RejectionStore = InMemoryRejectionStore(),
     cacheSize: Int = 0,
+    private val blockedAutocommit: (String) -> Boolean = { false },
 ) {
     /** Codes des langues actives. */
     val languages: List<String> = lexicons.keys.toList()
@@ -117,7 +121,7 @@ class Predictor(
                 inserted = if (restored != raw && isRejected(raw, restored)) raw else restored
             }
             settings.autocommitEnabled && ranked.isNotEmpty() && p1 >= settings.prudence.minProb &&
-                p1 >= config.minRatio * p2 && !isRejected(raw, ranked[0].text) -> {
+                p1 >= config.minRatio * p2 && !isRejected(raw, ranked[0].text) && !blockedAutocommit(ranked[0].key) -> {
                 case = SpaceCase.DOMINANT
                 inserted = ranked[0].text
             }

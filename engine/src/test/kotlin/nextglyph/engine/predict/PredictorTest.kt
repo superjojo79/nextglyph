@@ -25,6 +25,33 @@ class PredictorTest {
     @Nested
     inner class HappyPath {
 
+        @Test
+        fun `une clé bloquée n'est jamais insérée par complétion mais reste proposée`() {
+            val blocking = Predictor(
+                mapOf("fr" to PredictFixtures.french()), KeyboardLayouts.AZERTY,
+                blockedAutocommit = { it == "bonjour" },
+            )
+
+            val prediction = blocking.predict("Il dit bonj", blocking.initialLanguageState("fr"), settings)
+
+            assertThat(prediction.case).isEqualTo(SpaceCase.LITERAL)
+            assertThat(prediction.inserted).isEqualTo("bonj")
+            assertThat(prediction.candidates.map { it.text }).contains("bonjour")
+        }
+
+        @Test
+        fun `une clé bloquée n'empêche pas un mot tapé en entier d'être inséré`() {
+            val blocking = Predictor(
+                mapOf("fr" to PredictFixtures.french()), KeyboardLayouts.AZERTY,
+                blockedAutocommit = { true },
+            )
+
+            val prediction = blocking.predict("Il dit bonjour", blocking.initialLanguageState("fr"), settings)
+
+            assertThat(prediction.case).isEqualTo(SpaceCase.WORD)
+            assertThat(prediction.inserted).isEqualTo("bonjour")
+        }
+
         @ParameterizedTest(name = "« {0} » → « {1} » ({2})")
         @CsvSource(
             "bonj, bonjour, DOMINANT",
