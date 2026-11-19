@@ -20,6 +20,9 @@ kotlin {
 
 dependencies {
     implementation(libs.gson)
+    // Décompression bzip2 (exports Tatoeba) et tar (SCOWL) ; le JDK ne lit pas bzip2.
+    implementation(libs.commons.compress)
+    implementation(project(":engine"))
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
@@ -51,12 +54,31 @@ tasks.register<JavaExec>("fetchData") {
     outputs.upToDateWhen { false }
 }
 
+// Listes de mots (fréquences) et corpus d'évaluation, construits à partir de build/data/ :
+// build/wordlists/<lang>.tsv, build/wordlists/<lang>-stats.txt, build/corpus/*.txt.
+// Toute la logique est dans nextglyph.tools.wordlists (testée).
+tasks.register<JavaExec>("buildWordLists") {
+    group = "data"
+    description = "Construit les listes de mots et les corpus d'évaluation (build/wordlists, build/corpus)."
+    dependsOn("fetchData")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.wordlists.BuildWordListsMainKt")
+    // Le corpus anglais (environ 2 millions de phrases) est tenu en mémoire.
+    maxHeapSize = "3g"
+    args(
+        layout.projectDirectory.file("data/sources.json").asFile.path,
+        layout.buildDirectory.dir("data").get().asFile.path,
+        layout.buildDirectory.get().asFile.path,
+    )
+    outputs.upToDateWhen { false }
+}
+
 pitest {
     pitestVersion.set(libs.versions.pitest.core)
     junit5PluginVersion.set(libs.versions.pitest.junit5)
     targetClasses.set(listOf("nextglyph.tools.*"))
     // Point d'entrée sans logique (délègue à FetchDataCli) et contrôle de convention.
-    excludedClasses.set(listOf("nextglyph.tools.data.FetchDataMainKt"))
+    excludedClasses.set(listOf("nextglyph.tools.data.FetchDataMainKt", "nextglyph.tools.wordlists.BuildWordListsMainKt"))
     excludedTestClasses.set(listOf("nextglyph.tools.TestConventionTest"))
     mutators.set(listOf("STRONGER"))
     // Évite les mutants inutiles sur les vérifications de nullité générées par Kotlin.

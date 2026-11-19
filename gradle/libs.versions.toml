@@ -3,6 +3,7 @@ kotlin = "2.4.21"
 junit = "6.1.3"
 assertj = "3.27.7"
 gson = "2.13.2"
+commons-compress = "1.28.0"
 pitest-core = "1.30.2"
 pitest-junit5 = "1.2.3"
 pitest-gradle = "1.19.0"
@@ -13,6 +14,7 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
