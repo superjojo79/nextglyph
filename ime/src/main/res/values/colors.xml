@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Thème clair. Contraste libellé/touche >= 4,5:1 (spec §13). -->
+    <color name="keyboard_background">#D2D5DB</color>
+    <color name="key_background">#FFFFFF</color>
+    <color name="key_function_background">#AEB3BD</color>
+    <color name="key_pressed_background">#B8C7DD</color>
+    <color name="key_label">#1B1B1F</color>
+</resources>
