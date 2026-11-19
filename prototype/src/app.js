@@ -1,6 +1,7 @@
 // Interface du prototype : affichage, Pointer Events, panneau de réglages.
 // Toute la logique est dans les modules purs voisins.
 
+import { describeSources, loadLexiconData } from './datasource.js';
 import { Engine } from './engine.js';
 import { LayoutFreezer } from './freeze.js';
 import { decodeTap, hitTest } from './decoder.js';
@@ -18,6 +19,7 @@ const els = {
   bar: $('bar'),
   debug: $('debug'),
   error: $('error'),
+  dataSource: $('data-source'),
   settings: $('settings'),
   form: $('settings-form'),
   logCount: $('log-count'),
@@ -444,14 +446,9 @@ window.addEventListener('resize', () => {
 
 async function start() {
   try {
-    const [fr, en] = await Promise.all(
-      ['fr', 'en'].map(async (lang) => {
-        const res = await fetch(`data/${lang}.json`);
-        if (!res.ok) throw new Error(`data/${lang}.json : HTTP ${res.status}`);
-        return res.json();
-      }),
-    );
-    engine = new Engine({ fr, en }, settings);
+    const [fr, en] = await Promise.all(['fr', 'en'].map((lang) => loadLexiconData(fetch, lang)));
+    els.dataSource.textContent = describeSources({ fr, en });
+    engine = new Engine({ fr: fr.entries, en: en.entries }, settings);
   } catch (err) {
     showError(
       `Impossible de charger les lexiques (${err.message}). Servez le dossier prototype/ en HTTP ` +

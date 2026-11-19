@@ -5,7 +5,7 @@ import { defaults } from '../src/settings.js';
 import { Engine } from '../src/engine.js';
 
 export function loadSample(lang) {
-  return JSON.parse(readFileSync(new URL(`../data/${lang}.json`, import.meta.url), 'utf8'));
+  return JSON.parse(readFileSync(new URL(`../data/sample-${lang}.json`, import.meta.url), 'utf8'));
 }
 
 export function sampleEngine(overrides = {}) {
