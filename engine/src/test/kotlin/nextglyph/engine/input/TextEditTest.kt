@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 
 class TextEditTest {
 
-    private class RecordingEditor : TextEditor {
+    private class RecordingEditor : EditTarget {
         val calls = mutableListOf<String>()
         override fun deleteBefore(length: Int) {
             calls += "delete $length"
@@ -23,7 +23,7 @@ class TextEditTest {
         @Test
         fun `applique les opérations dans l'ordre à un éditeur`() {
             val editor = RecordingEditor()
-            val edit = TextEdit(listOf(EditOperation.DeleteBefore(2), EditOperation.Insert("ur ")), endsWithAutoSpace = true)
+            val edit = TextEdit(listOf(EditOperation.DeleteBeforeCursor(2), EditOperation.InsertText("ur ")), endsWithAutoSpace = true)
 
             edit.applyTo(editor)
 
@@ -34,18 +34,18 @@ class TextEditTest {
 
         @Test
         fun `applique les opérations à un texte`() {
-            val edit = TextEdit(listOf(EditOperation.DeleteBefore(2), EditOperation.Insert("ur ")))
+            val edit = TextEdit(listOf(EditOperation.DeleteBeforeCursor(2), EditOperation.InsertText("ur ")))
 
             assertThat(edit.applyTo("bonjoir")).isEqualTo("bonjour ")
         }
 
         @Test
         fun `deux modifications se composent, l'espace automatique est celle de la seconde`() {
-            val word = TextEdit(listOf(EditOperation.Insert("our ")), endsWithAutoSpace = true)
-            val sign = TextEdit(listOf(EditOperation.DeleteBefore(1), EditOperation.Insert(", ")), endsWithAutoSpace = true)
+            val word = TextEdit(listOf(EditOperation.InsertText("our ")), endsWithAutoSpace = true)
+            val sign = TextEdit(listOf(EditOperation.DeleteBeforeCursor(1), EditOperation.InsertText(", ")), endsWithAutoSpace = true)
 
             val both = word + sign
-            val reverse = sign + TextEdit(listOf(EditOperation.Insert("x")))
+            val reverse = sign + TextEdit(listOf(EditOperation.InsertText("x")))
 
             assertThat(both.applyTo("bonj")).isEqualTo("bonjour, ")
             assertThat(both.endsWithAutoSpace).isTrue()
@@ -57,16 +57,16 @@ class TextEditTest {
     inner class ErrorCases {
         @Test
         fun `rejette un effacement nul ou négatif et une insertion vide`() {
-            assertThatThrownBy { EditOperation.DeleteBefore(0) }.isInstanceOf(IllegalArgumentException::class.java)
+            assertThatThrownBy { EditOperation.DeleteBeforeCursor(0) }.isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("strictement positif")
-            assertThatThrownBy { EditOperation.DeleteBefore(-1) }.isInstanceOf(IllegalArgumentException::class.java)
-            assertThatThrownBy { EditOperation.Insert("") }.isInstanceOf(IllegalArgumentException::class.java)
+            assertThatThrownBy { EditOperation.DeleteBeforeCursor(-1) }.isInstanceOf(IllegalArgumentException::class.java)
+            assertThatThrownBy { EditOperation.InsertText("") }.isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("vide")
         }
 
         @Test
         fun `rejette un effacement plus long que le texte`() {
-            assertThatThrownBy { TextEdit(listOf(EditOperation.DeleteBefore(4))).applyTo("abc") }
+            assertThatThrownBy { TextEdit(listOf(EditOperation.DeleteBeforeCursor(4))).applyTo("abc") }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("4")
         }
@@ -83,8 +83,8 @@ class TextEditTest {
 
         @Test
         fun `effacer exactement tout le texte, un seul caractère`() {
-            assertThat(TextEdit(listOf(EditOperation.DeleteBefore(3))).applyTo("abc")).isEmpty()
-            assertThat(TextEdit(listOf(EditOperation.DeleteBefore(1), EditOperation.Insert("é"))).applyTo("e")).isEqualTo("é")
+            assertThat(TextEdit(listOf(EditOperation.DeleteBeforeCursor(3))).applyTo("abc")).isEmpty()
+            assertThat(TextEdit(listOf(EditOperation.DeleteBeforeCursor(1), EditOperation.InsertText("é"))).applyTo("e")).isEqualTo("é")
         }
     }
 }

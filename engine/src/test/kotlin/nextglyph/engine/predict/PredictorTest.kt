@@ -76,7 +76,7 @@ class PredictorTest {
 
             val commit = fr.commitSpace(prediction, frState, settings)
 
-            assertThat(commit.edit.operations).containsExactly(EditOperation.Insert("our "))
+            assertThat(commit.edit.operations).containsExactly(EditOperation.InsertText("our "))
             assertThat(commit.edit.endsWithAutoSpace).isTrue()
             assertThat(commit.edit.applyTo("Il dit bonj")).isEqualTo("Il dit bonjour ")
             assertThat(commit.undo).isEqualTo(UndoToken("bonj", "bonjour"))
@@ -89,7 +89,7 @@ class PredictorTest {
         fun `un mot gardé tel quel n'a pas de jeton d'annulation`() {
             val commit = fr.commitSpace(fr.at("le", frState), frState, settings)
 
-            assertThat(commit.edit.operations).containsExactly(EditOperation.Insert(" "))
+            assertThat(commit.edit.operations).containsExactly(EditOperation.InsertText(" "))
             assertThat(commit.edit.endsWithAutoSpace).isTrue()
             assertThat(commit.undo).isNull()
         }
@@ -98,7 +98,7 @@ class PredictorTest {
         fun `une correction efface puis réécrit à partir du début commun`() {
             val commit = fr.commitSpace(fr.at("bonjoir", frState), frState, settings)
 
-            assertThat(commit.edit.operations).containsExactly(EditOperation.DeleteBefore(2), EditOperation.Insert("ur "))
+            assertThat(commit.edit.operations).containsExactly(EditOperation.DeleteBeforeCursor(2), EditOperation.InsertText("ur "))
         }
 
         @Test
@@ -377,7 +377,7 @@ class PredictorTest {
 
                 assertThat(prediction.case).isEqualTo(SpaceCase.DISABLED)
                 assertThat(prediction.bar).isEqualTo(SuggestionBar.EMPTY)
-                assertThat(commit.edit.operations).containsExactly(EditOperation.Insert(" "))
+                assertThat(commit.edit.operations).containsExactly(EditOperation.InsertText(" "))
                 assertThat(commit.edit.endsWithAutoSpace).isFalse()
                 assertThat(commit.language).isSameAs(frState)
                 assertThat(fr.commitBeforePunctuation(prediction, frState, s).edit.isEmpty).isTrue()

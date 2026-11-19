@@ -1,7 +1,7 @@
 package nextglyph.engine.input
 
 /**
- * Opération d'édition abstraite sur le texte qui précède le curseur.
+ * Modifications du texte qui précède le curseur, exprimées avec [EditOperation].
  *
  * Les modules du moteur qui modifient le texte (validation par espace et annulation dans
  * `nextglyph.engine.predict`, ponctuation et typographie dans `nextglyph.engine.edit`) décrivent
@@ -9,25 +9,8 @@ package nextglyph.engine.input
  * `InputConnection` (`deleteSurroundingText(n, 0)`, `commitText`), regroupées entre
  * `beginBatchEdit()` et `endBatchEdit()` (spec §11.2).
  */
-sealed interface EditOperation {
-
-    /** Efface les [length] `char` qui précèdent le curseur. */
-    data class DeleteBefore(val length: Int) : EditOperation {
-        init {
-            require(length > 0) { "Le nombre de caractères à effacer doit être strictement positif ($length)." }
-        }
-    }
-
-    /** Insère [text] au curseur. */
-    data class Insert(val text: String) : EditOperation {
-        init {
-            require(text.isNotEmpty()) { "Le texte inséré ne doit pas être vide." }
-        }
-    }
-}
-
 /** Destination des opérations d'édition ; implémentée par l'IME au-dessus d'`InputConnection`. */
-interface TextEditor {
+interface EditTarget {
     fun deleteBefore(length: Int)
 
     fun insert(text: String)
@@ -49,11 +32,11 @@ data class TextEdit(val operations: List<EditOperation>, val endsWithAutoSpace: 
     val isEmpty: Boolean get() = operations.isEmpty()
 
     /** Applique les opérations à [editor], dans l'ordre. */
-    fun applyTo(editor: TextEditor) {
+    fun applyTo(editor: EditTarget) {
         for (operation in operations) {
             when (operation) {
-                is EditOperation.DeleteBefore -> editor.deleteBefore(operation.length)
-                is EditOperation.Insert -> editor.insert(operation.text)
+                is EditOperation.DeleteBeforeCursor -> editor.deleteBefore(operation.count)
+                is EditOperation.InsertText -> editor.insert(operation.text)
             }
         }
     }
@@ -66,7 +49,7 @@ data class TextEdit(val operations: List<EditOperation>, val endsWithAutoSpace: 
     fun applyTo(textBeforeCursor: String): String {
         val buffer = StringBuilder(textBeforeCursor)
         applyTo(
-            object : TextEditor {
+            object : EditTarget {
                 override fun deleteBefore(length: Int) {
                     require(length <= buffer.length) { "Impossible d'effacer $length caractères sur ${buffer.length}." }
                     buffer.setLength(buffer.length - length)

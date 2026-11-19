@@ -136,7 +136,7 @@ class Predictor(
      */
     fun commitSpace(prediction: Prediction, language: LanguageState, settings: PredictionSettings): Commit {
         if (prediction.case == SpaceCase.NO_WORD || prediction.case == SpaceCase.DISABLED) {
-            return Commit(TextEdit(listOf(EditOperation.Insert(" "))), null, language)
+            return Commit(TextEdit(listOf(EditOperation.InsertText(" "))), null, language)
         }
         val edit = TextEdit(replace(prediction.word, prediction.inserted + " "), endsWithAutoSpace = true)
         val undo = if (prediction.inserted != prediction.word) UndoToken(prediction.word, prediction.inserted) else null
@@ -363,8 +363,8 @@ class Predictor(
         fun replace(old: String, new: String): List<EditOperation> {
             val common = old.commonPrefixWith(new).length
             val ops = ArrayList<EditOperation>(2)
-            if (old.length > common) ops += EditOperation.DeleteBefore(old.length - common)
-            if (new.length > common) ops += EditOperation.Insert(new.substring(common))
+            if (old.length > common) ops += EditOperation.DeleteBeforeCursor(old.length - common)
+            if (new.length > common) ops += EditOperation.InsertText(new.substring(common))
             return ops
         }
     }
