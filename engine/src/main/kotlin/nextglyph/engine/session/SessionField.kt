@@ -5,6 +5,7 @@ import nextglyph.engine.edit.TextProfile
 import nextglyph.engine.input.EnterBehavior
 import nextglyph.engine.predict.FieldProfile
 import nextglyph.engine.predict.PredictionSettings
+import nextglyph.engine.predict.Prudence
 import nextglyph.engine.profile.AndroidInputConstants
 import nextglyph.engine.profile.CapitalizationMode
 import nextglyph.engine.profile.InputProfile
@@ -17,11 +18,13 @@ import nextglyph.engine.profile.ShortcutBar
  * [InputProfileResolver] et du comportement de la touche Entrée.
  *
  * @param autocommit réglage utilisateur « Validation par espace » (§14).
+ * @param prudence réglage utilisateur « Prudence de la validation » (§5.5, §14).
  */
 class SessionField(
     val profile: InputProfile,
     val enter: EnterBehavior = EnterBehavior.EnterKey,
     autocommit: Boolean = true,
+    prudence: Prudence = Prudence.NORMAL,
 ) {
     /** Réglages de la prédiction : profil, `NO_SUGGESTIONS`, incognito (aucun refus mémorisé, §9.2). */
     val prediction: PredictionSettings = PredictionSettings(
@@ -29,6 +32,7 @@ class SessionField(
         noSuggestions = !profile.suggestions,
         incognito = profile.incognito || !profile.learning,
         autocommit = autocommit,
+        prudence = prudence,
     )
 
     /** Profil d'édition : typographie et espace automatique seulement pour la prose (§9.1). */

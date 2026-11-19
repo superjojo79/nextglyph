@@ -1,23 +1,58 @@
 package nextglyph.ime.settings
 
+import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
+import android.widget.CompoundButton
+import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.SeekBar
+import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
+import nextglyph.engine.adapt.AdaptationMode
+import nextglyph.engine.layout.LayoutKind
+import nextglyph.engine.learn.ImportReport
+import nextglyph.engine.lexicon.LexiconLanguage
+import nextglyph.engine.predict.Prudence
+import nextglyph.ime.AppServices
 import nextglyph.ime.R
+import nextglyph.ime.contacts.ContactsSource
+import nextglyph.ime.settings.KeyboardSettings.Companion.AUTO
+import nextglyph.ime.settings.KeyboardSettings.Companion.BOTH
+import nextglyph.ime.settings.KeyboardSettings.Companion.storedName
 
-/** Écran de réglages minimal : explique l'activation du clavier et ouvre les écrans système. */
+/**
+ * Réglages (spec §14) : activation du clavier, puis tous les réglages de l'utilisateur, écrits dans les
+ * `SharedPreferences` partagées avec le service, qui les applique aussitôt. Vues classiques du cadre Android,
+ * sans dépendance.
+ *
+ * - **Contacts** (§6.1) : la permission `READ_CONTACTS` n'est demandée qu'ici, après une explication, quand
+ *   l'utilisateur active la fonction ; la couper efface immédiatement les noms de la mémoire du clavier.
+ * - **Données apprises** (§10.5, §12) : export et import du dictionnaire personnel en TSV par le Storage Access
+ *   Framework (aucune permission), effacement de tout ce qui a été appris, après confirmation.
+ */
 class SettingsActivity : Activity() {
 
+    private lateinit var services: AppServices
     private lateinit var status: TextView
+    private lateinit var learnedSummary: TextView
+    private lateinit var contactsSwitch: Switch
+    private val preferences: SharedPreferences get() = services.preferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        services = AppServices.get(this)
         setContentView(R.layout.activity_settings)
         status = findViewById(R.id.settings_status)
 
@@ -36,6 +71,8 @@ class SettingsActivity : Activity() {
         findViewById<View>(R.id.settings_choose).setOnClickListener {
             getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }
+        buildPreferences(findViewById(R.id.settings_preferences))
+        services.learned.load { updateLearnedSummary() }
     }
 
     override fun onResume() {
@@ -48,5 +85,296 @@ class SettingsActivity : Activity() {
                 R.string.settings_status_disabled
             },
         )
+        // Permission retirée depuis les réglages du système : la fonction est coupée.
+        if (preferences.getBoolean(KeyboardSettings.KEY_CONTACTS, false) && !ContactsSource.isPermitted(this)) setContacts(false)
+        contactsSwitch.isChecked = preferences.getBoolean(KeyboardSettings.KEY_CONTACTS, false)
+        services.syncContacts()
+        updateLearnedSummary()
+    }
+
+    private fun buildPreferences(root: LinearLayout) {
+        val current = services.settings
+
+        section(root, R.string.pref_section_keyboard)
+        choice(
+            root, R.string.pref_layout, KeyboardSettings.KEY_LAYOUT, current.layout?.let(::storedName) ?: AUTO,
+            listOf(AUTO to R.string.pref_layout_auto, storedName(LayoutKind.AZERTY) to R.string.pref_layout_azerty, storedName(LayoutKind.QWERTY) to R.string.pref_layout_qwerty),
+        )
+        choice(
+            root, R.string.pref_adaptation, KeyboardSettings.KEY_ADAPTATION, storedName(current.adaptationMode),
+            listOf(
+                storedName(AdaptationMode.OFF) to R.string.pref_adaptation_off,
+                storedName(AdaptationMode.CALM) to R.string.pref_adaptation_calm,
+                storedName(AdaptationMode.CALM_REINFORCED) to R.string.pref_adaptation_calm_reinforced,
+                storedName(AdaptationMode.ELASTIC) to R.string.pref_adaptation_elastic,
+            ),
+        )
+        rowHeight(root, current.rowHeightDp)
+        choice(
+            root, R.string.pref_haptics, KeyboardSettings.KEY_HAPTICS, storedName(current.haptics),
+            listOf(
+                storedName(HapticLevel.OFF) to R.string.pref_haptics_off,
+                storedName(HapticLevel.LIGHT) to R.string.pref_haptics_light,
+                storedName(HapticLevel.MEDIUM) to R.string.pref_haptics_medium,
+                storedName(HapticLevel.STRONG) to R.string.pref_haptics_strong,
+            ),
+        )
+
+        section(root, R.string.pref_section_languages)
+        val languages = if (current.languages.size == 2) BOTH else current.languages[0]
+        choice(
+            root, R.string.pref_languages, KeyboardSettings.KEY_LANGUAGES, languages,
+            listOf(BOTH to R.string.pref_languages_both, LexiconLanguage.FRENCH to R.string.pref_language_fr, LexiconLanguage.ENGLISH to R.string.pref_language_en),
+        )
+        choice(
+            root, R.string.pref_preferred_language, KeyboardSettings.KEY_PREFERRED_LANGUAGE, current.preferredLanguage ?: AUTO,
+            listOf(AUTO to R.string.pref_preferred_auto, LexiconLanguage.FRENCH to R.string.pref_language_fr, LexiconLanguage.ENGLISH to R.string.pref_language_en),
+        )
+
+        section(root, R.string.pref_section_typing)
+        toggle(root, R.string.pref_autocommit, R.string.pref_autocommit_summary, KeyboardSettings.KEY_AUTOCOMMIT, current.autocommit)
+        choice(
+            root, R.string.pref_prudence, KeyboardSettings.KEY_PRUDENCE, storedName(current.prudence),
+            listOf(
+                storedName(Prudence.CAUTIOUS) to R.string.pref_prudence_cautious,
+                storedName(Prudence.NORMAL) to R.string.pref_prudence_normal,
+                storedName(Prudence.BOLD) to R.string.pref_prudence_bold,
+            ),
+        )
+        toggle(root, R.string.pref_french_typography, R.string.pref_french_typography_summary, KeyboardSettings.KEY_FRENCH_TYPOGRAPHY, current.frenchTypography)
+        toggle(root, R.string.pref_double_space, R.string.pref_double_space_summary, KeyboardSettings.KEY_DOUBLE_SPACE, current.doubleSpacePeriod)
+
+        section(root, R.string.pref_section_contacts)
+        contactsSwitch = toggle(root, R.string.pref_contacts, R.string.pref_contacts_summary, null, current.contacts) { checked ->
+            if (checked) enableContacts() else setContacts(false)
+        }
+
+        section(root, R.string.pref_section_learned)
+        learnedSummary = text(root, "")
+        button(root, R.string.pref_export) { startExport() }
+        button(root, R.string.pref_import) { startImport() }
+        button(root, R.string.pref_clear) { confirmClear() }
+    }
+
+    /** Active les contacts : explication, puis demande de la permission si elle manque (§6.1). */
+    private fun enableContacts() {
+        if (ContactsSource.isPermitted(this)) {
+            setContacts(true)
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pref_contacts)
+            .setMessage(R.string.contacts_rationale)
+            .setPositiveButton(R.string.contacts_continue) { _, _ -> requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), REQUEST_CONTACTS) }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> setContacts(false) }
+            .setOnCancelListener { setContacts(false) }
+            .show()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_CONTACTS) return
+        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        setContacts(granted)
+        if (!granted) Toast.makeText(this, R.string.contacts_denied, Toast.LENGTH_LONG).show()
+    }
+
+    private fun setContacts(enabled: Boolean) {
+        preferences.edit().putBoolean(KeyboardSettings.KEY_CONTACTS, enabled).apply()
+        if (::contactsSwitch.isInitialized && contactsSwitch.isChecked != enabled) contactsSwitch.isChecked = enabled
+        services.syncContacts()
+    }
+
+    private fun startExport() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType(TSV_TYPE)
+            .putExtra(Intent.EXTRA_TITLE, EXPORT_NAME)
+        startActivityForResult(intent, REQUEST_EXPORT)
+    }
+
+    private fun startImport() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(TSV_TYPE, "text/plain", "text/*", "application/octet-stream"))
+        startActivityForResult(intent, REQUEST_IMPORT)
+    }
+
+    @Deprecated("API du cadre Android, seule disponible sans dépendance AndroidX.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        when (requestCode) {
+            REQUEST_EXPORT -> services.learned.exportTsv({ contentResolver.openOutputStream(uri, "wt") }) { ok ->
+                Toast.makeText(this, if (ok) R.string.export_done else R.string.export_failed, Toast.LENGTH_SHORT).show()
+            }
+            REQUEST_IMPORT -> services.learned.importTsv({ contentResolver.openInputStream(uri) }) { report ->
+                Toast.makeText(this, importMessage(report), Toast.LENGTH_LONG).show()
+                updateLearnedSummary()
+            }
+        }
+    }
+
+    private fun importMessage(report: ImportReport?): String = when {
+        report == null || report.unreadable -> getString(R.string.import_failed)
+        report.unsupportedVersion -> getString(R.string.import_unsupported)
+        else -> resources.getQuantityString(R.plurals.import_done, report.imported, report.imported, report.skippedCount)
+    }
+
+    private fun confirmClear() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pref_clear)
+            .setMessage(R.string.clear_confirm)
+            .setPositiveButton(R.string.clear_action) { _, _ ->
+                services.learned.clear()
+                updateLearnedSummary()
+                Toast.makeText(this, R.string.clear_done, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun updateLearnedSummary() {
+        if (!::learnedSummary.isInitialized) return
+        val data = services.learned.data
+        learnedSummary.text = if (data == null) {
+            getString(R.string.learned_loading)
+        } else {
+            resources.getQuantityString(R.plurals.learned_summary, data.personal.size, data.personal.size)
+        }
+    }
+
+    // Construction des vues.
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun section(root: LinearLayout, title: Int) {
+        root.addView(
+            TextView(this).apply {
+                setText(title)
+                setTextAppearance(android.R.style.TextAppearance_Material_Title)
+                setPadding(0, dp(24), 0, dp(4))
+                isFocusable = false
+                accessibilityHeading()
+            },
+        )
+    }
+
+    private fun TextView.accessibilityHeading() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isAccessibilityHeading = true
+    }
+
+    private fun text(root: LinearLayout, value: String): TextView = TextView(this).apply {
+        text = value
+        setTextAppearance(android.R.style.TextAppearance_Material_Body1)
+        setPadding(0, dp(4), 0, dp(4))
+    }.also(root::addView)
+
+    private fun label(root: LinearLayout, title: Int) {
+        root.addView(
+            TextView(this).apply {
+                setText(title)
+                setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
+                setPadding(0, dp(12), 0, 0)
+            },
+        )
+    }
+
+    private fun choice(root: LinearLayout, title: Int, key: String, selected: String, options: List<Pair<String, Int>>) {
+        label(root, title)
+        val group = RadioGroup(this)
+        for ((value, text) in options) {
+            group.addView(
+                RadioButton(this).apply {
+                    id = View.generateViewId()
+                    setText(text)
+                    tag = value
+                    minHeight = dp(MIN_TOUCH_DP)
+                    isChecked = value == selected
+                },
+            )
+        }
+        group.setOnCheckedChangeListener { radio, id ->
+            val value = radio.findViewById<View>(id)?.tag as? String ?: return@setOnCheckedChangeListener
+            preferences.edit().putString(key, value).apply()
+        }
+        root.addView(group)
+    }
+
+    private fun toggle(
+        root: LinearLayout,
+        title: Int,
+        summary: Int,
+        key: String?,
+        checked: Boolean,
+        onChange: ((Boolean) -> Unit)? = null,
+    ): Switch {
+        val switch = Switch(this).apply {
+            setText(title)
+            isChecked = checked
+            minHeight = dp(MIN_TOUCH_DP)
+            setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
+            setPadding(0, dp(12), 0, 0)
+        }
+        switch.setOnCheckedChangeListener { _: CompoundButton, value: Boolean ->
+            if (key != null) preferences.edit().putBoolean(key, value).apply()
+            onChange?.invoke(value)
+        }
+        root.addView(switch)
+        root.addView(
+            TextView(this).apply {
+                setText(summary)
+                setTextAppearance(android.R.style.TextAppearance_Material_Body1)
+            },
+        )
+        return switch
+    }
+
+    private fun rowHeight(root: LinearLayout, current: Int) {
+        label(root, R.string.pref_row_height)
+        val value = text(root, getString(R.string.pref_row_height_value, current))
+        root.addView(
+            SeekBar(this).apply {
+                max = KeyboardSettings.MAX_ROW_HEIGHT_DP - KeyboardSettings.MIN_ROW_HEIGHT_DP
+                progress = current - KeyboardSettings.MIN_ROW_HEIGHT_DP
+                minimumHeight = dp(MIN_TOUCH_DP)
+                contentDescription = getString(R.string.pref_row_height)
+                setOnSeekBarChangeListener(
+                    object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                            val dp = progress + KeyboardSettings.MIN_ROW_HEIGHT_DP
+                            value.text = getString(R.string.pref_row_height_value, dp)
+                            if (fromUser) preferences.edit().putInt(KeyboardSettings.KEY_ROW_HEIGHT, dp).apply()
+                        }
+
+                        override fun onStartTrackingTouch(bar: SeekBar) = Unit
+
+                        override fun onStopTrackingTouch(bar: SeekBar) = Unit
+                    },
+                )
+            },
+        )
+    }
+
+    private fun button(root: LinearLayout, title: Int, action: () -> Unit) {
+        root.addView(
+            android.widget.Button(this).apply {
+                setText(title)
+                minHeight = dp(MIN_TOUCH_DP)
+                setOnClickListener { action() }
+            },
+        )
+    }
+
+    private companion object {
+        const val REQUEST_CONTACTS = 1
+        const val REQUEST_EXPORT = 2
+        const val REQUEST_IMPORT = 3
+        const val TSV_TYPE = "text/tab-separated-values"
+        const val EXPORT_NAME = "nextglyph-dictionnaire.tsv"
+        const val MIN_TOUCH_DP = 48
     }
 }

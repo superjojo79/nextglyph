@@ -300,7 +300,8 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 
 - Source : `ContactsContract.Data` avec `StructuredName` (prénom, nom, deuxième prénom) ; `Nickname` en option.
 - Mise à jour : `ContentObserver` sur `ContactsContract.Contacts.CONTENT_URI`, avec reconstruction en arrière-plan.
-- Le sous-lexique est stocké séparément du lexique principal, dans le stockage privé de l'application.
+- Le sous-lexique est séparé du lexique principal et **n'est jamais écrit sur le disque** : les noms sont relus du carnet à chaque démarrage du clavier et à chaque modification, puis gardés en mémoire seulement (`docs/DECISIONS.md`, 2026-11-19, « M4 dans l'IME »). Couper la fonction (ou retirer la permission) les efface aussitôt.
+- Lecture : prénom, nom et deuxième prénom (`StructuredName`), surnom (`Nickname`), lignes réunies par contact ; au plus 20 000 contacts. Aucun nom n'est journalisé.
 
 ### 6.3 Utilisation
 
@@ -313,6 +314,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
   - premier caractère tapé en majuscule ;
   - après un autre nom de contact (prénom → nom).
 - Un nom qui est aussi un mot courant (« Rose », « Pierre », « Marie », « Olive ») n'est mis en majuscule que si le contexte le justifie ; sinon le mot courant l'emporte.
+- **Lecture du contexte** (`ContactContext.read`) : le mot en cours est écarté ; s'il ne reste que des blancs, c'est un début de message ; sinon le mot précédent est la dernière suite de lettres, apostrophes et traits d'union, une virgule étant sautée (« Bonjour, Gw ») ; un `@` est lui-même le mot précédent ; tout autre signe : pas de mot précédent. « Majuscule tapée » : première lettre du mot en capitale sans que la majuscule automatique l'impose.
 - **Réalisation** (`nextglyph.engine.contacts`, `docs/DECISIONS.md`, 2026-11-19). Chaque indice vrai ajoute un niveau (0 à 2) ; le poids des noms est multiplié par `contacts.contextBoost`^niveau (4 : ×1, ×4, ×16). Mots déclencheurs français et anglais (`bonjour`, `salut`, `coucou`, `cher`, `chère`, `avec`, `chez`, `à`, `pour`, `@`, `hello`, `hi`, `hey`, `dear`, `with`, `to`, `for`, `from`). « Majuscule tapée » : majuscule de l'utilisateur, pas la majuscule automatique de début de phrase. Au niveau 0, un nom qui est aussi un mot du lexique pèse au plus le quart de la fréquence de ce mot, et aucun nom ne peut être inséré par complétion ou correction (§5.5, cas 2) ; il reste proposé dans la barre. Les particules (`de`, `van`...) ne sont pas indexées ; les noms sont communs aux deux langues.
 
 ---
@@ -447,7 +449,9 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 ### 10.5 Dictionnaire personnel
 
 - Un mot inconnu validé tel quel est mis en attente ; il entre dans le dictionnaire personnel après `learn.minOccurrences` (défaut : 2) validations sans annulation.
-- Un appui long sur une suggestion permet de la supprimer du dictionnaire personnel.
+- Un appui long sur une suggestion permet de la supprimer du dictionnaire personnel (si elle y est ; un message le confirme).
+- **Dans la session** (`SessionLearning`) : un mot est observé quand il est validé par espace, par ponctuation ou par un choix dans la barre (le texte tapé gardé alors qu'un candidat dominait compte comme inconnu). Un ⌫ juste après une validation (annulation du §5.5, ou correction du mot) oublie le mot en attente et écarte ses frappes. Les frappes d'un mot validé ne sont intégrées au modèle spatial qu'au début du mot suivant, à la sortie du champ ou à `↵` ; une lettre effacée retire la sienne ; un déplacement du curseur écarte celles du mot en cours. Dans un champ sans validation par espace (e-mail, URL), les frappes sont intégrées à la fin de chaque mot.
+- **Persistance dans l'IME** : fichier `learned.ngls` du stockage privé non sauvegardé (`noBackupFilesDir`), écrit en arrière-plan (fichier temporaire synchronisé puis renommé), environ 3 s après un changement et à la sortie du champ ; jamais sur le fil de la frappe. Lu en arrière-plan au démarrage ; un fichier temporaire abandonné est supprimé.
 - Stockage : fichier local dans le stockage privé (`LearnedDataFile` : dictionnaire personnel, mémoire des refus, modèle spatial ; binaire versionné, une somme de contrôle par section, lecture tolérante : un fichier corrompu ou d'une version inconnue donne un état vide et un signalement, jamais un plantage). Export/import manuels depuis les réglages en TSV lisible (`PersonalDictionaryTsv` : `langue<TAB>mot<TAB>utilisations`).
 - Plafonds : 2 000 mots promus (le moins récemment utilisé est évincé) et 500 mots en attente (le moins récemment vu est oublié) ; 2 à 32 caractères, lettres, apostrophes et traits d'union ; majuscule initiale due au début de phrase ramenée en minuscules. L'annulation d'une validation oublie le mot en attente ; une suppression n'empêche pas de l'apprendre de nouveau. Rien n'est appris en incognito, mot de passe, e-mail, URL, champ numérique ni avec `NO_SUGGESTIONS`.
 - Intégration : les mots promus forment un lexique supplémentaire de la langue du mot dans le `LexiconSet` (fréquence : 1e-5 de la masse du lexique × `min(4, 1 + ln utilisations)`) ; il est reconstruit quand l'ensemble des mots change. Sans mot appris, la prédiction est exactement celle du lexique principal.
@@ -509,7 +513,7 @@ docs/        Cette spécification, décisions d'architecture.
 ## 12. Confidentialité et sécurité
 
 - Pas de permission `INTERNET`, pas de SDK tiers, pas de télémétrie.
-- Permissions : `READ_CONTACTS` (optionnelle), `VIBRATE`.
+- Permissions : `READ_CONTACTS` (optionnelle) seulement. `VIBRATE` n'est pas nécessaire : le retour haptique passe par `View.performHapticFeedback`, qui n'en demande pas. `ManifestTest` interdit toute autre permission dangereuse.
 - Aucune journalisation du texte saisi, y compris en debug pour les profils mot de passe et code PIN.
 - Toutes les données apprises (mots promus et en attente, refus, modèle spatial) sont effaçables en un geste depuis les réglages (`LearnedData.clear()`).
 - Le dictionnaire personnel et le modèle spatial sont exclus des sauvegardes automatiques Android (`android:allowBackup`/`dataExtractionRules`), sauf choix contraire de l'utilisateur.
@@ -519,7 +523,8 @@ docs/        Cette spécification, décisions d'architecture.
 ## 13. Accessibilité
 
 - **TalkBack** : l'adaptation visuelle est désactivée (disposition de repos) ; les lettres probables sont annoncées en priorité lors de l'exploration tactile ; la validation par espace annonce le mot inséré.
-- **Contrastes** : une touche atténuée garde un contraste de libellé d'au moins 3:1 ; les touches au repos respectent 4,5:1.
+- **Réalisation** (`KeyboardAccessibility`, `AccessibilityNodeProvider` du cadre Android, sans dépendance) : chaque touche de la couche affichée et chaque case de la barre est un nœud virtuel aux limites de la disposition au repos ; libellé : la lettre (en capitale si la majuscule est active), le nom des touches de fonction (Effacer, Espace, Symboles, Lettres, Majuscule, action de `↵`), « Espace, insère <mot> » quand l'espace remplacera le mot, état de `⇧` (« activée », « verrouillée »). Exploration au toucher par les événements de survol ; activation par `ACTION_CLICK` (double appui ou « relâcher pour saisir »). La touche qui a le focus de TalkBack est entourée d'un contour (contraste ≥ 3:1). L'annonce des lettres probables en priorité n'est pas réalisée en V1 (l'ordre des nœuds est celui des rangées).
+- **Contrastes** : une touche atténuée garde un contraste de libellé d'au moins 3:1 ; les touches au repos respectent 4,5:1, de même que les touches enfoncées, de fonction, `⇧` active, la suggestion surlignée et le texte tapé proposé dans la barre ; l'indicateur de langue et le contour du focus TalkBack gardent 3:1 (vérifié sur les deux thèmes par `KeyStyleTest`).
 - **Animations** : supprimées si les animations système sont désactivées.
 - **Tailles** : hauteur de rangée réglable de 34 à 46 dp ; zones de tap jamais inférieures à 32 × 32 dp après adaptation (sauf mode élastique explicitement choisi).
 
@@ -543,6 +548,8 @@ docs/        Cette spécification, décisions d'architecture.
 | Aperçu agrandi des touches | Oui / Non / Sauf mots de passe | Sauf mots de passe |
 | Retour haptique | Intensité | Moyen |
 | Données apprises | Exporter / Importer / Effacer | — |
+
+**Réalisation** (`SettingsActivity`, vues du cadre Android ; `docs/DECISIONS.md`, 2026-11-19) : les réglages sont enregistrés dans des `SharedPreferences` exclues des sauvegardes et appliqués aussitôt par le service, sans redémarrage. Deux réglages du tableau ne sont pas proposés en V1 : **Variante anglaise** (un seul lexique anglais est embarqué, le réglage serait sans effet) et **Aperçu agrandi des touches** (le clavier n'a pas d'aperçu). Retour haptique : Désactivé / Léger / Moyen / Fort (`performHapticFeedback` à l'appui d'une touche, sous réserve du réglage système « Retour tactile »). Export et import du dictionnaire personnel en TSV par le Storage Access Framework (`ACTION_CREATE_DOCUMENT`, `ACTION_OPEN_DOCUMENT`, aucune permission) ; effacement de toutes les données apprises après confirmation.
 
 ---
 

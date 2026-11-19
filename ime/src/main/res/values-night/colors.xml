@@ -6,4 +6,6 @@
     <color name="key_function_background">#2A2C31</color>
     <color name="key_pressed_background">#5A6070</color>
     <color name="key_label">#F1F1F5</color>
+    <!-- Contour du focus TalkBack : contraste >= 3:1 sur la touche et le fond (spec §13). -->
+    <color name="key_focus_outline">#B4CFFB</color>
 </resources>

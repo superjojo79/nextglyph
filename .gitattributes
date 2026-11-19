@@ -4,3 +4,4 @@
 *.jar binary
 *.png binary
 *.webp binary
+docs/DECISIONS.md merge=union

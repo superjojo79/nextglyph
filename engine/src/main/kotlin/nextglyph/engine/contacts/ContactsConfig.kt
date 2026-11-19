@@ -1,5 +1,7 @@
 package nextglyph.engine.contacts
 
+import nextglyph.engine.text.WordPrefix
+
 /**
  * Contexte d'écriture d'où dépend le bonus accordé aux noms de contacts (spec §6.3). L'IME le
  * renseigne à chaque changement de mot ; chaque indice vrai ajoute un niveau de bonus.
@@ -16,7 +18,51 @@ data class ContactContext(
     val atMessageStart: Boolean = false,
     val previousWord: String? = null,
     val typedCapital: Boolean = false,
-)
+) {
+    companion object {
+        /**
+         * Contexte lu dans le texte qui précède le curseur ([textBeforeCursor], `null` si le champ ne le
+         * fournit pas : seuls [personNameField] et [typedCapital] comptent alors).
+         *
+         * Le mot en cours (au sens de `WordPrefix.currentWord`, élisions de [elisionLanguage] retirées) est
+         * écarté ; s'il ne reste que des blancs, c'est un début de message. Sinon, le mot précédent est la
+         * dernière suite de lettres, apostrophes et traits d'union avant les blancs, une virgule éventuelle
+         * étant sautée (« Bonjour, Hél » : le mot précédent est « Bonjour ») ; un `@` est lui-même le mot
+         * précédent. Tout autre signe (point, chiffre) : pas de mot précédent.
+         */
+        fun read(
+            textBeforeCursor: CharSequence?,
+            personNameField: Boolean = false,
+            typedCapital: Boolean = false,
+            elisionLanguage: String = "",
+        ): ContactContext {
+            if (textBeforeCursor == null) return ContactContext(personNameField = personNameField, typedCapital = typedCapital)
+            val word = WordPrefix.currentWord(textBeforeCursor, 0, elisionLanguage).orEmpty()
+            val before = textBeforeCursor.subSequence(0, textBeforeCursor.length - word.length)
+            var end = skipBlanks(before, before.length)
+            if (end == 0) return ContactContext(personNameField, atMessageStart = true, typedCapital = typedCapital)
+            if (before[end - 1] == ',') end = skipBlanks(before, end - 1)
+            val previous = when {
+                end == 0 -> null
+                before[end - 1] == '@' -> "@"
+                else -> {
+                    var start = end
+                    while (start > 0 && isNameChar(before[start - 1])) start--
+                    if (start < end && before[start].isLetter()) before.substring(start, end) else null
+                }
+            }
+            return ContactContext(personNameField, atMessageStart = false, previousWord = previous, typedCapital = typedCapital)
+        }
+
+        private fun skipBlanks(text: CharSequence, from: Int): Int {
+            var end = from
+            while (end > 0 && text[end - 1].isWhitespace()) end--
+            return end
+        }
+
+        private fun isNameChar(c: Char): Boolean = c.isLetter() || c == '\'' || c == '’' || c == '-'
+    }
+}
 
 /**
  * Constantes des noms de contacts (spec §6.3), immuables.

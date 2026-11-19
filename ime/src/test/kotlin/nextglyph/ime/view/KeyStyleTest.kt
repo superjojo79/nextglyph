@@ -61,6 +61,42 @@ class KeyStyleTest {
             for (folder in listOf("values", "values-night")) assertThat(labelContrast(folder, 1f)).isGreaterThanOrEqualTo(4.5)
         }
 
+        @ParameterizedTest(name = "fond {0}")
+        @ValueSource(strings = ["key_pressed_background", "key_function_background", "key_background"])
+        fun `touches enfoncées, de fonction, ⇧ active et suggestion surlignée respectent 4,5 pour 1`(background: String) {
+            for (folder in listOf("values", "values-night")) {
+                val c = colors(folder)
+                assertThat(contrast(c.getValue("key_label"), c.getValue(background))).`as`("$folder, $background").isGreaterThanOrEqualTo(4.5)
+            }
+        }
+
+        @Test
+        fun `le texte tapé proposé dans la barre respecte 4,5 pour 1`() {
+            for (folder in listOf("values", "values-night")) {
+                val c = colors(folder)
+                val text = blend(c.getValue("key_label"), KeyStyle.TYPED_ALPHA / 255f, c.getValue("keyboard_background"))
+                assertThat(contrast(text, c.getValue("keyboard_background"))).`as`(folder).isGreaterThanOrEqualTo(4.5)
+            }
+        }
+
+        @Test
+        fun `l'indicateur de langue garde 3 pour 1 sur l'espace`() {
+            for (folder in listOf("values", "values-night")) {
+                val c = colors(folder)
+                val text = blend(c.getValue("key_label"), KeyStyle.LANGUAGE_ALPHA / 255f, c.getValue("key_background"))
+                assertThat(contrast(text, c.getValue("key_background"))).`as`(folder).isGreaterThanOrEqualTo(3.0)
+            }
+        }
+
+        @ParameterizedTest(name = "sur {0}")
+        @ValueSource(strings = ["key_background", "keyboard_background", "key_function_background", "key_pressed_background"])
+        fun `le contour du focus TalkBack garde 3 pour 1`(background: String) {
+            for (folder in listOf("values", "values-night")) {
+                val c = colors(folder)
+                assertThat(contrast(c.getValue("key_focus_outline"), c.getValue(background))).`as`("$folder, $background").isGreaterThanOrEqualTo(3.0)
+            }
+        }
+
         @ParameterizedTest(name = "opacité {0}")
         @ValueSource(floats = [0.30f, 0.44f, 0.6f, 0.8f])
         fun `une touche atténuée garde 3 pour 1 sur les deux thèmes (§13)`(opacity: Float) {

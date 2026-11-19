@@ -9,9 +9,9 @@ Suivi tenu par l'orchestrateur. Jalons définis au §16 de la [spécification](S
 | Socle (dépôt, CI, convention de tests, protection de `main`) | Terminé |
 | M0 — données, lexique, analyse, prototype | Terminé (2026-11-19) |
 | M1 — premier IME Android | Terminé (2026-11-19) |
-| M2 — saisie complète (validation, ponctuation, bilinguisme) | En cours |
-| M3 — profils de saisie (mot de passe, pavés, e-mail, URL, disposition classique) | En cours |
-| M4 | À faire |
+| M2 — saisie complète (validation, ponctuation, bilinguisme) | Terminé (2026-11-19) |
+| M3 — profils de saisie (mot de passe, pavés, e-mail, URL, disposition classique) | Terminé côté moteur et IME (2026-11-19) ; panel d'applications tierces à faire |
+| M4 — apprentissage, contacts, réglages, accessibilité | Fait (2026-11-19), vérifié sur émulateur sauf TalkBack (absent de l'image) |
 | M5 | Hors périmètre autonome : validation de l'utilisateur requise |
 
 ## M0 — bilan
@@ -58,6 +58,18 @@ Vérifié sur émulateur Android 16 (AZERTY et QWERTY) : adaptation visible apr�
 
 Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr-FR` (repli sur le point, appris par champ) ; les champs signés refusent le signe moins U+2212 (la touche insère `-`).
 
+## M4 — tâches
+
+| Tâche | État | PR |
+|---|---|---|
+| Moteur : dictionnaire personnel, refus persistants, modèle spatial, contacts, fichier d'état (`nextglyph.engine.learn`, `.contacts`) | Fait | #17 |
+| Session : `PredictionStack`, `SessionLearning`, `ContactContext.read`, réglages d'édition à chaud | Fait | — |
+| IME : persistance atomique en arrière-plan (`LearnedStore`), suppression d'un mot par appui long | Fait (vérifié sur émulateur) | — |
+| IME : contacts (`READ_CONTACTS` optionnelle, explication, `ContentObserver`, effacement) | Fait (vérifié sur émulateur) | — |
+| IME : réglages du §14 (sauf variante anglaise et aperçu, sans objet), export / import TSV, effacement | Fait (vérifié sur émulateur) | — |
+| IME : accessibilité (nœuds virtuels, annonces, contour du focus, contrastes testés) | Fait ; nœuds vérifiés par `uiautomator`, TalkBack non disponible sur l'émulateur | — |
+| Retour haptique | Fait ; non ressenti sur l'émulateur (pas de vibreur) | — |
+
 ## Problèmes ouverts
 
 - **Licences des lexiques français** : levé en M2, un fichier par source (`docs/DATA.md`) ; une relecture juridique de l'ensemble des attributions reste prévue avant M5.
@@ -65,3 +77,5 @@ Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr
 - **Fréquences anglaises** : tirées de Tatoeba (biais « Tom », « Mary ») ; chercher une meilleure source à licence compatible.
 - **Prototype** : n'implémente pas encore la correction des préfixes connus du §5.5 révisé ; ses valeurs par défaut sont alignées sur la spec.
 - **SCOWL** : mention de données COCA dans son README, à relire avant publication.
+- **TalkBack** : à vérifier sur un appareil ou une image avec TalkBack (exploration, « relâcher pour saisir », annonces) ; l'ordre « lettres probables d'abord » du §13 n'est pas réalisé.
+- **Variante anglaise** (§14) : sans lexique britannique, le réglage n'est pas proposé.

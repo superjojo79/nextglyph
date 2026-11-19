@@ -3,6 +3,9 @@
 
     <!-- Aucune permission réseau (spec §2.7, §12) : ManifestTest le vérifie sur le manifeste fusionné. -->
 
+    <!-- Noms des contacts (spec §6.1) : optionnelle, demandée seulement depuis les réglages. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"

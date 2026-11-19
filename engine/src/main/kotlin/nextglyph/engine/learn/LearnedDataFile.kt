@@ -100,7 +100,7 @@ object LearnedDataFile {
     /** Lit un état depuis [input] (sans le fermer), au plus [LearningConfig.maxFileBytes] octets. Ne lève jamais d'exception. */
     fun read(input: InputStream, config: LearningConfig = LearningConfig()): LoadResult {
         val bytes = try {
-            input.readNBytes(config.maxFileBytes + 1)
+            ByteCodec.readAtMost(input, config.maxFileBytes + 1)
         } catch (e: IOException) {
             return LoadResult(LearnedData(config), listOf(LoadIssue(LoadIssueKind.UNREADABLE, "Lecture impossible : ${e.javaClass.simpleName}.")))
         }

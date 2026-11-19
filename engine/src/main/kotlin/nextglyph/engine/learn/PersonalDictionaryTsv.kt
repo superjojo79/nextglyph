@@ -84,7 +84,7 @@ object PersonalDictionaryTsv {
     fun import(input: InputStream, dictionary: PersonalDictionary): ImportReport {
         val config = dictionary.config
         val bytes = try {
-            input.readNBytes(config.maxImportBytes + 1)
+            ByteCodec.readAtMost(input, config.maxImportBytes + 1)
         } catch (e: IOException) {
             return ImportReport(0, emptyList(), 0, truncated = false, unsupportedVersion = false, unreadable = true)
         }

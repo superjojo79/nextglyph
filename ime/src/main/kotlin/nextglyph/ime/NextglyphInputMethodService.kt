@@ -1,5 +1,6 @@
 package nextglyph.ime
 
+import android.content.SharedPreferences
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
@@ -8,16 +9,18 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import nextglyph.engine.adapt.DistributionSource
+import nextglyph.engine.contacts.ContactName
 import nextglyph.engine.input.EnterBehavior
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.layout.LayoutKind
+import nextglyph.engine.learn.LearnedData
 import nextglyph.engine.lexicon.LexiconLanguage
 import nextglyph.engine.lexicon.LexiconSet
 import nextglyph.engine.predict.InMemoryRejectionStore
-import nextglyph.engine.predict.Predictor
 import nextglyph.engine.profile.DecimalSeparatorPolicy
 import nextglyph.engine.profile.FieldKey
 import nextglyph.engine.profile.InputProfileResolver
@@ -25,9 +28,15 @@ import nextglyph.engine.session.EnterKeyLabel
 import nextglyph.engine.session.FieldKeyboard
 import nextglyph.engine.session.InputSession
 import nextglyph.engine.session.PopupAction
+import nextglyph.engine.session.PredictionStack
 import nextglyph.engine.session.SessionField
+import nextglyph.engine.session.SessionLearning
+import nextglyph.engine.session.TapOffset
+import nextglyph.ime.contacts.ContactsRepository
+import nextglyph.ime.learn.LearnedStore
 import nextglyph.ime.lexicon.AssetLexicons
 import nextglyph.ime.lexicon.LexiconLoader
+import nextglyph.ime.settings.KeyboardSettings
 import nextglyph.ime.view.KeyboardView
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -36,29 +45,38 @@ import java.util.concurrent.Executors
 /**
  * Service de méthode de saisie : câble la vue ([KeyboardView]) et l'éditeur du champ
  * ([InputConnectionTarget]) à la session de saisie du moteur ([InputSession]), qui décide de tout
- * (spec §4, §5, §7, §8, §9, §10.6, §11.2).
+ * (spec §4 à §10, §11.2, §13, §14).
  *
- * - Les lexiques des deux langues (français : un fichier par licence ; anglais) sont chargés en
- *   arrière-plan au démarrage ; le clavier reste neutre et sans suggestions tant qu'ils ne sont pas
- *   prêts. La langue préférée de départ suit le sous-type, puis la locale système.
- * - À chaque `onStartInputView`, [InputProfileResolver] choisit le profil et [FieldKeyboard] la
- *   disposition : compacte, mot de passe (§7), pavés (§8). L'appui long sur `?123` d'un profil texte
- *   propose la disposition classique (§4), et le retour.
- * - Mot de passe, code PIN et pavés : aucune lecture du champ (seule exception : la vérification du
- *   séparateur décimal, §8.1), aucune suggestion, aucun apprentissage.
- * - Aucun texte saisi n'est journalisé (§12).
+ * - Les lexiques des deux langues sont chargés en arrière-plan au démarrage ; le clavier reste neutre
+ *   et sans suggestions tant qu'ils ne sont pas prêts.
+ * - **Prédicteurs** ([PredictionStack]) : lexiques des langues actives, mots appris (§10.5) et noms des
+ *   contacts (§6.3), reconstruits en arrière-plan quand l'un d'eux change, puis installés dans la session.
+ * - **Apprentissage** ([LearnedStore]) : chargé au démarrage, enregistré quelques secondes après un
+ *   changement et à la sortie du champ, en arrière-plan ; rien n'est appris en incognito, mot de passe,
+ *   e-mail, URL ni dans les pavés (`LearningPolicy`).
+ * - **Réglages** (§14) : relus et appliqués à chaque modification, sans redémarrer le clavier.
+ * - Mot de passe, code PIN et pavés : aucune lecture du champ (sauf le séparateur décimal, §8.1).
+ * - Aucun texte saisi ni nom de contact n'est journalisé (§12).
  */
 class NextglyphInputMethodService : InputMethodService() {
 
     private val target = InputConnectionTarget { currentInputConnection }
     private val session = InputSession(target)
-    private val rejections = InMemoryRejectionStore()
     private val source = DistributionSource { prefix -> session.distribution(prefix) }
+    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var services: AppServices
+    private var settings = KeyboardSettings()
     private var keyboardView: KeyboardView? = null
     private var layoutKind = LayoutKind.QWERTY
     private var lexicons: Map<String, LexiconSet>? = null
     private var worker: ExecutorService? = null
     private var loader: LexiconLoader<Map<String, LexiconSet>>? = null
+
+    /** Génération de la dernière reconstruction demandée : un résultat plus ancien est ignoré. */
+    private var stackGeneration = 0
+    private var lexiconRevision = Long.MIN_VALUE
+    private var learnedRevision = Long.MIN_VALUE
+    private var resetLanguage = false
 
     /** Mémoire volatile du séparateur décimal accepté par chaque champ (§8.1). */
     private var decimalPolicy = DecimalSeparatorPolicy()
@@ -69,27 +87,49 @@ class NextglyphInputMethodService : InputMethodService() {
     private var fieldKey = FieldKey("", 0)
     private var fieldInputType = 0
 
+    private val save = Runnable { services.learned.saveIfChanged() }
+
+    private val preferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> applySettings() }
+    private val learnedListener = LearnedStore.Listener { data -> onLearnedChanged(data) }
+    private val contactsListener = ContactsRepository.Listener { _ -> rebuildPredictors() }
+
     override fun onCreate() {
         super.onCreate()
+        services = AppServices.get(this)
         val locale = resources.configuration.locales.get(0)
-        layoutKind = LayoutKind.defaultForLanguage(locale?.language)
         decimalPolicy = DecimalSeparatorPolicy(DecimalSeparators.preferred(locale))
-        fieldKeyboard = FieldKeyboard.of(SessionField.DEFAULT.profile, layoutKind)
-        session.onStateChanged = { state -> keyboardView?.setState(state) }
+        settings = services.settings
+        layoutKind = settings.layoutFor(locale?.language)
+        fieldKeyboard = FieldKeyboard.of(SessionField.DEFAULT.profile, layoutKind, textRowHeightDp = settings.rowHeightDp.toFloat())
+        session.setEditConfig(settings.editConfig)
+        session.onStateChanged = { state ->
+            keyboardView?.setState(state)
+            onLearningEvent()
+        }
+        session.onWordReplaced = { word -> keyboardView?.announceInserted(word) }
         val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nextglyph-lexicon").apply { isDaemon = true } }
         worker = executor
-        val handler = Handler(Looper.getMainLooper())
         val assets = AssetLexicons(assets)
         val open = { key: String -> assets.openAll(key.split(LANGUAGE_SEPARATOR)) }
         loader = LexiconLoader(open, executor) { handler.post(it) }.also { loader ->
             loader.load(LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)) { _, sets ->
                 lexicons = sets
-                installPredictor()
+                rebuildPredictors()
             }
         }
+        services.preferences.registerOnSharedPreferenceChangeListener(preferencesListener)
+        services.learned.addListener(learnedListener)
+        services.contacts.addListener(contactsListener)
+        services.learned.load()
+        services.syncContacts()
     }
 
     override fun onDestroy() {
+        services.preferences.unregisterOnSharedPreferenceChangeListener(preferencesListener)
+        services.learned.removeListener(learnedListener)
+        services.contacts.removeListener(contactsListener)
+        handler.removeCallbacks(save)
+        services.learned.saveIfChanged()
         loader?.cancel()
         worker?.shutdownNow()
         decimalPolicy.clear()
@@ -99,9 +139,12 @@ class NextglyphInputMethodService : InputMethodService() {
     override fun onCreateInputView(): View = KeyboardView(this).apply {
         setKeyboard(fieldKeyboard, EnterKeyLabel.of(field.enter))
         adaptationAllowed = field.adaptation
+        adaptationMode = settings.adaptationMode
+        haptics = settings.haptics
+        services.learned.data?.let { spatialModel = it.spatial }
         languages = session.predictor?.languages.orEmpty()
         listener = object : KeyboardView.Listener {
-            override fun onKey(key: Key, upper: Boolean) = onKeyPressed(key, upper)
+            override fun onKey(key: Key, upper: Boolean, offset: TapOffset?) = onKeyPressed(key, upper, offset)
 
             override fun onPopup(action: PopupAction) = when (action) {
                 is PopupAction.Text -> onPopupText(action.text)
@@ -111,6 +154,8 @@ class NextglyphInputMethodService : InputMethodService() {
             }
 
             override fun onBarItem(index: Int) = session.onBarItem(index)
+
+            override fun onBarItemLongPress(index: Int) = forgetSuggestion(index)
         }
         setSource(if (session.predictor != null) source else null)
         setState(session.state)
@@ -119,6 +164,8 @@ class NextglyphInputMethodService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // La permission a pu être accordée ou retirée depuis les réglages du système.
+        services.syncContacts()
         val key = FieldKey(info.packageName.orEmpty(), info.fieldId)
         // Champ redémarré (même champ, même type) : l'échappatoire choisie reste active.
         val keepClassic = restarting && fieldKeyboard.classic && key == fieldKey && info.inputType == fieldInputType
@@ -126,12 +173,15 @@ class NextglyphInputMethodService : InputMethodService() {
         fieldInputType = info.inputType
         val profile = InputProfileResolver.resolve(info.inputType, info.imeOptions, info.privateImeOptions)
         val enter = EnterBehaviorResolver.resolve(info.imeOptions, info.inputType)
-        fieldKeyboard = FieldKeyboard.of(profile, layoutKind, decimalPolicy.separatorFor(key)).withClassic(keepClassic)
+        fieldKeyboard = FieldKeyboard.of(profile, layoutKind, decimalPolicy.separatorFor(key), settings.rowHeightDp.toFloat())
+            .withClassic(keepClassic)
         startField(enter, info.initialSelStart, info.initialSelEnd)
     }
 
     override fun onFinishInput() {
         session.onFinishInput()
+        handler.removeCallbacks(save)
+        if (::services.isInitialized) services.learned.saveIfChanged()
         super.onFinishInput()
     }
 
@@ -149,7 +199,7 @@ class NextglyphInputMethodService : InputMethodService() {
 
     /** Applique [fieldKeyboard] : comportement de la session, disposition et libellé de `↵`. */
     private fun startField(enter: EnterBehavior, selStart: Int, selEnd: Int) {
-        field = SessionField(fieldKeyboard.profile, enter)
+        field = SessionField(fieldKeyboard.profile, enter, settings.autocommit, settings.prudence)
         keyboardView?.let { view ->
             view.setKeyboard(fieldKeyboard, EnterKeyLabel.of(enter))
             view.resetAdaptation()
@@ -167,11 +217,11 @@ class NextglyphInputMethodService : InputMethodService() {
         startField(field.enter, -1, -1)
     }
 
-    private fun onKeyPressed(key: Key, upper: Boolean) {
+    private fun onKeyPressed(key: Key, upper: Boolean, offset: TapOffset?) {
         when (key.kind) {
             KeyKind.SHIFT -> session.onShiftKey(SystemClock.uptimeMillis(), ViewConfiguration.getDoubleTapTimeout().toLong())
             KeyKind.DECIMAL -> onDecimalKey()
-            else -> session.onKey(key, upper)
+            else -> session.onKey(key, upper, offset)
         }
     }
 
@@ -191,24 +241,107 @@ class NextglyphInputMethodService : InputMethodService() {
         if (text.length == 1 && text[0].isLetter()) session.onLetter(lower, upper = lower != text) else session.onCharacter(text)
     }
 
-    /** Lexiques chargés : prédicteur bilingue (§10.6) et adaptation par sa distribution mélangée. */
-    private fun installPredictor() {
-        val sets = lexicons ?: return
-        val predictor = Predictor(sets, KeyboardLayouts.of(layoutKind), rejections = rejections)
-        session.setPredictor(predictor, preferredLanguage())
+    /** Appui long sur une suggestion : la retire du dictionnaire personnel si elle y est (§10.5). */
+    private fun forgetSuggestion(index: Int) {
+        val data = services.learned.data ?: return
+        val item = session.state.bar.items.getOrNull(index) ?: return
+        val removed = LexiconLanguage.SUPPORTED.map { data.personal.remove(item.text, it) }.any { it }
+        if (removed) {
+            Toast.makeText(this, getString(R.string.learned_word_removed, item.text), Toast.LENGTH_SHORT).show()
+            onLearningEvent()
+        }
+    }
+
+    /**
+     * Après chaque événement : si l'état appris a changé, enregistrement différé ; si les mots promus ont
+     * changé, reconstruction des prédicteurs.
+     */
+    private fun onLearningEvent() {
+        val data = services.learned.data ?: return
+        if (data.revision != learnedRevision) {
+            learnedRevision = data.revision
+            handler.removeCallbacks(save)
+            handler.postDelayed(save, SAVE_DELAY_MS)
+        }
+        if (data.personal.lexiconRevision != lexiconRevision) rebuildPredictors()
+    }
+
+    /** État appris chargé, importé ou effacé (§10.5, §12). */
+    private fun onLearnedChanged(data: LearnedData) {
+        session.learning = SessionLearning(data)
+        keyboardView?.spatialModel = data.spatial
+        learnedRevision = data.revision
+        rebuildPredictors()
+    }
+
+    /**
+     * Reconstruit les prédicteurs en arrière-plan (lexiques des langues actives, mots appris, contacts) puis
+     * les installe ; une reconstruction plus récente rend les précédentes caduques.
+     */
+    private fun rebuildPredictors() {
+        val all = lexicons ?: return
+        val executor = worker ?: return
+        val base = LinkedHashMap<String, LexiconSet>()
+        for (language in settings.languages) all[language]?.let { base[language] = it }
+        if (base.isEmpty()) return
+        val data = services.learned.data
+        lexiconRevision = data?.personal?.lexiconRevision ?: Long.MIN_VALUE
+        val personal = data?.personal?.copy()
+        val contacts: List<ContactName> = services.contacts.contacts
+        val layout = KeyboardLayouts.of(layoutKind)
+        val rejections = data?.rejections ?: InMemoryRejectionStore()
+        val generation = ++stackGeneration
+        executor.execute {
+            val stack = PredictionStack.build(base, layout, personal, contacts, rejections = rejections)
+            handler.post { if (generation == stackGeneration) installPredictors(stack) }
+        }
+    }
+
+    /** Prédicteurs prêts : bilinguisme (§10.6) et adaptation par la distribution mélangée. */
+    private fun installPredictors(stack: PredictionStack) {
+        // Langue préférée modifiée : l'état de langue repart de la nouvelle préférence.
+        if (resetLanguage) session.setPredictors(null)
+        resetLanguage = false
+        session.setPredictors(stack, preferredLanguage())
         keyboardView?.let { view ->
-            view.languages = predictor.languages
+            view.languages = stack.languages
             view.setSource(source)
             view.setState(session.state)
         }
     }
 
+    /** Réglages modifiés (§14) : appliqués aussitôt, sans redémarrer le clavier. */
+    private fun applySettings() {
+        val previous = settings
+        settings = services.settings
+        val kind = settings.layoutFor(resources.configuration.locales.get(0)?.language)
+        session.setEditConfig(settings.editConfig)
+        keyboardView?.let { view ->
+            view.adaptationMode = settings.adaptationMode
+            view.haptics = settings.haptics
+        }
+        val kindChanged = kind != layoutKind
+        if (kindChanged || settings.rowHeightDp != previous.rowHeightDp ||
+            settings.autocommit != previous.autocommit || settings.prudence != previous.prudence
+        ) {
+            layoutKind = kind
+            fieldKeyboard = FieldKeyboard.of(fieldKeyboard.requested, kind, fieldKeyboard.decimalLabel, settings.rowHeightDp.toFloat())
+            session.onFinishInput()
+            startField(field.enter, -1, -1)
+        }
+        val languagesChanged = settings.languages != previous.languages || settings.preferredLanguage != previous.preferredLanguage
+        if (languagesChanged) resetLanguage = true
+        if (kindChanged || languagesChanged) rebuildPredictors()
+        if (settings.contacts != previous.contacts) services.syncContacts()
+    }
+
     private fun preferredLanguage(): String {
         val subtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
-        return LexiconLanguage.choose(subtype?.languageTag, resources.configuration.locales.get(0)?.toLanguageTag())
+        return settings.preferredFor(subtype?.languageTag, resources.configuration.locales.get(0)?.toLanguageTag())
     }
 
     private companion object {
         const val LANGUAGE_SEPARATOR = "+"
+        const val SAVE_DELAY_MS = 3000L
     }
 }

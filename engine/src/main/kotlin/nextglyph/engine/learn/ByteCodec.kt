@@ -1,9 +1,31 @@
 package nextglyph.engine.learn
 
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
+
+/**
+ * Lecture bornée d'un flux, sans `InputStream.readNBytes` (absent d'Android avant l'API 33, alors que
+ * l'IME vise l'API 26).
+ */
+object ByteCodec {
+    /** Lit au plus [max] octets de [input] (moins si le flux se termine avant). */
+    fun readAtMost(input: InputStream, max: Int): ByteArray {
+        require(max >= 0) { "Nombre d'octets négatif : $max." }
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(BUFFER_SIZE)
+        while (out.size() < max) {
+            val read = input.read(buffer, 0, minOf(buffer.size, max - out.size()))
+            if (read < 0) break
+            out.write(buffer, 0, read)
+        }
+        return out.toByteArray()
+    }
+
+    private const val BUFFER_SIZE = 8192
+}
 
 /** Écriture d'entiers variables (LEB128), de chaînes UTF-8 et de nombres, en mémoire. */
 internal class ByteWriter {
