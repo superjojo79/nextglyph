@@ -232,3 +232,28 @@ Reste ouvert : au repos, la rangée 3 fait 30,6 dp à 360 dp (0,85 u) ; corrigé
 
 - **Rangée 3 à 0,85 u avec exception au §13** : affaiblit une contrainte d'accessibilité pour 1,4 dp.
 - **`↵` déplacée dans la barre de suggestions** : retire une touche essentielle de la zone de frappe et charge la barre.
+
+## 2026-11-19 — Édition de texte : espace automatique, typographie, majuscules (M2, moteur)
+
+### Contexte
+
+Le §5.6 et le §5.7 décrivent la ponctuation, la typographie française, le double espace et les majuscules sans fixer plusieurs cas : espace tapée par l'utilisateur, `«`, texte après le curseur, signes consécutifs, début de champ, abréviations.
+
+### Décision
+
+Package `nextglyph.engine.edit` (pur, sans Android) : `TextEditor` (`onWordCommitted`, `onPunctuation`, `onSpace`) reçoit un `EditContext` (texte avant et après le curseur, profil, langue de la phrase, mode de majuscules, état de shift, `EditState`) et renvoie un `EditResult` (opérations, nouvel état, état de shift). Les opérations sont `EditOperation.DeleteBeforeCursor(count)` et `EditOperation.InsertText(text)` (`nextglyph.engine.input`), appliquées dans un `beginBatchEdit`. `AutoCapitalization` (pure) calcule la majuscule ; réglages et constantes dans `EditConfig` (immuable).
+
+- **Vérification du texte réel** : l'espace automatique n'est supprimée que si `textBefore` se termine bien par une espace ordinaire ; l'état seul ne suffit jamais. L'IME remet l'état à `INITIAL` après toute autre frappe.
+- **Espace tapée** (`SpaceOrigin.TYPED`) : jamais remplacée par un signe (choix de l'utilisateur) ; elle sert au double espace.
+- **Espace automatique** : seulement en fin de texte ; ni après `'`, `«`, élision ou trait d'union final ; jamais dans les profils sans typographie.
+- **`«`** garde l'espace qui le précède et est suivi d'une fine insécable ; `»` remplace l'espace automatique et prend une fine insécable avant.
+- **Insécables** : pas en début de champ ni de ligne, pas derrière une espace existante, pas après `. , ; : ! ? …` (`?!` reste collé), sauf `»`.
+- **Double espace** : espace ordinaire (automatique ou tapée) précédée d'une lettre, d'un chiffre ou d'un guillemet ou parenthèse fermant, hors champ à profil sans typographie ; donne `. `. La majuscule suivante respecte le champ : sans `CAP_SENTENCES`, aucune majuscule forcée.
+- **Majuscules** : début de ligne compte comme début de phrase ; abréviations en liste courte et configurable (voir §5.7) ; un état manuel (une lettre ou verrouillé) l'emporte sur l'automatique ; plusieurs drapeaux `CAP_*` : l'application passe le plus fort.
+- **Apostrophe** insérée : U+0027, comme dans les lexiques.
+
+### Alternatives écartées
+
+- **Remplacer aussi l'espace tapée par un signe** : surprenant pour qui a tapé l'espace volontairement.
+- **Espace automatique au milieu du texte** : on ne peut pas deviner si elle est voulue.
+- **Forcer la majuscule après double espace même sans `CAP_SENTENCES`** : contredit le champ (identifiant, code).

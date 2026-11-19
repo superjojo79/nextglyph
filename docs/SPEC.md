@@ -233,6 +233,12 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 
 **Double espace :** deux espaces successives remplacent l'espace automatique par `. ` et activent la majuscule pour le mot suivant.
 
+**Précisions d'implémentation (`nextglyph.engine.edit`, voir `docs/DECISIONS.md`, 2026-11-19) :**
+- L'espace automatique n'est ajoutée qu'en fin de texte (rien après le curseur) et jamais après une élision ou un trait d'union final ; elle n'existe pas dans les profils e-mail, URL, mot de passe.
+- `«` conserve l'espace qui le précède (`dit «`) et n'est pas suivi d'espace automatique ; `»` remplace l'espace automatique.
+- Pas d'insécable en début de champ ni de ligne, ni derrière une espace déjà présente, ni entre deux signes (`?!`, `...!`). Une espace tapée par l'utilisateur n'est jamais remplacée.
+- Le double espace s'applique à une espace ordinaire (automatique ou tapée) précédée d'une lettre, d'un chiffre ou d'un guillemet ou parenthèse fermant ; la majuscule suivante dépend du réglage du champ (`CAP_SENTENCES`).
+
 **Accès aux autres signes :**
 - Appui long ou glissement vers le haut sur `?123` : menu rapide `- ( ) " ; @ #`.
 - Couche `?123` : chiffres et symboles complets, sur 3 rangées, même hauteur que la couche lettres.
@@ -242,6 +248,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 ### 5.7 Majuscules
 
 - **Automatiques** selon `TYPE_TEXT_FLAG_CAP_SENTENCES` / `_WORDS` / `_CHARACTERS` et `InputConnection.getCursorCapsMode()` : début de champ, après `. ? ! …` suivis d'une espace.
+- Détail : début de ligne = début de phrase ; guillemets et parenthèses fermants peuvent s'intercaler entre le signe et l'espace ; pas de majuscule après une abréviation (liste courte, commune FR/EN, sans point final : `m mm mme mmes mlle mlles mr mrs ms dr pr prof me st ste sr jr vs etc cf env approx e.g i.e u.s`). `_WORDS` : après une espace ou un saut de ligne ; `_CHARACTERS` : toujours. Aucune majuscule automatique en e-mail, URL, mot de passe (§9.1).
 - **Manuelles** : glissement vers le haut sur une lettre → majuscule pour cette lettre.
 - **Verrouillage** : depuis la couche `?123` (touche `⇪`). L'état verrouillé est affiché en permanence.
 - Les noms de contacts reçoivent leur majuscule à la validation (§6).
