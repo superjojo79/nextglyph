@@ -18,7 +18,9 @@ import kotlin.math.sqrt
  *   où le plafond est [AdaptationConfig.displacement] du mode (marge numérique de 10⁻⁵ u incluse,
  *   si bien que la garantie tient aussi pour les centres recalculés à partir des largeurs `Float`) ;
  * - largeur minimale : `minWidth × repos` pour une lettre, le repos pour l'espace ; les autres
- *   touches de fonction gardent leur largeur de repos ;
+ *   touches de fonction gardent leur largeur de repos ; hors mode Élastique, une lettre ne descend
+ *   pas non plus sous [AdaptationConfig.minKeyWidthDp] (jamais au-dessus de son repos), dès que la
+ *   largeur du clavier est connue ([keyboardWidthDp]) ;
  * - état neutre, mode Désactivé ou intensité nulle : exactement la disposition au repos ;
  * - déterminisme : mêmes entrées, même sortie, sans état caché.
  *
@@ -44,6 +46,20 @@ class LayoutSolver(
     private val target = DoubleArray(keys.size)
     private val edgeLow = DoubleArray(keys.size + 1)
     private val edgeHigh = DoubleArray(keys.size + 1)
+
+    /** Plancher des lettres, en unités (0 : aucun). */
+    private var floorUnits = 0.0
+
+    /**
+     * Largeur du clavier en dp, pour appliquer [AdaptationConfig.minKeyWidthDp] (1 u = largeur / 10).
+     * 0 (défaut) : largeur inconnue, aucun plancher en dp.
+     */
+    var keyboardWidthDp: Float = 0f
+        set(value) {
+            require(value >= 0f && value < Float.POSITIVE_INFINITY) { "La largeur doit être positive ou nulle : $value." }
+            field = value
+            floorUnits = if (value > 0f) config.minKeyWidthDp / (value / KeyboardLayout.ROW_UNITS).toDouble() else 0.0
+        }
 
     /**
      * Résout la disposition pour [weights] dans le mode de [config] et l'écrit dans [out].
@@ -163,7 +179,7 @@ class LayoutSolver(
     private fun isFixed(i: Int): Boolean = keys.keys[i].kind != KeyKind.LETTER && keys.keys[i].kind != KeyKind.SPACE
 
     private fun minWidth(i: Int): Double = when (keys.keys[i].kind) {
-        KeyKind.LETTER -> config.minWidth * rest(i)
+        KeyKind.LETTER -> max(config.minWidth * rest(i), if (config.mode == AdaptationMode.ELASTIC) 0.0 else min(rest(i), floorUnits))
         else -> rest(i)
     }
 

@@ -132,6 +132,10 @@ data class TapDecoderConfig(
  * @property animationMs durée de l'animation. Spec : 100 ms.
  * @property easeOutPower exposant de la courbe `1 − (1 − t)^n`. **Valeur choisie : 2**
  *   (comme le `DecelerateInterpolator` d'Android).
+ * @property minKeyWidthDp largeur minimale d'une lettre après adaptation, en dp (§13 : zones de tap
+ *   jamais inférieures à 32 dp), hors mode Élastique. Une lettre déjà plus étroite que cela au repos
+ *   n'est jamais réduite. **Valeur choisie : 32** ; sans effet tant que le solveur ignore la largeur
+ *   du clavier ([LayoutSolver.keyboardWidthDp]).
  * @property fastTypingMs `adapt.fastTypingMs`. Spec : 120 ms.
  * @property decoder paramètres du décodeur de tap (§5.3).
  */
@@ -160,6 +164,7 @@ data class AdaptationConfig(
     val animationMs: Long = 100L,
     val easeOutPower: Float = 2f,
     val fastTypingMs: Long = 120L,
+    val minKeyWidthDp: Float = 32f,
     val decoder: TapDecoderConfig = TapDecoderConfig(),
 ) {
     init {
@@ -192,6 +197,9 @@ data class AdaptationConfig(
         require(animationMs >= 0L) { "animationMs doit être positif ou nul : $animationMs." }
         require(easeOutPower >= 1f && easeOutPower < Float.POSITIVE_INFINITY) { "easeOutPower doit valoir au moins 1 : $easeOutPower." }
         require(fastTypingMs >= 0L) { "fastTypingMs doit être positif ou nul : $fastTypingMs." }
+        require(minKeyWidthDp >= 0f && minKeyWidthDp < Float.POSITIVE_INFINITY) {
+            "minKeyWidthDp doit être positif ou nul : $minKeyWidthDp."
+        }
     }
 
     /** Intensités d'opacité et de libellé du [mode] donné ([ModeProfile.NONE] pour Désactivé). */
