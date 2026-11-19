@@ -9,7 +9,7 @@ export class LanguageTracker {
   /**
    * @param {{langs?: string[], preferred?: string, window?: number, lock?: string}} [options]
    */
-  constructor({ langs = ['fr', 'en'], preferred = 'fr', window = 8, lock = 'auto' } = {}) {
+  constructor({ langs = ['fr', 'en'], preferred = 'fr', window = 4, lock = 'auto' } = {}) {
     if (!Array.isArray(langs) || langs.length === 0) {
       throw new RangeError('Au moins une langue active est requise.');
     }
