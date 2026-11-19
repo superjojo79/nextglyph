@@ -9,12 +9,12 @@ export const LAYOUTS = {
   azerty: [
     letters('azertyuiop'),
     letters('qsdfghjklm'),
-    [fn('sym', 1), ...letters('wxcvbn', 0.85), { id: 'space', kind: 'space', rest: 1.9 }, fn('enter', 1), fn('back', 1)],
+    [fn('sym', 1), ...letters('wxcvbn', 0.9), { id: 'space', kind: 'space', rest: 1.6 }, fn('enter', 1), fn('back', 1)],
   ],
   qwerty: [
     letters('qwertyuiop'),
     [{ id: 'spacer', kind: 'spacer', rest: 0.3 }, ...letters('asdfghjkl', 0.95), fn('enter', 1.15)],
-    [fn('sym', 1), ...letters('zxcvbnm', 0.85), { id: 'space', kind: 'space', rest: 2.05 }, fn('back', 1)],
+    [fn('sym', 1), ...letters('zxcvbnm', 0.9), { id: 'space', kind: 'space', rest: 1.7 }, fn('back', 1)],
   ],
 };
 

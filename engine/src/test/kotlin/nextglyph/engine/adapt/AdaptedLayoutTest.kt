@@ -30,7 +30,7 @@ class AdaptedLayoutTest {
             assertThat(layout.widthsByRow()).isEqualTo(azerty.restWidths())
             assertThat(layout.opacity(2, 9)).isEqualTo(1f)
             assertThat(layout.labelScale(2, 9)).isEqualTo(1f)
-            assertThat(layout.width(2, 7)).isEqualTo(1.9f)
+            assertThat(layout.width(2, 7)).isEqualTo(1.6f)
         }
 
         @Test
@@ -51,7 +51,7 @@ class AdaptedLayoutTest {
         fun `la représentation textuelle sépare les rangées`() {
             val text = AdaptedLayout(azerty).toString()
 
-            assertThat(text).startsWith("AdaptedLayout(a:1.0/1.0/1.0, z:").contains(" | q:", "_:1.9")
+            assertThat(text).startsWith("AdaptedLayout(a:1.0/1.0/1.0, z:").contains(" | q:", "_:1.6")
         }
     }
 

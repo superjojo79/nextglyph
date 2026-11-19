@@ -30,7 +30,7 @@ class KeyboardLayoutTest {
         fun `distances entre centres`() {
             assertThat(KeyboardLayout.AZERTY.distance('a', 'z')).isCloseTo(1.0, within(1e-9))
             assertThat(KeyboardLayout.AZERTY.distance('a', 's')).isCloseTo(Math.sqrt(2.0), within(1e-9))
-            assertThat(KeyboardLayout.AZERTY.distance('w', 'x')).isCloseTo(0.85, within(1e-9))
+            assertThat(KeyboardLayout.AZERTY.distance('w', 'x')).isCloseTo(0.9, within(1e-9))
             assertThat(KeyboardLayout.QWERTY.distance('a', 's')).isCloseTo(0.95, within(1e-9))
             assertThat(KeyboardLayout.QWERTY.distance('q', 'a')).isCloseTo(Math.hypot(0.275, 1.0), within(1e-9))
         }
@@ -80,10 +80,10 @@ class KeyboardLayoutTest {
 
         @Test
         fun `une distance juste au-dessus du seuil exclut la voisine`() {
-            // a (0,5 ; 0) et x (2,275 ; 2) en AZERTY : trop loin ; q et w (distance 1,36) voisines.
+            // a (0,5 ; 0) et x (2,35 ; 2) en AZERTY : trop loin ; q et w (distance 1,38) voisines.
             assertThat(KeyboardLayout.AZERTY.areNeighbors('q', 'x')).isFalse()
-            assertThat(KeyboardLayout.AZERTY.distance('q', 'w')).isCloseTo(Math.hypot(0.925, 1.0), within(1e-9))
-            // QWERTY : a (0,775 ; 1) et x (2,275 ; 2) à 1,80 u ; e (2,5 ; 0) à 1,99 u.
+            assertThat(KeyboardLayout.AZERTY.distance('q', 'w')).isCloseTo(Math.hypot(0.95, 1.0), within(1e-9))
+            // QWERTY : a (0,775 ; 1) et x (2,35 ; 2) à 1,83 u ; e (2,5 ; 0) à 1,99 u.
             assertThat(KeyboardLayout.QWERTY.areNeighbors('a', 'x')).isFalse()
             assertThat(KeyboardLayout.QWERTY.areNeighbors('a', 'e')).isFalse()
         }

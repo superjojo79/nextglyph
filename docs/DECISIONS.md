@@ -152,7 +152,7 @@ Le profil Texte adapte la disposition après chaque frappe (spec §5.2) et déco
 
 **Solveur.** Les largeurs cibles suivent les formules du §5.2, normalisées sur les lettres de la rangée (les touches de fonction gardent leur largeur ; l'espace vise `repos + spaceGain · P(fin)` et ne descend jamais sous son repos), puis sont mélangées avec le repos selon l'intensité. Le respect des contraintes est exact et en O(n) : chaque bord intérieur d'une rangée est une variable ; une passe de droite à gauche calcule l'intervalle des positions admissibles de chaque bord (largeur minimale, largeur fixe, somme des deux bords bornée par le plafond de déplacement du centre) ; la disposition au repos est toujours admissible, donc aucun intervalle n'est vide ; une passe de gauche à droite place chaque bord au plus près de sa cible dans son intervalle. Le plafond est appliqué avec une marge de 10⁻⁵ u, si bien qu'il tient aussi pour les centres recalculés à partir des largeurs `Float` (testé sans tolérance sur 3 000 distributions aléatoires).
 
-**Modes.** Le plafond est par touche, en fraction de sa propre largeur au repos (0,5 × 0,85 u pour une lettre de la rangée 3). Calme : opacité seule. Calme renforcé (défaut) : opacité, libellé, plafond 0,15. Élastique : tout, plafond `adapt.maxDisplacement` = 0,5.
+**Modes.** Le plafond est par touche, en fraction de sa propre largeur au repos (0,5 × 0,9 u pour une lettre de la rangée 3). Calme : opacité seule. Calme renforcé (défaut) : opacité, libellé, plafond 0,15. Élastique : tout, plafond `adapt.maxDisplacement` = 0,5.
 
 **Décodeur : règles de frontière.**
 - La nature de la touche est celle de la touche *affichée* sous le doigt : un tap sur espace, ⌫, ↵ ou `?123` produit toujours cette touche, et un tap sur une lettre produit toujours une lettre, même tout près de l'espace. Le décodage probabiliste ne départage que des lettres. Une faute « lettre au lieu d'espace » relève de la correction à la validation (§10.4), pas du décodeur.
@@ -212,7 +212,7 @@ Fin du périmètre M1 : l'IME charge les lexiques, suit le mot en cours, adapte 
 
 La contrainte de 32 dp était donc violée, à l'écran de 360 dp déjà au repos pour la rangée 3, et après adaptation partout, y compris en Calme renforcé (le plafond de déplacement du centre limite le décalage, pas la largeur). Solution retenue : **largeur minimale en dp dans le solveur**. `AdaptationConfig.minKeyWidthDp` (32) et `LayoutSolver.keyboardWidthDp` (renseignée par la vue) donnent un plancher `min(repos, 32 dp)` aux lettres, en plus de `minWidth × repos` ; la disposition au repos reste admissible, donc les garanties du solveur (topologie, rangées de 10 u, plafond de déplacement) sont inchangées. Le mode Élastique, explicitement choisi, en est exempté (§13). Après correction : 32 dp au minimum pour les lettres des rangées 1 et 2, aux deux largeurs ; rangée 3 : 32 dp à 411 dp, et à 360 dp la largeur de repos (30,6 dp) qu'aucune adaptation ne réduit. Vérifié par `MinimumKeyWidthTest`.
 
-Reste ouvert : au repos, la rangée 3 fait 30,6 dp à 360 dp (0,85 u du §5.1), 1,4 dp sous la contrainte du §13 ; aucune adaptation n'y change rien. Un correctif demande de modifier le §5.1 (lettres à 0,9 u, espace à 1,6 u en AZERTY et 1,7 u en QWERTY, soit 32,4 dp à 360 dp) et donc `KeyboardLayouts`, le prototype et l'analyse M0, ce qui sort de ce périmètre ; à trancher.
+Reste ouvert : au repos, la rangée 3 fait 30,6 dp à 360 dp (0,85 u) ; corrigé par l'entrée « Rangée 3 à 0,9 u » ci-dessous.
 
 ### Alternatives écartées
 
@@ -221,3 +221,14 @@ Reste ouvert : au repos, la rangée 3 fait 30,6 dp à 360 dp (0,85 u du §5.1), 
 - **Copie manuelle des lexiques dans `ime/src/main/assets`** : fichiers de plusieurs Mo dans git ou étape à la main, non reproductible.
 - **Lexiques compressés dans l'APK puis copiés au démarrage** : lecture complète à chaque installation, `mmap` direct impossible.
 - **Calcul du préfixe par état tenu dans l'IME** (ajout et retrait de lettres) : se désynchronise à chaque déplacement du curseur ou édition par l'application ; relire le texte avant le curseur est plus robuste et reste sous le budget.
+
+## 2026-11-19 — Rangée 3 à 0,9 u (taille minimale de 32 dp, §13)
+
+**Contexte.** Au repos, les lettres de la rangée 3 (0,85 u) mesurent 30,6 dp à 360 dp, soit 1,4 dp sous le minimum de 32 dp du §13 ; aucune adaptation ne pouvait y remédier.
+
+**Décision.** Les lettres de la rangée 3 passent à 0,9 u (32,4 dp à 360 dp ; 36,9 dp à 411 dp). L'espace absorbe la différence : 1,6 u en AZERTY (`?123` 1 + 6 × 0,9 + espace 1,6 + `↵` 1 + `⌫` 1 = 10 u) et 1,7 u en QWERTY (`?123` 1 + 7 × 0,9 + espace 1,7 + `⌫` 1 = 10 u ; la rangée 2 QWERTY ne change pas). L'espace continue de grandir avec P(fin) (§5.2). Mis à jour : §5.1 et récapitulatif, `KeyboardLayouts`, prototype, géométrie de l'analyse M0 (`tools`, sans relancer l'analyse complète : l'adjacence ne change pas pour l'essentiel, les chiffres du rapport restent indicatifs). `MinimumKeyWidthTest` exige désormais 32 dp au repos et après adaptation en Calme renforcé pour toutes les lettres, à 360 et 411 dp, en AZERTY et QWERTY.
+
+### Alternatives écartées
+
+- **Rangée 3 à 0,85 u avec exception au §13** : affaiblit une contrainte d'accessibilité pour 1,4 dp.
+- **`↵` déplacée dans la barre de suggestions** : retire une touche essentielle de la zone de frappe et charge la barre.

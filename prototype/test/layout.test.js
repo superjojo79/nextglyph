@@ -23,18 +23,18 @@ describe('HappyPath', () => {
     }
   });
 
-  it('AZERTY : rangée 3 = ?123, 6 lettres à 0,85 u, espace 1,9 u, ↵, ⌫', () => {
+  it('AZERTY : rangée 3 = ?123, 6 lettres à 0,9 u, espace 1,6 u, ↵, ⌫', () => {
     const row = LAYOUTS.azerty[2];
     assert.deepEqual(row.map((k) => k.id), ['sym', 'w', 'x', 'c', 'v', 'b', 'n', 'space', 'enter', 'back']);
-    assert.equal(row[1].rest, 0.85);
-    assert.equal(row[7].rest, 1.9);
+    assert.equal(row[1].rest, 0.9);
+    assert.equal(row[7].rest, 1.6);
   });
 
   it('QWERTY : ↵ en bout de rangée 2, rangée 3 de 7 lettres', () => {
     assert.equal(LAYOUTS.qwerty[1].at(-1).id, 'enter');
     assert.equal(LAYOUTS.qwerty[1][0].rest, 0.3);
     assert.equal(LAYOUTS.qwerty[2].filter((k) => k.kind === 'letter').length, 7);
-    assert.equal(LAYOUTS.qwerty[2].find((k) => k.id === 'space').rest, 2.05);
+    assert.equal(LAYOUTS.qwerty[2].find((k) => k.id === 'space').rest, 1.7);
   });
 
   it('la largeur totale de chaque rangée est conservée', () => {
