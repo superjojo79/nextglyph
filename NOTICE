@@ -39,6 +39,20 @@ SCOWL / English Speller Database (en_US Hunspell dictionary, 2026.02.25)
   with credit to Alan Beale. The affix file derives from Geoff Kuenning's
   Ispell (BSD license, Copyright 1993 Geoff Kuenning).
 
+French inflected forms lexicon v7.7 (Dicollecte / Grammalecte)
+  Olivier R. and contributors. https://grammalecte.net/
+  License: Mozilla Public License 2.0, https://www.mozilla.org/MPL/2.0/
+  Same project and license as the French spelling dictionaries above; the same
+  conditions apply to data derived from it.
+
+SCOWL 2020.12.07 (pre-expanded word lists, sizes 10 to 70 used)
+  https://wordlist.aspell.net/ , https://sourceforge.net/projects/wordlist/
+  Copyright 2000-2018 by Kevin Atkinson, under the same permission notice as
+  the SCOWL entry above ("Permission to use, copy, modify, distribute and sell
+  these word lists ... provided that the above copyright notice appears in all
+  copies and that both that copyright notice and this permission notice appear
+  in supporting documentation").
+
 Tatoeba sentences (offline analysis only, not distributed in the application)
   Sentences by the contributors of Tatoeba, https://tatoeba.org/
   License: Creative Commons Attribution 2.0 France

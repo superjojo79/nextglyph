@@ -28,7 +28,16 @@ Elles sont toutes décrites, avec URL, taille et SHA-256, dans `tools/data/sourc
 | `tatoeba-fra-sentences` | fr | c | Tatoeba, export hebdomadaire des phrases en français | https://downloads.tatoeba.org/exports/per_language/fra/fra_sentences.tsv.bz2 | CC BY 2.0 FR | https://tatoeba.org/en/downloads (« These files are released under CC BY 2.0 FR ») ; https://tatoeba.org/en/terms_of_use | Corpus de phrases pour l'analyse du §15.1 ; phrases courtes, proches de la conversation | 9 805 546 o |
 | `tatoeba-eng-sentences` | en | c | Tatoeba, export hebdomadaire des phrases en anglais | https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences.tsv.bz2 | CC BY 2.0 FR | idem | idem | 24 947 715 o |
 
-Total téléchargé : 84 901 370 octets (environ 81 Mio).
+Deux sources s'y ajoutent pour la construction des listes de mots (voir « Construction des listes de mots ») : les mêmes projets, sous la même licence, mais sous forme de **listes déjà fléchies**, ce qui évite d'implémenter l'expansion des affixes Hunspell.
+
+| Id | Langue | Besoin | Nom, version | URL officielle | Licence exacte | Page où la licence est indiquée | Usage | Taille |
+|---|---|---|---|---|---|---|---|---|
+| `dicollecte-lexique-7-7-fr` | fr | a | Lexique des formes fléchies (Dicollecte / Grammalecte) v7.7, 2025 (même version que le dictionnaire Hunspell) | https://www.grammalecte.net/dic/lexique-grammalecte-fr-v7.7.zip | MPL-2.0 | `README_lexique.txt` dans l'archive (« MPL : Mozilla Public License version 2.0 ») et en-tête du fichier `lexique-grammalecte-fr-v7.7.txt` (« Licence : MPL v2.0 ») ; la page de téléchargement https://grammalecte.net/ ne donne que la licence GPL 3 du programme, comme pour le dictionnaire Hunspell | Formes fléchies (environ 476 000 formes distinctes) avec lemme et étiquettes ; seule la colonne « Flexion » est lue | 12 325 782 o |
+| `scowl-final-lists-2020-12-07-en` | en | a | SCOWL (SCOWLv1) 2020.12.07 : listes déjà développées `final/{english,american}-{words,upper,proper-names,contractions,abbreviations}.NN`, `NN` = taille 10 (très courant) à 95 (rare) | https://downloads.sourceforge.net/project/wordlist/SCOWL/2020.12.07/scowl-2020.12.07.tar.gz | Même licence permissive de type MIT que SCOWL 2026 (copyright 2000-2018 Kevin Atkinson, fichier `Copyright` de l'archive) | `Copyright` dans l'archive ; https://wordlist.aspell.net/ | Vocabulaire anglais US avec niveau de fréquence. **Seuls les niveaux ≤ 70 sont utilisés** : ils viennent de sources du domaine public (Moby, 12dicts, 5desk...) ; les niveaux 80 et 95 incluent UKACD et d'autres sources à conditions d'attribution particulières | 2 569 810 o |
+
+Pourquoi SCOWL 2020.12.07 et non 2026.02.25 : la version 2026 ne publie pas de liste développée avec niveaux (seulement des dictionnaires Hunspell à affixes, une taille à la fois, et un générateur en ligne non versionné) ; la version 1 est la dernière à publier les listes par taille, et son archive est immuable (SHA-256 vérifié). Le dictionnaire Hunspell en_US 2026 et le dictionnaire Hunspell français restent dans le manifeste mais **ne sont pas utilisés** par `buildWordLists`.
+
+Total téléchargé : 99 796 962 octets (environ 95 Mio).
 
 ### Couverture des besoins
 
@@ -42,9 +51,50 @@ Total téléchargé : 84 901 370 octets (environ 81 Mio).
 
 - **Lexique 3 vs Lexique 4.** La page officielle ne propose plus que Lexique 4.10 (et 3.82 en archive, sans licence indiquée sur la page). Lexique 4.10 contient les mêmes informations que Lexique 3 (formes, lemmes, fréquences de sous-titres) et déclare CC BY-SA 4.0 ; c'est lui qui est retenu.
 - **Lexique 4.10 pèse 49 Mo** : seul `Lexique4.1.tsv` (34 Mo) est utile. Le fichier brut n'est jamais versionné ; seul le lexique binaire dérivé l'est dans l'APK (≤ 8 Mo par langue).
-- **SCOWL.** Le fichier est une liste Hunspell (mots de base et drapeaux d'affixes) : `tools/` devra la développer (équivalent de `unmunch`) pour obtenir les formes fléchies. Le README de SCOWL précise que des données COCA (3-grammes, non librement distribuées) ont servi à classer les mots, « within the rights given by the NDA » ; la liste distribuée est elle-même sous licence permissive. Point à relire avant publication F-Droid.
+- **SCOWL.** Le fichier Hunspell est une liste de mots de base et de drapeaux d'affixes ; il n'est pas développé : `buildWordLists` utilise à la place les listes déjà fléchies de SCOWL 2020.12.07 (ci-dessus). Le README de SCOWL précise que des données COCA (3-grammes, non librement distribuées) ont servi à classer les mots, « within the rights given by the NDA » ; la liste distribuée est elle-même sous licence permissive. Point à relire avant publication F-Droid.
 - **Tatoeba.** Le fichier est une exportation hebdomadaire écrasée à chaque semaine : son SHA-256 devient obsolète au prochain export. Voir « Points d'attention » plus bas.
 - **Dicollecte.** La page de téléchargement de grammalecte.net ne mentionne pas de licence pour les dictionnaires : elle est indiquée dans `README_dict_fr.txt` de l'archive. Le programme Grammalecte lui-même est sous GPL 3 et n'est **pas** utilisé.
+
+## Construction des listes de mots
+
+`./gradlew :tools:buildWordLists` (dépend de `fetchData` ; code dans `nextglyph.tools.wordlists`, testé) produit, sous `tools/build/` (ignoré par git, jamais distribué) :
+
+- `wordlists/<lang>.tsv` : `forme d'affichage<TAB>fréquence entière > 0`, UTF-8, fins de ligne `\n`, trié par fréquence décroissante puis par forme (ordre des unités UTF-16) ;
+- `wordlists/<lang>-stats.txt` : entrées, clés distinctes, exclusions par motif, compteurs, couverture ;
+- `corpus/<lang>-train.txt`, `corpus/<lang>-test.txt` (une phrase par ligne), `corpus/mixed-test.txt` et `corpus/mixed-test-languages.txt` (`fr` ou `en` pour chaque ligne du corpus mixte, nécessaire au §15.1 pour mesurer la convergence du score de langue).
+
+Les sorties sont déterministes (mêmes entrées, mêmes fichiers).
+
+### Filtre commun
+
+La clé d'une forme est `TextNormalizer.normalize(forme)` (module `engine`). Une forme est **exclue** si `normalize` la refuse (vide, > 64 caractères, espace, seulement des diacritiques), si sa clé contient un caractère hors `a-z ' -`, ou si sa clé n'a aucune lettre (`-`, `'`). Chaque exclusion est comptée par motif dans le fichier de statistiques. Les apostrophes typographiques sont ramenées à `'` avant tout. La casse d'affichage de la source est conservée (`Tom`, `I`, `Monday`, `TV`) ; plusieurs formes d'affichage peuvent partager une clé (`paris`, `Paris`) : une ligne par forme.
+
+### Français
+
+- Vocabulaire : formes du lexique Dicollecte 7.7 (toutes variantes orthographiques, 1990 comprise), plus les formes de Lexique 4.10 que Dicollecte ne contient pas (à la casse près). L'élision `l'`, `qu'`... vient de Lexique.
+- Fréquence : colonne `11_FreqOrtho` de Lexique 4.10 (fréquence par million de mots, sous-titres de films ; répétée sur chaque ligne d'une forme, on garde le maximum). **Fréquence entière = max(1, arrondi(fréquence par million × 100))**, soit une résolution de 0,01 par million ; plafonnée à 2³¹−1. Un mot absent de Lexique (ou de fréquence nulle) reçoit la **fréquence plancher 1**. Lexique ne distingue pas la casse : si un groupe contient une variante tout en minuscules (`paris`), elle porte la fréquence et les autres (`Paris`) reçoivent le plancher ; sans variante minuscule, toutes la portent. Limite connue : les noms propres homographes d'un nom commun sont donc au plancher.
+- Les exclusions sont comptées sur les formes de Dicollecte et de Lexique ; les formes en double après normalisation des apostrophes sont fusionnées.
+
+### Anglais
+
+- Vocabulaire : listes SCOWL 2020.12.07 de niveau ≤ 70 (`MAX_LEVEL`) : mots (`english-words`, `american-words`, orthographe américaine), majuscules (`-upper`), noms propres (`-proper-names`), contractions (`-contractions`) et abréviations (`-abbreviations`, presque toutes exclues car elles contiennent un point). Une forme présente à plusieurs niveaux garde le plus courant. Encodage de l'archive : ISO-8859-1.
+- Fréquence : **fréquence = occurrences dans la partie entraînement de Tatoeba anglais + a priori(niveau)**, avec a priori(niveau) = `floor(1000 × 0,5^((niveau − 10) / 10))`, minimum 1 : 10 → 1000, 20 → 500, 35 → 176, 40 → 125, 50 → 62, 55 → 44, 60 → 31, 70 → 15. Un mot sans occurrence reçoit donc exactement le plancher de son niveau. Les occurrences d'un mot en début de phrase compté capitalisé (`The`) sont attribuées à la forme d'affichage du lexique (`the`) si le lexique n'a pas la forme capitalisée.
+- Possessifs : une forme en `'s` hors contractions (`ability's`), jamais vue dans le corpus d'entraînement, est exclue (motif compté ; 32 922 formes). Les contractions (`don't`, `it's`) restent.
+- Biais à connaître : Tatoeba contient beaucoup de phrases d'apprentissage avec `Tom` et `Mary` (`Tom` est le 3e mot le plus fréquent).
+
+### Corpus et partition
+
+- Source : export Tatoeba de chaque langue (`id<TAB>langue<TAB>texte`) ; lignes mal formées et autres langues ignorées et comptées.
+- Doublons : les phrases de texte identique (espaces normalisés) sont dédoublonnées en gardant le plus petit identifiant, **avant** la partition, pour qu'une phrase répétée ne fuie pas du test vers l'entraînement.
+- Partition : phrase de test si `floorMod(SplitMix64(id), 100) < 10` (10 % de test), indépendante de l'ordre du fichier et des autres phrases ; une phrase est dans un seul des deux fichiers. Les phrases sortent triées par identifiant.
+- Corpus mixte : blocs alternés de phrases de test, français d'abord ; taille de bloc = 1 + `floorMod(SplitMix64(20261119 + n° du bloc), 8)`, soit 1 à 8 phrases ; s'arrête quand la langue dont c'est le tour est épuisée (le français, moins nombreux).
+
+### Tokenisation (comptage anglais, couverture)
+
+- Un mot est une suite de lettres ; `'` et `-` y sont admis entre deux lettres. Une suite contenant un chiffre est ignorée. La casse est conservée.
+- Anglais : `don't`, `Tom's`, `rock'n'roll`, `well-known` sont un seul mot.
+- Français : **`l'école` est deux mots, `l'` et `école`** (convention du §5.8 : l'élision est validée seule, le mot suivant commence sans espace ; le lexique contient `l'`, `d'`, `j'`, `qu'`...). Préfixes d'élision séparés : `c d j l m n s t qu jusqu lorsqu puisqu quoiqu`. `aujourd'hui`, `quelqu'un`, `prud'homme` restent entiers ; `peut-être`, `c'est-à-dire` (`c'` + `est-à-dire`) gardent leurs traits d'union.
+- Couverture : parmi les 1 000 clés les plus fréquentes du corpus de test (égalités départagées par ordre alphabétique), part présente dans la liste ; et part des occurrences couverte. Les mots du test que le filtre exclut (hors alphabet) sont comptés à part, hors dénominateur.
 
 ## Sources examinées et écartées
 
@@ -67,7 +117,9 @@ Total téléchargé : 84 901 370 octets (environ 81 Mio).
 >
 > **Dictionnaires orthographiques français (Dicollecte)** v7.7 : Olivier R. et contributeurs. https://grammalecte.net/ — Mozilla Public License 2.0 (https://www.mozilla.org/MPL/2.0/). Données modifiées : conversion en lexique binaire.
 >
-> **SCOWL / English Speller Database** : Copyright 2000-2026 Kevin Atkinson. https://wordlist.aspell.net/ — licence permissive (voir `NOTICE`).
+> **SCOWL / English Speller Database** : Copyright 2000-2026 Kevin Atkinson (listes développées : SCOWL 2020.12.07, copyright 2000-2018). https://wordlist.aspell.net/ — licence permissive (voir `NOTICE`).
+>
+> **Lexique des formes fléchies (Dicollecte)** v7.7 : même attribution et même licence MPL-2.0 que les dictionnaires orthographiques ci-dessus.
 >
 > **Tatoeba** (analyse hors ligne, non distribué) : phrases des contributeurs de Tatoeba, https://tatoeba.org/ — licence CC BY 2.0 FR (https://creativecommons.org/licenses/by/2.0/fr/).
 
