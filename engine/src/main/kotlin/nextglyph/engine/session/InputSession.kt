@@ -1,5 +1,6 @@
 package nextglyph.engine.session
 
+import nextglyph.engine.contacts.ContactContext
 import nextglyph.engine.edit.AutoCapitalization
 import nextglyph.engine.edit.EditConfig
 import nextglyph.engine.edit.EditContext
@@ -16,6 +17,7 @@ import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.lexicon.Distribution
 import nextglyph.engine.lexicon.LexiconLanguage
+import nextglyph.engine.predict.FieldProfile
 import nextglyph.engine.predict.LanguageState
 import nextglyph.engine.predict.Prediction
 import nextglyph.engine.predict.Predictor
@@ -51,11 +53,24 @@ import kotlin.math.max
  */
 class InputSession(
     private val target: SessionTarget,
-    private val editor: TextEditor = TextEditor(),
+    private var editor: TextEditor = TextEditor(),
 ) {
-    /** Prédicteur (lexiques chargés), ou `null` tant qu'il n'est pas prêt : saisie sans suggestions. */
+    /** Prédicteur de base (lexiques chargés), ou `null` tant qu'il n'est pas prêt : saisie sans suggestions. */
     var predictor: Predictor? = null
         private set
+
+    /** Prédicteurs par niveau de contexte des contacts (§6.3), ou `null` tant qu'ils ne sont pas prêts. */
+    var predictors: PredictionStack? = null
+        private set
+
+    /** Apprentissage (§5.3, §10.5), ou `null` : rien n'est appris (données pas encore chargées). */
+    var learning: SessionLearning? = null
+
+    /**
+     * Prévenu quand la validation par espace insère un autre mot que le texte tapé (§13 : annoncé par
+     * TalkBack). Le texte n'est transmis qu'à l'IME, jamais journalisé.
+     */
+    var onWordReplaced: ((String) -> Unit)? = null
 
     /** Score de langue courant, ou `null` sans prédicteur. */
     var language: LanguageState? = null
@@ -82,6 +97,10 @@ class InputSession(
     private var languageVersion = 0
     private var lastShiftTapMs: Long? = null
 
+    // Majuscule initiale du mot en cours : due au début de phrase, ou tapée par l'utilisateur (§6.3, §10.5).
+    private var wordAutoCapital = false
+    private var wordTypedCapital = false
+
     private var cursor = UNKNOWN
     private var selectionLength = 0
     private val pending = ArrayDeque<Int>()
@@ -92,7 +111,16 @@ class InputSession(
      * Installe le prédicteur ; l'état de langue repart de [preferred] (§10.6), sauf s'il porte
      * déjà sur les mêmes langues.
      */
-    fun setPredictor(predictor: Predictor?, preferred: String = LexiconLanguage.FRENCH) {
+    fun setPredictor(predictor: Predictor?, preferred: String = LexiconLanguage.FRENCH) =
+        setPredictors(predictor?.let(PredictionStack::of), preferred)
+
+    /**
+     * Installe les prédicteurs (lexiques, mots appris, contacts) ; l'état de langue repart de [preferred],
+     * sauf s'il porte déjà sur les mêmes langues.
+     */
+    fun setPredictors(stack: PredictionStack?, preferred: String = LexiconLanguage.FRENCH) {
+        val predictor = stack?.base
+        this.predictors = stack
         this.predictor = predictor
         val current = language
         language = when {
@@ -104,8 +132,15 @@ class InputSession(
         refresh()
     }
 
+    /** Réglages de l'édition (§14 : typographie française, double espace), appliqués aussitôt. */
+    fun setEditConfig(config: EditConfig) {
+        editor = TextEditor(config)
+        refresh()
+    }
+
     /** Nouveau champ (ou même champ redémarré), sélection initiale [selStart]–[selEnd] (−1 : inconnue). */
     fun onStartInput(field: SessionField, selStart: Int, selEnd: Int) {
+        learning?.onWordAbandoned()
         this.field = field
         composing = ""
         editState = EditState.INITIAL
@@ -120,6 +155,7 @@ class InputSession(
 
     /** Fin de la saisie dans le champ : le mot en cours est validé tel quel. */
     fun onFinishInput() {
+        learning?.onWordAbandoned()
         if (composing.isNotEmpty()) target.finishComposingText()
         composing = ""
         undo = null
@@ -146,6 +182,7 @@ class InputSession(
             }
         }
         pending.clear()
+        learning?.onWordAbandoned()
         cursor = if (selStart >= 0 && selEnd >= 0) minOf(selStart, selEnd) else UNKNOWN
         selectionLength = if (cursor == UNKNOWN) 0 else abs(selEnd - selStart)
         if (composing.isNotEmpty()) {
@@ -157,10 +194,13 @@ class InputSession(
         refresh()
     }
 
-    /** Appui validé sur [key] ; [upper] : glissé vers le haut sur une lettre (majuscule, §5.7). */
-    fun onKey(key: Key, upper: Boolean = false) {
+    /**
+     * Appui validé sur [key] ; [upper] : glissé vers le haut sur une lettre (majuscule, §5.7) ; [offset] :
+     * position de la frappe par rapport à la touche au repos (modèle spatial, §5.3), `null` si inconnue.
+     */
+    fun onKey(key: Key, upper: Boolean = false, offset: TapOffset? = null) {
         when (key.kind) {
-            KeyKind.LETTER -> onLetter(key.label, upper)
+            KeyKind.LETTER -> onLetter(key.label, upper, offset)
             KeyKind.CHARACTER -> onCharacter(key.label)
             KeyKind.SPACE -> onSpace()
             KeyKind.BACKSPACE -> onBackspace()
@@ -171,14 +211,24 @@ class InputSession(
         }
     }
 
-    /** Lettre [letter] (en minuscule, ou variante accentuée), en majuscule si [upper] ou si la majuscule est active. */
-    fun onLetter(letter: String, upper: Boolean = false) {
+    /**
+     * Lettre [letter] (en minuscule, ou variante accentuée), en majuscule si [upper] ou si la majuscule est
+     * active ; [offset] : position de la frappe (modèle spatial, §5.3).
+     */
+    fun onLetter(letter: String, upper: Boolean = false, offset: TapOffset? = null) {
         require(letter.isNotEmpty()) { "Une lettre ne peut pas être vide." }
         undo = null
         editState = EditState.INITIAL
+        val auto = !upper && state.shift == ShiftState.ONCE && manualShift == ShiftState.OFF
         val capital = upper || state.shift != ShiftState.OFF
         val text = if (capital) letter.uppercase(Locale.ROOT) else letter
+        learning?.onLetter(letter, offset, field.prediction)
         batch { typeIntoWord(text) }
+        if (composing == text) {
+            // Première lettre d'un mot : d'où vient sa majuscule.
+            wordAutoCapital = capital && auto
+            wordTypedCapital = capital && !auto
+        }
         if (manualShift == ShiftState.ONCE) manualShift = ShiftState.OFF
         refresh()
     }
@@ -214,6 +264,7 @@ class InputSession(
             plain(" ", validate = false)
             return
         }
+        var replaced: String? = null
         batch {
             val p = currentPrediction()
             val predictor = predictor
@@ -231,8 +282,11 @@ class InputSession(
                     setLanguage(commit.language)
                     editState = EditState(if (atEnd()) SpaceOrigin.AUTO else SpaceOrigin.TYPED)
                     undo = commit.undo?.let { PendingUndo(it, language) }
+                    if (p.inserted != p.word) replaced = p.inserted
                 }
+                learning?.onValidated(p, language, field.prediction, wordAutoCapital)
             } else {
+                learning?.onWordEnded()
                 finishComposing()
                 val result = editor.onSpace(context())
                 apply(TextEdit(result.operations))
@@ -241,6 +295,7 @@ class InputSession(
             }
         }
         refresh()
+        replaced?.let { onWordReplaced?.invoke(it) }
     }
 
     /**
@@ -263,6 +318,7 @@ class InputSession(
         if (pendingUndo != null && predictor != null) {
             val edit = predictor.undo(target.textBeforeCursor(LOOKBACK), pendingUndo.token, field.prediction)
             if (edit != null) {
+                learning?.onUndo()
                 batch {
                     apply(edit)
                     reopenComposing()
@@ -272,6 +328,7 @@ class InputSession(
                 return
             }
         }
+        learning?.onErase()
         batch {
             when {
                 composing.isNotEmpty() -> {
@@ -305,6 +362,7 @@ class InputSession(
     fun onEnter() {
         undo = null
         editState = EditState.INITIAL
+        learning?.onWordEnded()
         when (val enter = field.enter) {
             EnterBehavior.NewLine -> {
                 batch { commit("\n") }
@@ -414,6 +472,9 @@ class InputSession(
         batch {
             val p = currentPrediction() ?: return@batch
             val commit = predictor.pickSuggestion(p, Suggestion(item.text, item.highlighted, item.typed), language, field.prediction)
+            // Le texte tapé, gardé alors qu'un candidat dominait : il n'est dans aucun lexique (cas 2 du §5.5).
+            val unknown = item.typed && p.case == SpaceCase.DOMINANT
+            learning?.onSuggestionPicked(item.text, unknown, language, field.prediction, wordAutoCapital)
             apply(commit.edit)
             setLanguage(commit.language)
             editState = EditState(if (atEnd()) SpaceOrigin.AUTO else SpaceOrigin.TYPED)
@@ -449,10 +510,13 @@ class InputSession(
         val p = currentPrediction()
         val predictor = predictor
         val language = language
-        if (p != null && predictor != null && language != null) {
+        if (p != null && predictor != null && language != null && p.case != SpaceCase.NO_WORD && p.case != SpaceCase.DISABLED) {
             val commit = predictor.commitBeforePunctuation(p, language, field.prediction)
             apply(commit.edit)
             setLanguage(commit.language)
+            learning?.onValidated(p, language, field.prediction, wordAutoCapital)
+        } else {
+            learning?.onWordEnded()
         }
         finishComposing()
     }
@@ -530,10 +594,19 @@ class InputSession(
     private fun atEnd(): Boolean = target.textAfterCursor(1).isNullOrEmpty()
 
     private fun currentPrediction(): Prediction? {
-        val predictor = predictor ?: return null
         val language = language ?: return null
-        if (!field.composes || selectionLength > 0) return null
-        return predictor.predict(target.textBeforeCursor(LOOKBACK), language, field.prediction)
+        if (predictors == null || !field.composes || selectionLength > 0) return null
+        val before = target.textBeforeCursor(LOOKBACK)
+        return predictorFor(before)?.predict(before, language, field.prediction)
+    }
+
+    /** Prédicteur du niveau de contexte des contacts (§6.3) pour le texte [before]. */
+    private fun predictorFor(before: CharSequence?): Predictor? {
+        val stack = predictors ?: return null
+        if (stack.directory == null) return stack.base
+        val typedCapital = wordTypedCapital && composing.isNotEmpty()
+        val personName = field.prediction.profile == FieldProfile.PERSON_NAME
+        return stack.forContext(ContactContext.read(before, personName, typedCapital, elisionLanguage()))
     }
 
     private fun context(): EditContext = EditContext(
@@ -573,12 +646,8 @@ class InputSession(
         } else {
             val before = target.textBeforeCursor(LOOKBACK)
             val lang = language
-            val predictor = predictor
-            val p = if (predictor != null && lang != null && field.composes && selectionLength == 0) {
-                predictor.predict(before, lang, field.prediction)
-            } else {
-                null
-            }
+            val predictor = if (lang != null && field.composes && selectionLength == 0) predictorFor(before) else null
+            val p = if (predictor != null && lang != null) predictor.predict(before, lang, field.prediction) else null
             prediction = p
             val shift = if (before == null) manualShift else AutoCapitalization.shiftFor(before, field.textProfile, field.capsMode, manualShift)
             val prefix = if (field.adaptation && lang != null) WordPrefix.of(before, selectionLength, elisionLanguage()) else null

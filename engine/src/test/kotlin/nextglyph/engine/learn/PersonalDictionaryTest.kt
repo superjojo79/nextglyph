@@ -30,6 +30,21 @@ class PersonalDictionaryTest {
     inner class HappyPath {
 
         @Test
+        fun `une copie garde mots promus, mots en attente et ordre, et reste indépendante`() {
+            dictionary.importWord("zorglub", "fr", 3)
+            dictionary.importWord("Bidule", "en", 1)
+            dictionary.see("machin")
+
+            val copy = dictionary.copy()
+            dictionary.remove("zorglub", "fr")
+
+            assertThat(copy.words().map { it.form }).containsExactly("Bidule", "zorglub")
+            assertThat(copy.pendingWords().map { it.form }).containsExactly("machin")
+            assertThat(copy.config).isSameAs(dictionary.config)
+            assertThat(copy.sets(base())).isNotSameAs(base())
+        }
+
+        @Test
         fun `chaque modification fait avancer la révision`() {
             val seen = ArrayList<Long>()
             fun step(action: () -> Unit) {

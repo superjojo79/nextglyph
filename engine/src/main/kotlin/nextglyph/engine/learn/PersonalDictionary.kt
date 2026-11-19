@@ -207,6 +207,17 @@ class PersonalDictionary(val config: LearningConfig = LearningConfig()) {
         return true
     }
 
+    /**
+     * Copie indépendante (mots promus et en attente, ordre d'utilisation compris) : l'IME la passe à un
+     * fil d'arrière-plan pour reconstruire les lexiques ([sets]) sans partager cet objet non thread-safe.
+     */
+    fun copy(): PersonalDictionary {
+        val copy = PersonalDictionary(config)
+        val (promoted, waiting) = snapshot()
+        copy.restore(promoted, waiting)
+        return copy
+    }
+
     /** Oublie tout : mots promus et en attente (§12). */
     fun clear() {
         if (words.isNotEmpty()) lexiconRevision++
