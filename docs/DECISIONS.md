@@ -59,3 +59,81 @@ Les maxima isolés de quelques millisecondes relevés par le programme correspon
 - **Ordre préfixe (parent avant enfants)** : les distances vers l'avant dépendent de la taille des sous-arbres encore à écrire, ce qui impose deux passes ; l'ordre postfixe s'écrit en une passe.
 - **Validation complète au chargement, ou somme de contrôle** : coûte un parcours de tout le fichier (plusieurs millisecondes) à chaque ouverture du clavier. La vérification paresseuse à chaque lecture suffit à garantir qu'aucune requête ne plante ni ne boucle.
 - **Distribution de la lettre suivante précalculée par nœud** (28 probabilités) : multiplierait la taille par 10 pour gagner quelques microsecondes.
+
+---
+
+## 2026-11-19 — Validation par espace : correction des préfixes connus
+
+### Contexte
+
+Le §5.2 ne prévoit la correction à distance d'édition que pour un préfixe inconnu, et le §5.5 ne précisait pas si les candidats de la validation par espace comprennent des corrections quand le texte tapé est un préfixe valide. L'analyse M0 (`docs/analysis/M0-corpus.md`, partie 2) simule un utilisateur qui tape les mots des corpus de test Tatoeba avec 0, 2 ou 5 % de fautes de substitution par une touche voisine et appuie sur espace dès que la touche espace affiche le mot voulu.
+
+### Décision
+
+À la validation par espace, les candidats comprennent les corrections à distance 1 (pondérées par l'adjacence) **même si le texte tapé est un préfixe connu**, dès lors que ce n'est pas un mot du lexique (§5.5, §10.4). L'adaptation visuelle (§5.2) n'est pas modifiée.
+
+### Mesures
+
+Fausses validations (part des validations automatiques), 5 % de fautes, `minProb = 0,7` : français 4,83 % → 2,10 %, anglais 3,74 % → 1,62 %. Sans cette correction, aucun réglage de la grille testée (`minProb` 0,4 à 0,9, `minRatio` 1,5 à 10, longueur minimale 1 à 3) ne passe sous 3 % en français (minimum 3,26 %) : les fausses validations viennent de fautes qui forment un autre préfixe valide (`ke` pour `le`), surtout sur les mots de 2 à 4 lettres. Coût sans faute de frappe : 18,3 → 17,3 % de mots complétés en français, KSPC 0,940 → 0,944.
+
+### Alternatives écartées
+
+- **Longueur minimale avant validation automatique** (2 ou 3 lettres) : réduit les fausses validations sans les ramener sous 3 % en français ; sans effet une fois la correction étendue.
+- **Seuils plus élevés seulement** (`minProb` 0,8 ou 0,9) : les fausses validations dues aux fautes ont une confiance élevée ; 4,76 % au mieux en français à 5 % de fautes, et beaucoup moins de complétions.
+
+---
+
+## 2026-11-19 — Seuils de la validation par espace
+
+### Contexte
+
+Le §5.5 fixait `autocommit.minProb = 0,60` et `autocommit.minRatio = 2,0` à titre provisoire, à recalibrer par l'analyse du §15.1. Objectif du §15.2 : moins de 3 % de validations automatiques annulées, approximé par le taux de fausses validations simulé.
+
+### Décision
+
+`autocommit.minProb = 0,70` (au lieu de 0,60) ; `autocommit.minRatio = 2,0` inchangé. Réglage « Prudence de la validation » (§14) : Prudente 0,80, Normale 0,70, Audacieuse 0,60. Pas de longueur minimale.
+
+### Mesures
+
+Avec la correction des préfixes connus (entrée précédente), fausses validations sur les corpus de test :
+
+| `minProb` | FR 0 / 2 / 5 % de fautes | EN 0 / 2 / 5 % | Mots complétés ou corrigés, FR / EN sans faute | KSPC FR / EN |
+|---|---|---|---|---|
+| 0,60 | 0,73 / 1,41 / 2,59 % | 1,01 / 1,15 / 1,61 % | 19,3 / 24,2 % | 0,936 / 0,928 |
+| **0,70** | **0,67 / 1,17 / 2,10 %** | **1,11 / 1,19 / 1,62 %** | **17,3 / 20,9 %** | **0,944 / 0,939** |
+| 0,80 | 0,57 / 0,98 / 1,76 % | 1,03 / 1,09 / 1,47 % | 14,7 / 17,1 % | 0,953 / 0,951 |
+
+0,60 respecte aussi l'objectif, mais avec une marge faible (2,59 %) pour un modèle de fautes optimiste (substitutions seulement, que la correction sait traiter) ; 0,70 garde une marge d'environ un tiers pour un coût de 2 à 3 points de mots complétés. `minRatio` n'a pas d'effet mesurable dès que `minProb ≥ 0,67` (la condition est alors toujours remplie) ; il est conservé comme garde-fou et pour le réglage Audacieuse.
+
+### Alternatives écartées
+
+- **0,60 (valeur initiale)** : marge trop faible à 5 % de fautes en français.
+- **0,80 et plus** : gain de 0,3 point sur les fausses validations pour 2,6 points de mots complétés en moins (FR) ; retenu pour le réglage Prudente.
+
+---
+
+## 2026-11-19 — Score de langue : fenêtre de 4 mots, indice par fréquence relative
+
+### Contexte
+
+Le §10.6 fixait une fenêtre glissante de 8 mots, et comptait les mots communs aux deux langues « pour les deux langues ». L'analyse M0 (partie 3) mesure, sur le corpus mixte étiqueté (1,1 million de mots, 32 501 changements de langue), la part des mots dont la langue dominante avant la frappe est la bonne, le délai pour suivre un changement de langue et les fausses validations attribuables à la langue.
+
+### Décision
+
+Fenêtre de **4 mots**. Chaque mot validé apporte un indice **proportionnel à sa fréquence relative** dans chaque lexique, `(f_FR, f_EN) / (f_FR + f_EN)`, au lieu d'un simple test d'appartenance.
+
+### Mesures
+
+| Indice, fenêtre | Langue dominante correcte | Délai moyen | Changements non rattrapés |
+|---|---|---|---|
+| appartenance, 8 (ancienne règle) | 86,9 % | 4,41 mots | 1 103 |
+| appartenance, 4 | 91,1 % | 2,53 mots | 228 |
+| fréquence, 2 | 94,1 % | 1,47 mot | 31 |
+| **fréquence, 4** | **92,6 %** | **2,48 mots** | **179** |
+
+Les fausses validations du corpus mixte dépendent peu de la fenêtre (< 0,02 point) : 0,58 % sans faute et 0,90 % à 2 % de fautes (`minProb = 0,7`), contre 0,54 % et 0,84 % si la langue de la phrase est connue ; environ un quart d'entre elles sont attribuables à la langue (22 à 26 % avec l'indice par fréquence, 26 à 30 % avec l'appartenance).
+
+### Alternatives écartées
+
+- **Fenêtre de 2 ou 3 mots** : légèrement meilleure sur ce corpus (+1,1 à +1,5 point), mais le corpus mixte change de langue tous les 34 mots en moyenne, ce qui favorise la réactivité, et la stabilité sur un long texte monolingue n'est pas mesurée ; une fenêtre de 2 mots bascule sur un seul mot ambigu, contraire à l'exigence « pas de bascule brutale » du §10.6. À réévaluer sur des textes réels (M5).
+- **Appartenance aux lexiques** : les mots courts communs (`a`, `on`, `son`, `plus`) tirent le score vers 50/50 ; moins précise à toutes les tailles de fenêtre.

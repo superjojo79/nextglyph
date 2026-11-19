@@ -155,7 +155,7 @@ La normalisation par rangée conserve la largeur totale ; le solveur ajuste ensu
 
 **Cas particuliers :**
 
-- *Début de mot* (`p` vide) : les poids viennent de la distribution des initiales, conditionnée par le contexte (mot précédent) si disponible. L'adaptation est atténuée de moitié.
+- *Début de mot* (`p` vide) : les poids viennent de la distribution des initiales, conditionnée par le contexte (mot précédent) si disponible. L'adaptation est atténuée de moitié (confirmé par l'analyse M0 : distribution des initiales presque plate, 4,2 bits, lettre tapée dans le top 3 une fois sur trois ; `docs/analysis/M0-corpus.md`).
 - *Préfixe inconnu* (aucun mot ne commence par `p`) : on tente une correction à distance d'édition 1 sur le préfixe ; si elle ne donne rien, le clavier revient à l'état neutre (toutes les touches au repos).
 - *Animation* : 100 ms, `ease-out`. Elle est supprimée si l'utilisateur a désactivé les animations système (`ANIMATOR_DURATION_SCALE == 0`).
 - *Saisie rapide* : si l'intervalle entre deux frappes est inférieur à `adapt.fastTypingMs` (défaut : 120 ms), la mise à jour visuelle est différée jusqu'à une pause, pour ne pas faire clignoter le clavier. Le décodage (§5.3), lui, reste toujours actif.
@@ -192,7 +192,8 @@ Un tap sur une suggestion valide ce mot et ajoute une espace automatique.
 
 1. **`t` est un mot du lexique** → on insère `t`, avec restitution des accents si elle est sans ambiguïté (`ecole` → `école`). Les cas ambigus (`a`/`à`, `ou`/`où`, `du`/`dû`, `la`/`là`) sont insérés tels quels ; les variantes accentuées restent dans la barre et sont choisies par le contexte quand le modèle de bigrammes est disponible.
 2. **`t` n'est pas un mot, et un candidat `w` domine** → on insère `w`. Domine signifie :
-   `P(w) ≥ autocommit.minProb` (défaut : 0,60) **et** `P(w) / P(2e candidat) ≥ autocommit.minRatio` (défaut : 2,0).
+   `P(w) ≥ autocommit.minProb` (défaut : 0,70) **et** `P(w) / P(2e candidat) ≥ autocommit.minRatio` (défaut : 2,0).
+   Les candidats comprennent les complétions de `t` **et** ses corrections (§10.4), **même si `t` est un préfixe connu** : une faute forme souvent un autre préfixe valide (`ke` pour `le`), dont la complétion dominerait sinon à tort. Réglage « Prudence de la validation » (§14) : `minProb` = 0,80 (Prudente), 0,70 (Normale), 0,60 (Audacieuse). Valeurs mesurées au §15.1 (`docs/analysis/M0-corpus.md`) : avec 5 % de fautes simulées, au plus 2,1 % de fausses validations en réglage Normal.
    Ce cas couvre la complétion (`bonj` → `bonjour`), la correction (`bonjoru` → `bonjour`), les élisions (`jai` → `j'ai`, `cest` → `c'est`, `lecole` → `l'école`), les traits d'union (`peutetre` → `peut-être`) et les contractions anglaises (`dont` → `don't`, `im` → `I'm`, `youre` → `you're`).
    Les contractions anglaises qui sont aussi des mots valides (`well`/`we'll`, `its`/`it's`, `were`/`we're`, `ill`/`I'll`, `cant`/`can't`, `id`/`I'd`) relèvent du cas 1 : jamais de remplacement automatique en V1, la variante reste proposée dans la barre.
 3. **Sinon** → on insère `t` tel quel. Le mot n'est **pas** ajouté au dictionnaire personnel à ce stade (cf. §10.5).
@@ -408,6 +409,7 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 
 - Candidats par distance d'édition pondérée par la géométrie du clavier (une substitution entre touches voisines coûte moins cher).
 - Limite V1 : distance 1 sur le préfixe, distance 2 sur le mot complet à la validation.
+- Pour l'adaptation visuelle (§5.2), la correction n'est tentée que si le préfixe est inconnu. À la validation par espace (§5.5), elle est tentée aussi quand le texte tapé est un préfixe connu qui n'est pas un mot : sans cela, l'objectif de moins de 3 % de validations annulées (§15.2) n'est pas atteint avec 5 % de fautes de frappe (analyse M0).
 
 ### 10.5 Dictionnaire personnel
 
@@ -420,9 +422,9 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 
 Beaucoup d'utilisateurs alternent les deux langues, parfois dans une même phrase. Nextglyph ne demande donc pas de « changer de langue » : les deux lexiques sont actifs en même temps.
 
-- **Score de langue.** Une estimation `π_FR` / `π_EN` est tenue à jour à partir des derniers mots validés (fenêtre glissante, défaut : 8 mots), en partant de la langue préférée de l'utilisateur.
+- **Score de langue.** Une estimation `π_FR` / `π_EN` est tenue à jour à partir des derniers mots validés (fenêtre glissante, défaut : 4 mots), en partant de la langue préférée de l'utilisateur.
 - **Mélange.** `P(c | p) = π_FR · P_FR(c | p) + π_EN · P_EN(c | p)`. Le même mélange s'applique à `P(fin | p)` et au classement des suggestions. Le score évolue progressivement : pas de bascule brutale de l'adaptation visuelle.
-- **Mots communs aux deux langues** (`table`, `question`, `important`) : ils comptent pour les deux langues dans le score.
+- **Indice d'un mot validé.** Chaque mot apporte au score un poids par langue proportionnel à sa fréquence relative dans chaque lexique : `(f_FR, f_EN) / (f_FR + f_EN)`, où `f_L` est la fréquence du mot divisée par la masse totale du lexique `L` ; un mot inconnu des deux lexiques n'apporte rien. Les **mots communs aux deux langues** (`table`, `question`, `important`, mais aussi `a`, `on`, `son`) comptent donc pour les deux, selon leur fréquence dans chacune. Mesure M0 : 92,6 % de mots avec la bonne langue dominante et 2,5 mots pour suivre un changement de langue, contre 86,9 % et 4,4 mots avec une fenêtre de 8 mots et un simple test d'appartenance (`docs/analysis/M0-corpus.md`).
 - **Restitution des accents** : uniquement à partir du lexique français. Une forme sans accent qui est un mot anglais valide (`resume`, `cafe`) n'est jamais accentuée automatiquement ; la variante accentuée reste proposée dans la barre.
 - **Règles propres à chaque langue** (typographie française, majuscule de `I`, élisions, contractions) : appliquées selon la langue de la phrase en cours, c'est-à-dire la langue dominante du score depuis la dernière ponctuation finale.
 - **Indicateur.** La touche espace affiche discrètement la langue dominante (`FR`, `EN`). Un appui long sur l'espace ouvre le menu des langues : verrouiller le français, verrouiller l'anglais, ou mode automatique (par défaut).
@@ -516,7 +518,7 @@ Sur un corpus représentatif pour chaque langue (français, anglais), puis sur u
 - part des mots que la validation par espace complète ou corrige correctement, et taux de fausses validations, pour une grille de seuils (`minProb`, `minRatio`) ;
 - sur le corpus mixte : vitesse de convergence du score de langue (§10.6) et taux de fausses validations dues à la mauvaise langue.
 
-Ces résultats fixent les valeurs par défaut du §5.2 et du §5.5.
+Ces résultats fixent les valeurs par défaut du §5.2 et du §5.5. Méthode, résultats et limites de l'analyse M0 : `docs/analysis/M0-corpus.md` (commande `./gradlew :tools:analyzeCorpus`).
 
 ### 15.2 Critères d'acceptation
 

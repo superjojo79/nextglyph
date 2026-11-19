@@ -135,3 +135,34 @@ pitest {
         "nextglyph.tools.lexicons.ExportPrototypeDataMainKt",
     )
 }
+
+// ---------------------------------------------------------------------------
+// Analyse de corpus du §15.1 (package nextglyph.tools.analysis, testée).
+// Bloc indépendant : n'altère pas les tâches ci-dessus.
+// ---------------------------------------------------------------------------
+
+// Lit build/wordlists/<lang>.tsv et les corpus de TEST de build/corpus/ (jamais l'entraînement),
+// construit les lexiques en mémoire et écrit build/analysis/M0-corpus-results.md.
+// Échantillon déterministe facultatif : -PanalysisSample=<1..100> (pour cent des phrases monolingues).
+tasks.register<JavaExec>("analyzeCorpus") {
+    group = "data"
+    description = "Analyse de corpus du §15.1 (adaptation, validation par espace, bilinguisme)."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.analysis.AnalyzeCorpusMainKt")
+    maxHeapSize = "4g"
+    val sample = providers.gradleProperty("analysisSample")
+    args(
+        listOfNotNull(
+            layout.buildDirectory.dir("wordlists").get().asFile.path,
+            layout.buildDirectory.dir("corpus").get().asFile.path,
+            layout.buildDirectory.file("analysis/M0-corpus-results.md").get().asFile.path,
+            sample.orNull,
+        ),
+    )
+    outputs.upToDateWhen { false }
+}
+
+// Point d'entrée sans logique (délègue à AnalyzeCorpusCli), exclu de PIT comme les autres.
+pitest {
+    excludedClasses.add("nextglyph.tools.analysis.AnalyzeCorpusMainKt")
+}
