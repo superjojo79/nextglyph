@@ -9,7 +9,7 @@ Suivi tenu par l'orchestrateur. Jalons définis au §16 de la [spécification](S
 | Socle (dépôt, CI, convention de tests, protection de `main`) | Terminé |
 | M0 — données, lexique, analyse, prototype | Terminé (2026-11-19) |
 | M1 — premier IME Android | Terminé (2026-11-19) |
-| M2 — saisie complète (validation, ponctuation, bilinguisme) | En cours |
+| M2 — saisie complète (validation, ponctuation, bilinguisme) | Terminé (2026-11-19) |
 | M3 — profils de saisie (mot de passe, pavés, e-mail, URL, disposition classique) | Terminé côté moteur et IME (2026-11-19) ; panel d'applications tierces à faire |
 | M4 — apprentissage, contacts, réglages, accessibilité | Fait (2026-11-19), vérifié sur émulateur sauf TalkBack (absent de l'image) |
 | M5 | Hors périmètre autonome : validation de l'utilisateur requise |
