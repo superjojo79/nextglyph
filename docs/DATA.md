@@ -121,7 +121,23 @@ La clé d'une forme est `TextNormalizer.normalize(forme)` (module `engine`). Une
 >
 > **Lexique des formes fléchies (Dicollecte)** v7.7 : même attribution et même licence MPL-2.0 que les dictionnaires orthographiques ci-dessus.
 >
-> **Tatoeba** (analyse hors ligne, non distribué) : phrases des contributeurs de Tatoeba, https://tatoeba.org/ — licence CC BY 2.0 FR (https://creativecommons.org/licenses/by/2.0/fr/).
+> **Tatoeba** (corpus non distribué ; les fréquences anglaises qui en sont dérivées figurent dans `en.nglx`) : phrases des contributeurs de Tatoeba, https://tatoeba.org/ — licence CC BY 2.0 FR (https://creativecommons.org/licenses/by/2.0/fr/).
+
+## Fichiers de données distribués
+
+`./gradlew :tools:buildLexicons` produit, sous `tools/build/lexicons/` (ignoré par git), un lexique binaire par langue ainsi que `report.md` (clés, formes, taille, temps de chargement, latence de `distribution`, comparaison au budget de 8 Mio du §11.3). Chaque `.nglx` est une adaptation des données ci-dessous : conversion des listes de mots (`buildWordLists`) en arbre radix binaire (`LexiconBuilder`, formes hors alphabet ignorées et comptées dans le rapport). Ces fichiers sont livrés **à côté** du code, comme fichiers de données distincts ; ils ne sont pas versionnés dans git (ils se régénèrent) et ne portent pas la licence Apache-2.0 du code.
+
+| Fichier | Sources | Licence | Attribution à afficher dans l'application |
+|---|---|---|---|
+| `fr.nglx` | Lexique 4.10 (fréquences ; formes absentes de Dicollecte) ; Dicollecte v7.7, lexique des formes fléchies (vocabulaire) | **CC BY-SA 4.0** pour ce qui vient de Lexique et **MPL-2.0** pour ce qui vient de Dicollecte (voir la réserve ci-dessous) | Les attributions « Lexique 4.10 » et « Lexique des formes fléchies (Dicollecte) » du texte d'attribution, avec mention « données modifiées : conversion en lexique binaire », les liens vers les deux licences et vers les sources |
+| `en.nglx` | SCOWL 2020.12.07, niveaux ≤ 70 (vocabulaire, niveaux utilisés comme a priori) ; fréquences comptées sur la partie entraînement du corpus Tatoeba anglais | Licence permissive de type MIT pour SCOWL ; **CC BY 2.0 FR** pour les fréquences dérivées de Tatoeba | L'attribution « SCOWL » (avec l'avis de copyright, repris dans `NOTICE`) et l'attribution « Tatoeba » |
+
+Réserves à lever avant la première publication :
+
+- **`fr.nglx` mélange deux licences.** CC BY-SA 4.0 n'est pas compatible avec MPL-2.0 au sens des licences elles-mêmes (la compatibilité à sens unique de CC BY-SA 4.0 ne vise que la GPL 3). Le fichier est donc livré en indiquant que chaque partie reste soumise à sa licence d'origine et en fournissant les deux textes et les deux sources ; une relecture juridique reste nécessaire. Variante à envisager si elle est refusée : un fichier français par source, ce qui coûterait un second lexique.
+- **`en.nglx` contient des comptes dérivés de Tatoeba**, alors que le corpus lui-même n'est pas distribué (voir plus bas) : l'attribution Tatoeba doit donc figurer dans l'application, pas seulement dans `NOTICE`.
+- **SCOWL** : voir la remarque sur la mention COCA (relecture juridique).
+- **Prototype web** : `prototype/data/fr.json` et `en.json` (générés par `:tools:exportPrototypeData`) sont un sous-ensemble des mêmes données ; ils portent les mêmes licences, ne sont pas versionnés et ne sont pas distribués. Le prototype n'est pas livré aux utilisateurs.
 
 ## Points d'attention pour F-Droid
 

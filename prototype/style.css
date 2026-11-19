@@ -85,6 +85,7 @@ main { flex: 1; min-height: 0; padding: 0 12px 8px; display: flex; flex-directio
 }
 @keyframes blink { to { visibility: hidden; } }
 
+.data-source { margin-top: 6px; font-size: 0.75em; }
 .error { margin-top: 8px; padding: 8px 12px; border: 1px solid #c0392b; border-radius: 8px; }
 
 .settings {

@@ -111,7 +111,20 @@ Chaque tap (position x, y en unités u sur la largeur du clavier = 10 u ; touche
 
 ## Données
 
-`data/<langue>.json` : tableau `[{"w": "école", "f": 12345}, ...]` (mot avec accents, apostrophes et traits d'union ; fréquence relative). Les fichiers fournis (`fr.json`, `en.json`) sont de petits lexiques d'exemple écrits pour le prototype, avec des fréquences plausibles de type loi de Zipf ; ils seront remplacés par les vrais lexiques issus des dictionnaires. Le prototype fonctionne avec des fichiers de 100 000 mots (trie construit au chargement ; voir `test/lexicon.test.js`).
+Format : `[{"w": "école", "f": 12345}, ...]` (mot avec accents, apostrophes et traits d'union ; fréquence relative).
+
+Au démarrage, pour chaque langue, le prototype charge `data/<langue>.json` **s'il existe**, sinon le petit lexique d'exemple versionné `data/sample-<langue>.json` (environ 1 000 mots, fréquences plausibles de type loi de Zipf). Une ligne sous la zone de texte indique ce qui est chargé : `Lexiques — FR : 100000 mots (générés) ; EN : 100000 mots (générés)`, ou `(exemple)` avec un renvoi à cette section.
+
+### Générer les vrais lexiques
+
+Depuis la racine du dépôt (télécharge les sources la première fois, environ 95 Mio, puis construit les listes de mots ; JDK requis) :
+
+```sh
+./gradlew :tools:exportPrototypeData                          # 100 000 formes les plus fréquentes par langue
+./gradlew :tools:exportPrototypeData -PprototypeWords=50000   # autre limite
+```
+
+Cela écrit `prototype/data/fr.json` et `en.json`, puis il suffit de recharger la page. Ces fichiers (environ 2,5 Mo chacun pour 100 000 formes) ne sont **pas versionnés** (ignorés par le contrôle de version) : ils dérivent de Lexique 4.10 (CC BY-SA 4.0), de Dicollecte (MPL-2.0), de SCOWL et de Tatoeba (CC BY 2.0 FR), voir `docs/DATA.md`. Pour revenir aux exemples, supprimer ces deux fichiers. Le prototype supporte 100 000 mots par langue (trie construit au chargement ; voir `test/lexicon.test.js`).
 
 Les formes avec apostrophe ou trait d'union (`j'ai`, `peut-être`, `don't`) sont indexées sous leur clé de lettres (`jai`, `peutetre`, `dont`) : c'est ainsi que la validation les restitue (§5.5, cas 2).
 
@@ -120,9 +133,10 @@ Les formes avec apostrophe ou trait d'union (`j'ai`, `peut-être`, `don't`) sont
 ```
 prototype/
   index.html, style.css      page et styles (clair / sombre)
-  data/                     lexiques d'exemple
+  data/                     sample-*.json (exemples versionnés) ; fr.json, en.json générés, non versionnés
   src/
     normalize.js            normalisation (§5.8)
+    datasource.js           choix du fichier de lexique (généré, sinon exemple)
     lexicon.js              trie de lexique (§10.1)
     language.js             score de langue (§10.6)
     distribution.js         P(c | p), P(fin | p), candidats, corrections (§5.2, §10.4)
