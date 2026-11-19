@@ -214,3 +214,5 @@ Implémentées dans `tools` pour l'analyse, absentes de `engine` :
 - `CandidateMixer` : mélange bilingue des candidats ;
 - `KeyboardLayout` : géométrie des lettres et voisinage ;
 - `LanguageScore` / `LanguageEvidence` : score de langue à fenêtre glissante, indice par fréquence relative.
+
+Portées en M2 dans `nextglyph.engine.predict` (`CandidateSource`, mélange dans `Predictor`, `KeyAdjacency`, `LanguageState` et `Predictor.evidence`) ; la validation rejouée avec le moteur est décrite dans `docs/analysis/M2-engine.md`.

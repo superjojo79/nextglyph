@@ -11,7 +11,10 @@ import java.nio.file.Paths
  * `:tools:analyzeCorpus` : lit les sorties de `buildWordLists` (listes de mots et corpus de
  * **test** uniquement, jamais l'entraînement) et écrit les résultats en Markdown.
  *
- * Arguments : `<dossier wordlists> <dossier corpus> <fichier de sortie> [pourcentage d'échantillon]`.
+ * Arguments : `[--engine] <dossier wordlists> <dossier corpus> <fichier de sortie> [pourcentage d'échantillon]`.
+ * Avec `--engine`, l'analyse M2 ([EngineAnalysis]) remplace celle de M0 : validation par espace
+ * rejouée avec le moteur (`nextglyph.engine.predict`) ; l'échantillon s'applique alors aux phrases
+ * monolingues et au corpus mixte.
  */
 object AnalyzeCorpusCli {
 
@@ -19,10 +22,18 @@ object AnalyzeCorpusCli {
     const val EXIT_FAILURE = 1
     const val EXIT_USAGE = 2
 
-    fun run(args: Array<String>, out: PrintStream, err: PrintStream, config: AnalysisConfig = AnalysisConfig()): Int {
+    fun run(
+        arguments: Array<String>,
+        out: PrintStream,
+        err: PrintStream,
+        config: AnalysisConfig = AnalysisConfig(),
+        engineConfig: EngineAnalysisConfig = EngineAnalysisConfig(),
+    ): Int {
+        val engine = arguments.firstOrNull() == ENGINE_FLAG
+        val args = if (engine) arguments.copyOfRange(1, arguments.size) else arguments
         val sample = args.getOrNull(3)?.toIntOrNull()
         if (args.size !in 3..4 || (args.size == 4 && (sample == null || sample !in 1..100))) {
-            err.println("Usage : analyzeCorpus <dossier wordlists> <dossier corpus> <fichier de sortie> [échantillon en % (1-100)]")
+            err.println("Usage : analyzeCorpus [$ENGINE_FLAG] <dossier wordlists> <dossier corpus> <fichier de sortie> [échantillon en % (1-100)]")
             return EXIT_USAGE
         }
         val wordLists = Paths.get(args[0])
@@ -37,8 +48,14 @@ object AnalyzeCorpusCli {
                 Language.entries.firstOrNull { it.code == code }
                     ?: throw AnalysisException("Étiquette de langue inconnue ligne ${i + 1} : « $code ».")
             }
-            val effective = if (sample == null) config else config.copy(samplePercent = sample)
-            val report = CorpusAnalysis(effective) { out.println("[${(System.nanoTime() - started) / NANOS_PER_SECOND} s] $it") }.run(fr, en, mixed, labels)
+            val progress = { line: String -> out.println("[${(System.nanoTime() - started) / NANOS_PER_SECOND} s] $line") }
+            val report = if (engine) {
+                val effective = if (sample == null) engineConfig else engineConfig.copy(samplePercent = sample, mixedSamplePercent = sample)
+                EngineAnalysis(effective, progress).run(fr, en, mixed, labels)
+            } else {
+                val effective = if (sample == null) config else config.copy(samplePercent = sample)
+                CorpusAnalysis(effective, progress).run(fr, en, mixed, labels)
+            }
             val seconds = (System.nanoTime() - started) / NANOS_PER_SECOND
             output.parent?.let(Files::createDirectories)
             Files.writeString(output, report + "Durée de l'analyse : $seconds s.\n")
@@ -64,4 +81,7 @@ object AnalyzeCorpusCli {
     private fun lines(path: Path): List<String> = Files.readAllLines(path)
 
     private const val NANOS_PER_SECOND = 1_000_000_000L
+
+    /** Premier argument facultatif : analyse M2 avec le moteur. */
+    const val ENGINE_FLAG: String = "--engine"
 }

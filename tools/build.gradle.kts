@@ -181,3 +181,25 @@ tasks.register<JavaExec>("analyzeCorpus") {
 pitest {
     excludedClasses.add("nextglyph.tools.analysis.AnalyzeCorpusMainKt")
 }
+
+// Analyse M2 : validation par espace, séparateurs, accents et corpus mixte rejoués avec le moteur
+// (nextglyph.engine.predict) ; écrit build/analysis/M2-engine-results.md. Échantillon déterministe
+// (défaut 5 %) : -PanalysisSample=<1..100>. Même point d'entrée que analyzeCorpus (option --engine).
+tasks.register<JavaExec>("analyzeEngine") {
+    group = "data"
+    description = "Analyse M2 : validation par espace et bilinguisme avec le moteur de prédiction."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.analysis.AnalyzeCorpusMainKt")
+    maxHeapSize = "4g"
+    val sample = providers.gradleProperty("analysisSample")
+    args(
+        listOfNotNull(
+            "--engine",
+            layout.buildDirectory.dir("wordlists").get().asFile.path,
+            layout.buildDirectory.dir("corpus").get().asFile.path,
+            layout.buildDirectory.file("analysis/M2-engine-results.md").get().asFile.path,
+            sample.orNull,
+        ),
+    )
+    outputs.upToDateWhen { false }
+}

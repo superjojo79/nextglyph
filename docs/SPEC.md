@@ -4,7 +4,7 @@
 |---|---|
 | Projet | Nextglyph, clavier adaptatif open source |
 | Statut | Brouillon v0.2 |
-| Date | 2026-11-18 |
+| Date | 2026-11-20 |
 | Licence | Apache-2.0 |
 | Plateforme cible | Android, minSdk 26 (Android 8.0) |
 | Langues V1 | Français et anglais |
@@ -180,7 +180,7 @@ La barre a trois états :
 
 | État | Contenu |
 |---|---|
-| Mot en cours | 3 suggestions. Le candidat dominant éventuel est au centre et surligné. |
+| Mot en cours | 3 suggestions. Au centre, le mot que l'espace insérera (surligné s'il diffère du texte tapé : candidat dominant, accent ou majuscule restitués) ; à gauche, le texte tapé quand il serait remplacé, pour le garder ; sinon les meilleurs candidats. Les variantes d'un mot tapé (`à` pour `a`, `it's` pour `its`, `j'aime` pour `jaime`) y sont proposées sans jamais être insérées automatiquement. |
 | Juste après une validation | Ponctuation (§5.6). |
 | Champ vide / début de texte | Mots probables en début de phrase (prédiction du mot suivant, V2), sinon vide. |
 
@@ -190,21 +190,22 @@ Un tap sur une suggestion valide ce mot et ajoute une espace automatique.
 
 À l'appui sur espace, avec un mot en cours `t` :
 
-1. **`t` est un mot du lexique** → on insère `t`, avec restitution des accents si elle est sans ambiguïté (`ecole` → `école`). Les cas ambigus (`a`/`à`, `ou`/`où`, `du`/`dû`, `la`/`là`) sont insérés tels quels ; les variantes accentuées restent dans la barre et sont choisies par le contexte quand le modèle de bigrammes est disponible.
+1. **`t` est un mot du lexique** (d'au moins une langue active, §10.6) → on insère `t`, avec restitution des accents si elle est sans ambiguïté (`ecole` → `école`) : une orthographe représente au moins 95 % des occurrences de la clé dans chaque lexique actif qui la contient, et ces lexiques s'accordent (les variantes rares des sources, comme `écolé`, ne bloquent pas la restitution). Les cas ambigus (`a`/`à`, `ou`/`où`, `du`/`dû`, `la`/`là`) sont insérés tels quels ; les variantes accentuées restent dans la barre et sont choisies par le contexte quand le modèle de bigrammes est disponible. La casse est restituée de même (§5.7). Un mot tapé avec un accent (forme forcée, §5.8) n'est jamais modifié.
 2. **`t` n'est pas un mot, et un candidat `w` domine** → on insère `w`. Domine signifie :
    `P(w) ≥ autocommit.minProb` (défaut : 0,70) **et** `P(w) / P(2e candidat) ≥ autocommit.minRatio` (défaut : 2,0).
    Les candidats comprennent les complétions de `t` **et** ses corrections (§10.4), **même si `t` est un préfixe connu** : une faute forme souvent un autre préfixe valide (`ke` pour `le`), dont la complétion dominerait sinon à tort. Réglage « Prudence de la validation » (§14) : `minProb` = 0,80 (Prudente), 0,70 (Normale), 0,60 (Audacieuse). Valeurs mesurées au §15.1 (`docs/analysis/M0-corpus.md`) : avec 5 % de fautes simulées, au plus 2,1 % de fausses validations en réglage Normal.
    Ce cas couvre la complétion (`bonj` → `bonjour`), la correction (`bonjoru` → `bonjour`), les élisions (`jai` → `j'ai`, `cest` → `c'est`, `lecole` → `l'école`), les traits d'union (`peutetre` → `peut-être`) et les contractions anglaises (`dont` → `don't`, `im` → `I'm`, `youre` → `you're`).
+   Apostrophe ou trait d'union omis : édition de poids 0,5 (§10.4). Élision française omise (`t = e + r`, `e` parmi `c d j l m n s t qu jusqu lorsqu puisqu quoiqu`, `r` commençant par une voyelle ou un `h`) : candidat `e'w` pour chaque complétion `w` de `r` (seulement `e'r` si `r` est un mot), de score `0,5 × f(e') / masse des mots à initiale voyelle ou h × f(w)`.
    Les contractions anglaises qui sont aussi des mots valides (`well`/`we'll`, `its`/`it's`, `were`/`we're`, `ill`/`I'll`, `cant`/`can't`, `id`/`I'd`) relèvent du cas 1 : jamais de remplacement automatique en V1, la variante reste proposée dans la barre.
 3. **Sinon** → on insère `t` tel quel. Le mot n'est **pas** ajouté au dictionnaire personnel à ce stade (cf. §10.5).
 
 Puis une espace automatique est insérée.
 
-**Prévisibilité :** dès qu'un candidat dominant existe, la touche espace affiche `␣ <mot>` et le mot est surligné dans la barre.
+**Prévisibilité :** dès que l'espace insérera autre chose que le texte tapé (candidat dominant, accent ou majuscule restitués), la touche espace affiche `␣ <mot>` et le mot est surligné dans la barre.
 
-**Annulation :** un appui sur ⌫ immédiatement après une validation automatique (curseur inchangé, aucune autre frappe) remplace le mot inséré par le texte tapé à l'origine, sans espace. Un deuxième ⌫ efface normalement.
+**Annulation :** un appui sur ⌫ immédiatement après une validation automatique (curseur inchangé, aucune autre frappe) remplace le mot inséré par le texte tapé à l'origine, sans espace. Un deuxième ⌫ efface normalement. Une validation suivie d'un signe de ponctuation (§5.6) n'est plus annulable ainsi : le ⌫ efface d'abord le signe.
 
-**Apprentissage du refus :** si une même correction `t → w` est annulée `autocommit.rejectLimit` fois (défaut : 2), elle n'est plus proposée automatiquement (elle reste dans la barre).
+**Apprentissage du refus :** si une même correction `t → w` est annulée `autocommit.rejectLimit` fois (défaut : 2), elle n'est plus proposée automatiquement (elle reste dans la barre). Il en va de même d'une restitution d'accent ou de majuscule annulée (`ecole → école`). Les compteurs sont en mémoire en M2, derrière une interface prévue pour la persistance (M4) ; aucun compteur n'est écrit en incognito ni dans le profil mot de passe.
 
 **Désactivation :** la validation par espace est inactive dans les profils mot de passe, e-mail, URL, numériques, avec `TYPE_TEXT_FLAG_NO_SUGGESTIONS`, et via un réglage utilisateur.
 
@@ -385,6 +386,7 @@ Défini par `IME_FLAG_NO_PERSONALIZED_LEARNING` ou forcé par l'utilisateur. Le 
 ### 10.1 Lexique
 
 - Structure : trie compact (arbre radix) sur les formes normalisées ; choix, format et mesures dans `docs/DECISIONS.md` (2026-11-19).
+- Un lexique peut être réparti en plusieurs fichiers d'une même langue (sources sous licences différentes, dictionnaire personnel, contacts), fusionnés à la lecture sans copie : les fréquences d'une même forme s'additionnent, comme les masses des préfixes (`LexiconSet`, `docs/DECISIONS.md`, 2026-11-20).
 - Chaque nœud stocke la somme des fréquences de son sous-arbre et la fréquence maximale d'une forme du sous-arbre (complétions best-first) ; chaque nœud terminal stocke ses formes d'affichage avec leur fréquence.
 - Ainsi, `P(c | p)` et `P(fin | p)` se calculent en O(1) par lettre après la descente sur `p`.
 - Format binaire mappé en mémoire (`mmap`), construit hors ligne par `tools/`.
@@ -415,7 +417,7 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 ### 10.4 Correction
 
 - Candidats par distance d'édition pondérée par la géométrie du clavier (une substitution entre touches voisines coûte moins cher).
-- Limite V1 : distance 1 sur le préfixe, distance 2 sur le mot complet à la validation.
+- Limite V1 : distance 1 sur le préfixe, distance 2 sur le mot complet à la validation. M2 n'implémente que la distance 1, y compris à la validation (méthode et poids de l'analyse M0 : substitution par une touche voisine 0,01, autre substitution 0,0005, omission, lettre en trop, inversion 0,002, apostrophe ou trait d'union omis 0,5) ; l'objectif de moins de 3 % de fausses validations est atteint sans la distance 2 (`docs/analysis/M2-engine.md`).
 - Pour l'adaptation visuelle (§5.2), la correction n'est tentée que si le préfixe est inconnu. À la validation par espace (§5.5), elle est tentée aussi quand le texte tapé est un préfixe connu qui n'est pas un mot : sans cela, l'objectif de moins de 3 % de validations annulées (§15.2) n'est pas atteint avec 5 % de fautes de frappe (analyse M0).
 
 ### 10.5 Dictionnaire personnel
@@ -430,10 +432,10 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 Beaucoup d'utilisateurs alternent les deux langues, parfois dans une même phrase. Nextglyph ne demande donc pas de « changer de langue » : les deux lexiques sont actifs en même temps.
 
 - **Score de langue.** Une estimation `π_FR` / `π_EN` est tenue à jour à partir des derniers mots validés (fenêtre glissante, défaut : 4 mots), en partant de la langue préférée de l'utilisateur.
-- **Mélange.** `P(c | p) = π_FR · P_FR(c | p) + π_EN · P_EN(c | p)`. Le même mélange s'applique à `P(fin | p)` et au classement des suggestions. Le score évolue progressivement : pas de bascule brutale de l'adaptation visuelle.
+- **Mélange.** `P(c | p) = π_FR · P_FR(c | p) + π_EN · P_EN(c | p)`, les poids étant renormalisés sur les langues où `p` est un préfixe connu. Le même mélange s'applique à `P(fin | p)`. Pour les candidats de la validation, `P(w) = Σ_L π_L · score_L(w) / Σ_L π_L · total_L`, les scores étant rapportés à la masse de chaque lexique. Le score évolue progressivement : pas de bascule brutale de l'adaptation visuelle.
 - **Indice d'un mot validé.** Chaque mot apporte au score un poids par langue proportionnel à sa fréquence relative dans chaque lexique : `(f_FR, f_EN) / (f_FR + f_EN)`, où `f_L` est la fréquence du mot divisée par la masse totale du lexique `L` ; un mot inconnu des deux lexiques n'apporte rien. Les **mots communs aux deux langues** (`table`, `question`, `important`, mais aussi `a`, `on`, `son`) comptent donc pour les deux, selon leur fréquence dans chacune. Mesure M0 : 92,6 % de mots avec la bonne langue dominante et 2,5 mots pour suivre un changement de langue, contre 86,9 % et 4,4 mots avec une fenêtre de 8 mots et un simple test d'appartenance (`docs/analysis/M0-corpus.md`).
-- **Restitution des accents** : uniquement à partir du lexique français. Une forme sans accent qui est un mot anglais valide (`resume`, `cafe`) n'est jamais accentuée automatiquement ; la variante accentuée reste proposée dans la barre.
-- **Règles propres à chaque langue** (typographie française, majuscule de `I`, élisions, contractions) : appliquées selon la langue de la phrase en cours, c'est-à-dire la langue dominante du score depuis la dernière ponctuation finale.
+- **Restitution des accents** : uniquement à partir du lexique français. Une forme sans accent qui est un mot anglais valide (`resume`) n'est jamais accentuée automatiquement ; la variante accentuée reste proposée dans la barre. Un mot que le lexique anglais écrit lui aussi avec l'accent (`café`) est restitué.
+- **Règles propres à chaque langue** (typographie française, majuscule de `I`, élisions, contractions) : appliquées selon la langue de la phrase en cours, c'est-à-dire la langue dominante du score restreint aux mots validés depuis la dernière ponctuation finale, avec pour a priori le score au début de la phrase (sans mot validé dans la phrase : la langue dominante). Une langue verrouillée est aussi la langue de la phrase.
 - **Indicateur.** La touche espace affiche discrètement la langue dominante (`FR`, `EN`). Un appui long sur l'espace ouvre le menu des langues : verrouiller le français, verrouiller l'anglais, ou mode automatique (par défaut).
 - **Réglages.** Langues actives : français, anglais, ou les deux (défaut : les deux) ; langue préférée de départ ; variante anglaise US ou UK.
 

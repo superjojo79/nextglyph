@@ -257,3 +257,47 @@ Package `nextglyph.engine.edit` (pur, sans Android) : `TextEditor` (`onWordCommi
 - **Remplacer aussi l'espace tapée par un signe** : surprenant pour qui a tapé l'espace volontairement.
 - **Espace automatique au milieu du texte** : on ne peut pas deviner si elle est voulue.
 - **Forcer la majuscule après double espace même sans `CAP_SENTENCES`** : contredit le champ (identifiant, code).
+
+---
+
+## 2026-11-20 — Prédiction, validation par espace et bilinguisme dans le moteur (M2)
+
+### Contexte
+
+M2 porte dans le moteur (`nextglyph.engine.predict`, Kotlin pur) ce que l'analyse M0 avait simulé dans `tools` : candidats de la validation par espace avec correction pondérée par l'adjacence (§5.5, §10.4), mélange bilingue et score de langue (§10.6), plus ce que M0 ne mesurait pas : élisions, apostrophes et traits d'union, restitution des accents et de la casse (§5.7, §5.8), annulation, apprentissage du refus, barre de suggestions (§5.4). L'IME appliquera les décisions via `InputConnection` ; la ponctuation et la typographie (`nextglyph.engine.edit`) sont traitées par une autre tâche.
+
+### Décision
+
+**API pure.** `Predictor` prend l'état (texte avant le curseur, `LanguageState`, `PredictionSettings`) et renvoie une `Prediction` (cas de l'espace, texte inséré, libellé de l'espace, candidats, barre) ; `commitSpace`, `commitBeforePunctuation`, `pickSuggestion` et `undo` renvoient des modifications abstraites (`TextEdit` : `DeleteBefore(n)`, `Insert(texte)`, drapeau « se termine par une espace automatique »), définies dans `nextglyph.engine.input` pour que `edit` produise les mêmes et que les deux se composent (`TextEdit.plus`). `LanguageState` est une valeur immuable (fenêtre, verrouillage, langue de la phrase) ; seule la mémoire des refus (`RejectionStore`, en mémoire, interface prévue pour la persistance) a un état. Constantes dans `PredictionConfig` (immuable). Un cache LRU facultatif des candidats par texte tapé sert aux simulations.
+
+**Ensemble de lexiques (`LexiconSet`, package `lexicon`).** Plusieurs lexiques d'une même langue fusionnés à la lecture, sans copie. **Les fréquences d'une même forme s'additionnent**, comme les masses des préfixes : c'est la seule règle cohérente avec `distribution` (les masses des nœuds sont des sommes de fréquences). Les membres partagent donc une même échelle, et un fichier de couverture ne recopie pas les comptes du fichier de fréquences. `completions` est exacte quand chaque forme n'appartient qu'à un membre (fichiers découpés par source) ; sinon une forme répartie entre membres sans figurer dans les meilleures d'aucun peut manquer (la fréquence des formes renvoyées reste exacte). Ouvre la voie au découpage de `fr.nglx` par licence (Lexique / Dicollecte), au dictionnaire personnel et aux contacts.
+
+**Candidats.** Méthode et poids de M0 sans changement (distance 1, y compris sur un préfixe connu qui n'est pas un mot ; 6 formes par préfixe ; substitution voisine 0,01, autre 0,0005, omission, lettre en trop, inversion 0,002, apostrophe ou trait d'union omis 0,5), sur l'adjacence calculée à partir de la disposition du moteur (`KeyAdjacency`, 1,5 u). Ajout : **élisions françaises omises** (`lecole` → `l'école`), absentes des clés du lexique puisque l'élision y est un mot à part (§5.8) : candidat `e'w` de score `0,5 × f(e') / masse des initiales voyelles ou h × f(w)` (probabilité de l'élision devant un mot qui l'admet, multipliée par le coût d'une apostrophe omise) ; si le mot élidé est complet, lui seul est candidat (`lami` → `l'ami`, pas `l'amis`).
+
+**Coût.** Pour tenir 2 ms par frappe en bilingue : `Lexicon.prefixMass` (masse d'un préfixe sans lire ses enfants, pour tester les éditions) et arrêt anticipé de l'exploration des préfixes candidats, triés par la borne `poids × masse` de leurs mots (exact).
+
+**Validation.** Les trois cas du §5.5, `minProb` selon la prudence (0,80 / 0,70 / 0,60), `minRatio` 2. Paires ambiguës : un mot d'au moins une langue active relève du cas 1, donc `its`, `well`, `a`, `ou`, et en bilingue `dont` (mot français) ne sont jamais remplacés ; la variante (`it's`, `we'll`, `à`, `où`, `don't`, ainsi que l'élision cachée : `jaime` → `j'aime`) reste dans la barre. Désactivation : profils mot de passe, e-mail, URL, numériques, `NO_SUGGESTIONS`, réglage utilisateur ; incognito et mot de passe n'écrivent aucun compteur de refus.
+
+**Accents et casse.** Restitution « sans ambiguïté » précisée : une orthographe représente au moins **95 %** des occurrences de la clé dans chaque lexique actif qui la contient, et ces lexiques s'accordent. Sans ce seuil, les variantes rares des sources (`écolé` 3 contre `école` 20 593, `fenêtré` 1) bloquaient la restitution de la plupart des mots. L'accord entre lexiques réalise la règle du §10.6 (`resume` anglais bloque `résumé`, mais `café` est restitué : le lexique anglais l'accentue aussi). Casse : celle de la forme la plus fréquente de l'orthographe retenue, dans le lexique de la langue de la phrase (`i` → `I` en anglais seulement, `paris` reste en minuscules), sauf casse invraisemblable des sources (`daV`) ; puis la casse tapée (initiale, tout en majuscules).
+
+**Barre.** Au centre le mot que l'espace insérera, surligné s'il diffère du texte tapé ; à gauche le texte tapé quand il serait remplacé (pour le garder) ; puis variantes et candidats. Le libellé de l'espace est le texte inséré quand il diffère du texte tapé (correction, mais aussi accent ou majuscule restitués), rien sinon.
+
+**Bilinguisme.** Score de M0 (fenêtre de 4 mots, indice par fréquence relative, `π0` = 0,75 pour la langue préférée). Mélange des candidats `P(w) = Σ π_L score_L(w) / Σ π_L total_L` ; distribution mélangée pour l'adaptation renormalisée sur les langues où le préfixe est connu. Langue de la phrase : langue dominante du score restreint aux mots validés depuis la dernière ponctuation finale, avec pour a priori le score au début de la phrase. Les élisions sont retirées du mot en cours dès que le français a un poids non nul.
+
+### Mesures
+
+Détail dans `docs/analysis/M2-engine.md` (`./gradlew :tools:analyzeEngine`, échantillon déterministe de 5 % du corpus de test).
+
+- Fausses validations, réglage Normal, 0 / 2 / 5 % de fautes : FR 0,66 / 1,10 / 2,17 %, EN 0,90 / 1,08 / 1,37 % ; pire cas toutes prudences 2,76 % (FR, 5 %, Audacieuse). Référence M0 rejouée sur le même échantillon : FR 0,63 / 1,08 / 2,14 %, EN identique ; l'écart français (≤ 0,04 point) vient des candidats d'élision.
+- Corpus mixte, Normal : 0,36 % (sans faute) et 0,69 % (2 %) de fausses validations, contre 0,34 et 0,62 % avec la langue connue ; langue de la phrase correcte pour 96,7 % des mots.
+- Séparateurs omis (FR) : 68,6 % des élisions restituées, 2,1 % fausses ; accents (FR seul) : 58,6 % restitués, 0,23 % faux.
+- Coût de `predict` par frappe (JVM de bureau) : bilingue, moyenne 0,31 à 0,42 ms, p99 1,3 ms, p99,9 < 2 ms ; une langue : p99 < 0,9 ms.
+
+### Alternatives écartées
+
+- **Maximum des fréquences** entre membres d'un `LexiconSet` : incohérent avec les masses des nœuds.
+- **Restitution des accents seulement si une unique orthographe existe** (lecture littérale) : bloque les mots dont les sources contiennent une variante rare (moins de la moitié des mots accentués restitués sur le corpus de test).
+- **Candidats d'élision sans le facteur `f(e') / masse des initiales`** : une élision rare (`lorsqu'`) pèserait autant que `l'`.
+- **Élision complétée même quand le mot élidé est complet** (`dautre` → `d'autres`) : même travers que la complétion d'un mot tapé en entier, écarté par le cas 1.
+- **Distance 2 sur le mot complet** (§10.4) : non nécessaire pour l'objectif de 3 %, coûteuse ; reportée.
+- **Annulation après ponctuation** : l'annulation reste réservée au ⌫ immédiatement après l'espace ; après un signe, le ⌫ efface le signe.

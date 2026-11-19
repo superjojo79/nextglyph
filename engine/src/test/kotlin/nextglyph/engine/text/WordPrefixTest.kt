@@ -12,6 +12,17 @@ class WordPrefixTest {
     @Nested
     inner class HappyPath {
 
+        @Test
+        fun `mot en cours tel qu'écrit - casse, accents et apostrophe typographique conservés`() {
+            assertThat(WordPrefix.currentWord("Il dit Écol", 0, "fr")).isEqualTo("Écol")
+            assertThat(WordPrefix.currentWord("qu’Écol", 0, "fr")).isEqualTo("Écol")
+            assertThat(WordPrefix.currentWord("I don’t", 0, "en")).isEqualTo("don’t")
+            assertThat(WordPrefix.currentWord("Il dit ", 0, "fr")).isEmpty()
+            assertThat(WordPrefix.currentWord("abc", 2, "fr")).isEmpty()
+            assertThat(WordPrefix.currentWord("a2b", 0, "fr")).isNull()
+            assertThat(WordPrefix.currentWord(null, 0, "fr")).isNull()
+        }
+
         @ParameterizedTest(name = "« {0} » → {1}")
         @CsvSource(
             "bonjour je su, su",
