@@ -58,6 +58,23 @@ class Lexicon private constructor(
     }
 
     /**
+     * Masse des mots commençant par [prefix] (somme de leurs fréquences, 0 si le préfixe est
+     * inconnu), lue sur le seul nœud atteint : plus rapide que [distribution] quand seules la
+     * connaissance du préfixe et sa masse comptent (correction, §10.4). Même quantification que
+     * [Distribution.totalMass], dont elle peut différer de 0,07 % au plus.
+     */
+    fun prefixMass(prefix: String): Double {
+        val cursor = Cursor()
+        return when (cursor.locate(prefix)) {
+            UNKNOWN -> 0.0
+            ROOT -> rootMass
+            else -> cursor.mass
+        }
+    }
+
+    private val rootMass: Double by lazy { distribution("").totalMass }
+
+    /**
      * Les [limit] formes les plus fréquentes dont la clé commence par [prefix] (le préfixe
      * lui-même compris s'il est un mot), par fréquence décroissante, puis clé et forme
      * croissantes à fréquence égale.
@@ -126,7 +143,8 @@ class Lexicon private constructor(
         var labelLength = 0
         var hasChildren = false
         var terminal = false
-        private var mass = 0.0
+        var mass = 0.0
+            private set
         private var maxFrequency = 0L
         var childBlock = 0
         private var formsStart = 0

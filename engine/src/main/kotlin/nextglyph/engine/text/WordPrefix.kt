@@ -37,11 +37,7 @@ object WordPrefix {
      * @param language code de langue du lexique (`fr` active les élisions).
      */
     fun of(textBeforeCursor: CharSequence?, selectionLength: Int = 0, language: String = ""): String? {
-        if (textBeforeCursor == null) return null
-        if (selectionLength > 0) return ""
-        val token = lastToken(textBeforeCursor)
-        if (token.length > TextNormalizer.MAX_INPUT_LENGTH || token.any(Char::isDigit)) return null
-        val word = if (language == FRENCH) withoutElisions(token) else token
+        val word = currentWord(textBeforeCursor, selectionLength, language) ?: return null
         if (word.isEmpty()) return ""
         val key = try {
             TextNormalizer.normalize(word.replace('‑', '-'))
@@ -49,6 +45,20 @@ object WordPrefix {
             return null
         }
         return if (LexiconAlphabet.isValidKey(key)) key else null
+    }
+
+    /**
+     * Le mot en cours **tel qu'il est écrit** avant le curseur (casse, accents et apostrophes
+     * typographiques conservés), après les élisions françaises : `""` au début d'un mot, `null`
+     * dans les mêmes cas que [of] pour un texte indisponible, un chiffre ou un mot trop long. Sa
+     * longueur est le nombre de `char` à remplacer pour réécrire le mot (validation, §5.5).
+     */
+    fun currentWord(textBeforeCursor: CharSequence?, selectionLength: Int = 0, language: String = ""): String? {
+        if (textBeforeCursor == null) return null
+        if (selectionLength > 0) return ""
+        val token = lastToken(textBeforeCursor)
+        if (token.length > TextNormalizer.MAX_INPUT_LENGTH || token.any(Char::isDigit)) return null
+        return if (language == FRENCH) withoutElisions(token) else token
     }
 
     private fun lastToken(text: CharSequence): String {
