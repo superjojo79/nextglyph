@@ -1,5 +1,6 @@
 package nextglyph.tools.analysis
 
+import nextglyph.engine.lexicon.LexiconLanguage
 import nextglyph.tools.wordlists.Language
 import java.io.IOException
 import java.io.PrintStream
@@ -11,10 +12,12 @@ import java.nio.file.Paths
  * `:tools:analyzeCorpus` : lit les sorties de `buildWordLists` (listes de mots et corpus de
  * **test** uniquement, jamais l'entraînement) et écrit les résultats en Markdown.
  *
- * Arguments : `[--engine] <dossier wordlists> <dossier corpus> <fichier de sortie> [pourcentage d'échantillon]`.
+ * Arguments : `[--engine | --engine-combined] <dossier wordlists> <dossier corpus> <fichier de sortie> [pourcentage d'échantillon]`.
  * Avec `--engine`, l'analyse M2 ([EngineAnalysis]) remplace celle de M0 : validation par espace
  * rejouée avec le moteur (`nextglyph.engine.predict`) ; l'échantillon s'applique alors aux phrases
- * monolingues et au corpus mixte.
+ * monolingues et au corpus mixte. Le moteur lit alors les lexiques comme l'application : le
+ * français en deux fichiers fusionnés (`fr-lexique.tsv` sans casse, `fr-dicollecte.tsv`), s'ils
+ * existent. `--engine-combined` lit la liste française unique `fr.tsv` (comparaison).
  */
 object AnalyzeCorpusCli {
 
@@ -29,7 +32,8 @@ object AnalyzeCorpusCli {
         config: AnalysisConfig = AnalysisConfig(),
         engineConfig: EngineAnalysisConfig = EngineAnalysisConfig(),
     ): Int {
-        val engine = arguments.firstOrNull() == ENGINE_FLAG
+        val combined = arguments.firstOrNull() == ENGINE_COMBINED_FLAG
+        val engine = combined || arguments.firstOrNull() == ENGINE_FLAG
         val args = if (engine) arguments.copyOfRange(1, arguments.size) else arguments
         val sample = args.getOrNull(3)?.toIntOrNull()
         if (args.size !in 3..4 || (args.size == 4 && (sample == null || sample !in 1..100))) {
@@ -41,8 +45,8 @@ object AnalyzeCorpusCli {
         val output = Paths.get(args[2])
         return try {
             val started = System.nanoTime()
-            val fr = input(Language.FR, KeyboardLayout.AZERTY, wordLists, corpus, out)
-            val en = input(Language.EN, KeyboardLayout.QWERTY, wordLists, corpus, out)
+            val fr = input(Language.FR, KeyboardLayout.AZERTY, wordLists, corpus, out, split = engine && !combined)
+            val en = input(Language.EN, KeyboardLayout.QWERTY, wordLists, corpus, out, split = engine && !combined)
             val mixed = lines(corpus.resolve("mixed-test.txt"))
             val labels = lines(corpus.resolve("mixed-test-languages.txt")).mapIndexed { i, code ->
                 Language.entries.firstOrNull { it.code == code }
@@ -70,13 +74,18 @@ object AnalyzeCorpusCli {
         }
     }
 
-    private fun input(language: Language, layout: KeyboardLayout, wordLists: Path, corpus: Path, out: PrintStream): LanguageInput {
+    private fun input(language: Language, layout: KeyboardLayout, wordLists: Path, corpus: Path, out: PrintStream, split: Boolean): LanguageInput {
         out.println("Lexique ${language.code} : construction en mémoire")
-        val lexicon = Files.newBufferedReader(wordLists.resolve("${language.code}.tsv")).useLines {
-            WordListLoader.load(it, language.code)
-        }
-        return LanguageInput(language, lexicon, layout, lines(corpus.resolve("${language.code}-test.txt")))
+        val lexicon = load(wordLists.resolve("${language.code}.tsv"), language.code)
+        val test = lines(corpus.resolve("${language.code}-test.txt"))
+        val files = LexiconLanguage.files(language.code).map { wordLists.resolve("${it.baseName}.tsv") }
+        if (!split || files.size < 2 || !files.all(Files::isRegularFile)) return LanguageInput(language, lexicon, layout, test)
+        out.println("Lexique ${language.code} : fichiers séparés ${files.map { it.fileName }}")
+        val set = LexiconLanguage.assemble(language.code, files.map { load(it, language.code) })
+        return LanguageInput(language, lexicon, layout, test, set)
     }
+
+    private fun load(path: Path, tag: String) = Files.newBufferedReader(path).useLines { WordListLoader.load(it, tag) }
 
     private fun lines(path: Path): List<String> = Files.readAllLines(path)
 
@@ -84,4 +93,7 @@ object AnalyzeCorpusCli {
 
     /** Premier argument facultatif : analyse M2 avec le moteur. */
     const val ENGINE_FLAG: String = "--engine"
+
+    /** Variante de [ENGINE_FLAG] avec la liste française unique `fr.tsv`. */
+    const val ENGINE_COMBINED_FLAG: String = "--engine-combined"
 }

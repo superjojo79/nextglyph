@@ -1,6 +1,7 @@
 package nextglyph.tools.analysis
 
 import nextglyph.engine.lexicon.Lexicon
+import nextglyph.engine.lexicon.LexiconSet
 import nextglyph.tools.wordlists.Language
 import nextglyph.tools.wordlists.SentencePartition
 import nextglyph.tools.wordlists.Tokenizer
@@ -55,7 +56,14 @@ data class AnalysisConfig(
 }
 
 /** Données d'une langue : lexique, disposition de l'utilisateur, phrases de test. */
-class LanguageInput(val language: Language, val lexicon: Lexicon, val layout: KeyboardLayout, val test: List<String>)
+class LanguageInput(
+    val language: Language,
+    val lexicon: Lexicon,
+    val layout: KeyboardLayout,
+    val test: List<String>,
+    /** Lexique tel que le moteur le lit (M2) : les fichiers séparés par licence, ou [lexicon] seul. */
+    val set: LexiconSet = LexiconSet(lexicon),
+)
 
 /**
  * Exécute les trois parties du §15.1 et rend les résultats en Markdown. [log] reçoit

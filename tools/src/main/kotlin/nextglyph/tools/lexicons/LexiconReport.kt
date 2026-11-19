@@ -26,20 +26,33 @@ object LexiconReport {
     /** Budget de `P(c | p)` (spec §11.3) : 1 ms. */
     const val DISTRIBUTION_BUDGET_NANOS: Long = 1_000_000L
 
+    /** Taille totale des fichiers de chaque langue, dans l'ordre d'apparition. */
+    fun sizesByLanguage(measures: List<LexiconMeasure>): Map<String, Long> {
+        val sizes = LinkedHashMap<String, Long>()
+        for (m in measures) sizes.merge(m.languageTag, m.sizeBytes, Long::plus)
+        return sizes
+    }
+
     fun render(measures: List<LexiconMeasure>, sizeBudget: Long = SIZE_BUDGET_BYTES): String = buildString {
         appendLine("# Rapport des lexiques binaires")
         appendLine()
-        appendLine("Budgets (spec §11.3) : taille ≤ 8 Mio par langue ; `distribution` < 1 ms.")
+        appendLine("Budgets (spec §11.3) : taille ≤ 8 Mio par langue (tous ses fichiers) ; `distribution` < 1 ms.")
+        appendLine()
+        appendLine("| Langue | Taille totale |")
+        appendLine("|---|---|")
+        for ((language, size) in sizesByLanguage(measures)) {
+            appendLine("| $language | $size octets (${mebibytes(size)} Mio) : ${verdict(size <= sizeBudget)} |")
+        }
         for (m in measures) {
             appendLine()
-            appendLine("## ${m.languageTag}")
+            appendLine("## ${m.languageTag} : `${m.fileName}`")
             appendLine()
             appendLine("| Mesure | Valeur |")
             appendLine("|---|---|")
             appendLine("| Fichier | `${m.fileName}` |")
             appendLine("| Clés | ${m.keyCount} |")
             appendLine("| Formes d'affichage | ${m.formCount} |")
-            appendLine("| Taille | ${m.sizeBytes} octets (${mebibytes(m.sizeBytes)} Mio) : ${verdict(m.sizeBytes <= sizeBudget)} |")
+            appendLine("| Taille | ${m.sizeBytes} octets (${mebibytes(m.sizeBytes)} Mio) |")
             appendLine("| Chargement (map + `Lexicon.load`) | ${millis(m.loadNanos.toDouble())} ms |")
             appendLine("| Préfixes mesurés | ${m.prefixCount} |")
             val d = m.distribution

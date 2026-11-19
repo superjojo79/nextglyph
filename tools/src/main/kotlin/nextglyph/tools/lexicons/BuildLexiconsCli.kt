@@ -1,7 +1,9 @@
 package nextglyph.tools.lexicons
 
 import nextglyph.engine.lexicon.Lexicon
+import nextglyph.engine.lexicon.LexiconFile
 import nextglyph.engine.lexicon.LexiconFormatException
+import nextglyph.engine.lexicon.LexiconLanguage
 import nextglyph.tools.wordlists.Language
 import java.io.IOException
 import java.io.PrintStream
@@ -12,12 +14,14 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 
 /**
- * `buildLexicons <listes> <corpus> <sortie>` : construit `<sortie>/<lang>.nglx` à partir de
- * `<listes>/<lang>.tsv`, le recharge par `mmap`, mesure `distribution` sur les préfixes de
- * `<corpus>/<lang>-test.txt` et écrit `<sortie>/report.md`.
+ * `buildLexicons <listes> <corpus> <sortie>` : pour chaque fichier embarqué
+ * (`LexiconLanguage.ALL_FILES` : `fr-lexique`, `fr-dicollecte`, `en`), construit
+ * `<sortie>/<nom>.nglx` à partir de `<listes>/<nom>.tsv`, le recharge par `mmap`, mesure
+ * `distribution` sur les préfixes de `<corpus>/<langue>-test.txt` et écrit `<sortie>/report.md`.
+ * Le français est découpé par licence (un fichier par source, `docs/DATA.md`).
  *
- * Code de sortie : 0 ; 1 si une entrée est invalide ou si un lexique dépasse [sizeBudget]
- * (le rapport est alors écrit quand même).
+ * Code de sortie : 0 ; 1 si une entrée est invalide ou si les fichiers d'une langue dépassent
+ * ensemble [sizeBudget] (le rapport est alors écrit quand même).
  */
 class BuildLexiconsCli(
     private val sizeBudget: Long = SIZE_BUDGET_BYTES,
@@ -35,10 +39,10 @@ class BuildLexiconsCli(
         val outDir = Paths.get(args[2])
         return try {
             Files.createDirectories(outDir)
-            val measures = Language.entries.map { build(it, wordlists, corpus, outDir, out) }
+            val measures = LexiconLanguage.ALL_FILES.map { build(it, wordlists, corpus, outDir, out) }
             Files.writeString(outDir.resolve(REPORT_NAME), LexiconReport.render(measures, sizeBudget))
-            val tooBig = measures.filter { it.sizeBytes > sizeBudget }
-            tooBig.forEach { err.println("${it.fileName} : ${it.sizeBytes} octets, au-delà du budget de $sizeBudget octets.") }
+            val tooBig = LexiconReport.sizesByLanguage(measures).filter { it.value > sizeBudget }
+            tooBig.forEach { (language, size) -> err.println("Lexiques $language : $size octets, au-delà du budget de $sizeBudget octets.") }
             if (tooBig.isEmpty()) EXIT_OK else EXIT_FAILURE
         } catch (e: LexiconToolException) {
             err.println(e.message)
@@ -52,13 +56,14 @@ class BuildLexiconsCli(
         }
     }
 
-    private fun build(language: Language, wordlists: Path, corpus: Path, outDir: Path, out: PrintStream): LexiconMeasure {
-        val tsv = wordlists.resolve("${language.code}.tsv")
+    private fun build(file: LexiconFile, wordlists: Path, corpus: Path, outDir: Path, out: PrintStream): LexiconMeasure {
+        val language = Language.entries.first { it.code == file.language }
+        val tsv = wordlists.resolve("${file.baseName}.tsv")
         val testFile = corpus.resolve("${language.code}-test.txt")
-        out.println("Lexique ${language.code} : lecture de $tsv")
+        out.println("Lexique ${file.baseName} : lecture de $tsv")
         val entries = WordListTsv.parse(Files.readAllLines(tsv), tsv.fileName.toString())
         val compiled = LexiconCompiler.compile(language.code, entries)
-        val target = outDir.resolve("${language.code}.nglx")
+        val target = outDir.resolve(file.name)
         Files.write(target, compiled.bytes)
 
         val loadStart = nanoTime()

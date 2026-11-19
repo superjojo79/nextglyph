@@ -65,6 +65,33 @@ object FrenchWordList {
     fun scaled(perMillion: Double): Long =
         if (perMillion.isNaN() || perMillion <= 0.0) FLOOR else (perMillion * SCALE).roundToLong().coerceIn(FLOOR, MAX_FREQUENCY)
 
+    /** Listes françaises séparées par licence : une par source (`docs/DATA.md`). */
+    data class Split(val lexique: WordListResult, val dicollecte: WordListResult)
+
+    /**
+     * Listes séparées par source, aucune ne contenant de données de l'autre :
+     * - `lexique` : orthographes de Lexique 4.10 (en minuscules, Lexique ne distingue pas la casse)
+     *   et leur fréquence [scaled] (CC BY-SA 4.0) ;
+     * - `dicollecte` : formes de Dicollecte, casse comprise, à la fréquence [FLOOR] (MPL-2.0).
+     *
+     * Fusionnées par le moteur (`LexiconSet`, Lexique déclaré sans casse), elles redonnent la liste
+     * de [build], à ceci près qu'une forme présente dans les deux sources compte le plancher en plus.
+     */
+    fun split(dicollecte: Collection<String>, lexique: Map<String, Double>): Split {
+        val lexiqueLog = ExclusionLog()
+        val lexiqueEntries = filterEntries(lexique.map { (form, perMillion) -> form to scaled(perMillion) }, lexiqueLog)
+        val dicoLog = ExclusionLog()
+        val dicoForms = LinkedHashSet<String>()
+        for (form in dicollecte) {
+            if (!dicoForms.add(canonicalApostrophes(form))) dicoLog.add(EXCLUSION_DUPLICATE)
+        }
+        val dicoEntries = filterEntries(dicoForms.map { it to FLOOR }, dicoLog)
+        return Split(
+            WordListResult(lexiqueEntries, lexiqueLog.asMap(), mapOf("formes Lexique" to lexique.size)),
+            WordListResult(dicoEntries, dicoLog.asMap(), mapOf("formes Dicollecte" to dicoForms.size)),
+        )
+    }
+
     /**
      * Vocabulaire = formes de Dicollecte + formes de Lexique absentes de Dicollecte (à la casse près).
      * Fréquence = Lexique si la forme y est, sinon [FLOOR]. Pour un groupe de variantes de casse

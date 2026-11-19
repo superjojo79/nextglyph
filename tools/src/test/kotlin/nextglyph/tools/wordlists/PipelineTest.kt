@@ -149,6 +149,12 @@ class PipelineTest {
 
             val fr = Files.readAllLines(out.resolve("wordlists/fr.tsv"))
             assertThat(fr).containsExactly("je\t2000", "vois\t1000", "l'\t800", "nombre\t500", "Paris\t1")
+            // Listes séparées par licence : aucune donnée de l'autre source.
+            assertThat(Files.readAllLines(out.resolve("wordlists/fr-lexique.tsv")))
+                .containsExactly("je\t2000", "vois\t1000", "l'\t800", "nombre\t500")
+            assertThat(Files.readAllLines(out.resolve("wordlists/fr-dicollecte.tsv")))
+                .containsExactly("Paris\t1", "je\t1", "nombre\t1", "vois\t1")
+            assertThat(log).anyMatch { it.contains("4 formes Lexique, 4 formes Dicollecte") }
             val en = Files.readAllLines(out.resolve("wordlists/en.tsv"))
             assertThat(en.map { it.substringBefore('\t') }).containsExactly("I", "the", "see")
             assertThat(en.map { it.substringAfter('\t').toLong() }).isSortedAccordingTo(reverseOrder())

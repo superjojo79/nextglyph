@@ -75,16 +75,20 @@ class MeasureTest {
                 """
                 # Rapport des lexiques binaires
 
-                Budgets (spec §11.3) : taille ≤ 8 Mio par langue ; `distribution` < 1 ms.
+                Budgets (spec §11.3) : taille ≤ 8 Mio par langue (tous ses fichiers) ; `distribution` < 1 ms.
 
-                ## fr
+                | Langue | Taille totale |
+                |---|---|
+                | fr | 1048576 octets (1.00 Mio) : dans le budget |
+
+                ## fr : `fr.nglx`
 
                 | Mesure | Valeur |
                 |---|---|
                 | Fichier | `fr.nglx` |
                 | Clés | 12 |
                 | Formes d'affichage | 15 |
-                | Taille | 1048576 octets (1.00 Mio) : dans le budget |
+                | Taille | 1048576 octets (1.00 Mio) |
                 | Chargement (map + `Lexicon.load`) | 2.50 ms |
                 | Préfixes mesurés | 4 |
                 | `distribution` moyenne | 1.50 µs |
@@ -192,9 +196,11 @@ class MeasureTest {
         fun `rapport - plusieurs langues dans l'ordre`() {
             val m = LexiconMeasure("fr", "fr.nglx", 1, 1, 10, emptyList(), 1, 0, null)
 
-            val text = LexiconReport.render(listOf(m, m.copy(languageTag = "en", fileName = "en.nglx")))
+            val text = LexiconReport.render(listOf(m, m.copy(fileName = "fr-b.nglx", sizeBytes = 5), m.copy(languageTag = "en", fileName = "en.nglx")))
 
             assertThat(text.indexOf("## fr")).isLessThan(text.indexOf("## en"))
+            assertThat(text).contains("| fr | 15 octets", "| en | 10 octets")
+            assertThat(LexiconReport.sizesByLanguage(listOf(m, m))).containsExactly(java.util.AbstractMap.SimpleEntry("fr", 20L))
         }
     }
 }

@@ -77,7 +77,8 @@ class EngineAnalysis(private val config: EngineAnalysisConfig = EngineAnalysisCo
         val out = StringBuilder()
         out.appendLine("# Résultats bruts de `:tools:analyzeEngine` (M2)").appendLine()
         out.appendLine("Configuration : $config").appendLine()
-        val sets = mapOf(Language.FR to LexiconSet(fr.lexicon), Language.EN to LexiconSet(en.lexicon))
+        val sets = mapOf(Language.FR to fr.set, Language.EN to en.set)
+        out.appendLine("Lexiques : ${sets.values.joinToString(" ; ") { "${it.language} ${it.members.size} fichier(s)" }}").appendLine()
         for (input in listOf(fr, en)) {
             val sample = input.test.filterIndexed { i, _ -> keep(i, config.samplePercent) }
             val words = CorpusWords.count(sample.asSequence(), Tokenizer(input.language))

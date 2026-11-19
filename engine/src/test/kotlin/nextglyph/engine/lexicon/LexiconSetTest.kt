@@ -55,6 +55,23 @@ class LexiconSetTest {
         }
 
         @Test
+        fun `membre sans casse - sa fréquence va à la forme minuscule, sinon aux variantes de casse`() {
+            // Comme Lexique (orthographes sans casse) et Dicollecte (formes, fréquence plancher).
+            val lexique = LexiconFixtures.lexicon(listOf("paris" to 500L, "marseille" to 300L, "tchatche" to 7L), "fr")
+            val dicollecte = LexiconFixtures.lexicon(listOf("paris" to 1L, "Paris" to 1L, "Marseille" to 1L, "MARSEILLE" to 1L), "fr")
+
+            val french = LexiconSet(listOf(lexique, dicollecte), caseless = listOf(lexique))
+
+            assertThat(french.displayForms("paris")).containsExactly(LexiconEntry("paris", "paris", 501L), LexiconEntry("Paris", "paris", 1L))
+            assertThat(french.displayForms("marseille"))
+                .containsExactly(LexiconEntry("MARSEILLE", "marseille", 301L), LexiconEntry("Marseille", "marseille", 301L))
+            assertThat(french.displayForms("tchatche")).containsExactly(LexiconEntry("tchatche", "tchatche", 7L))
+            assertThat(french.completions("ma", 1).map { it.form }).containsExactly("MARSEILLE")
+            assertThat(french.completions("pa", 5).map { it.form }).containsExactly("paris", "Paris")
+            assertThat((french + LexiconFixtures.lexicon(listOf("x" to 1L), "fr")).caseless).containsExactly(lexique)
+        }
+
+        @Test
         fun `appartenance, langue et ajout d'un membre`() {
             val personal = LexiconFixtures.lexicon(listOf("chouquette" to 3L), "fr")
 
@@ -85,6 +102,15 @@ class LexiconSetTest {
             assertThatThrownBy { LexiconSet(main, english) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("même langue")
+        }
+
+        @Test
+        fun `rejette un membre sans casse étranger à l'ensemble`() {
+            val other = LexiconFixtures.lexicon(listOf("chat" to 1L), "fr")
+
+            assertThatThrownBy { LexiconSet(listOf(main), caseless = listOf(other)) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("sans casse")
         }
 
         @Test
@@ -124,6 +150,17 @@ class LexiconSetTest {
 
             assertThat(set.completions("ch", 0)).isEmpty()
             assertThat(saturated.displayForms("x").single().frequency).isEqualTo(Long.MAX_VALUE)
+        }
+
+        @Test
+        fun `un ensemble dont tous les membres sont sans casse garde leurs formes`() {
+            val a = LexiconFixtures.lexicon(listOf("chat" to 4L), "fr")
+            val b = LexiconFixtures.lexicon(listOf("chat" to 6L, "chien" to 1L), "fr")
+
+            val both = LexiconSet(listOf(a, b), caseless = listOf(a, b))
+
+            assertThat(both.displayForms("chat")).containsExactly(LexiconEntry("chat", "chat", 10L))
+            assertThat(both.completions("ch", 1).map { it.form }).containsExactly("chat")
         }
     }
 }

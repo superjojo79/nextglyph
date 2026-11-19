@@ -3,10 +3,27 @@ package nextglyph.engine.lexicon
 import java.util.Locale
 
 /**
- * Langues des lexiques embarqués (spec §10.1) et choix de la langue active.
+ * Un fichier de lexique embarqué (asset de l'application, produit par `:tools:buildLexicons`).
  *
- * M1 : une seule langue active à la fois, choisie d'après le sous-type de méthode de saisie
- * courant ; le bilinguisme (§10.6) viendra ensuite.
+ * @property name nom du fichier (`fr-lexique.nglx`).
+ * @property language code de langue (`fr`).
+ * @property caseless ses formes sont des orthographes sans casse (voir [LexiconSet]).
+ */
+data class LexiconFile(val name: String, val language: String, val caseless: Boolean = false) {
+    /** Nom sans l'extension `.nglx` : nom de la liste de mots correspondante (`fr-lexique.tsv`). */
+    val baseName: String get() = name.removeSuffix(EXTENSION)
+
+    companion object {
+        const val EXTENSION: String = ".nglx"
+    }
+}
+
+/**
+ * Langues des lexiques embarqués (spec §10.1), fichiers de chacune et choix de la langue préférée.
+ *
+ * Le français est réparti en deux fichiers, un par licence (`docs/DATA.md`) : `fr-lexique.nglx`
+ * (formes et fréquences de Lexique 4.10, CC BY-SA 4.0, sans casse) et `fr-dicollecte.nglx` (formes
+ * de Dicollecte, fréquence plancher, MPL-2.0), fusionnés à la lecture en un [LexiconSet].
  */
 object LexiconLanguage {
 
@@ -16,10 +33,27 @@ object LexiconLanguage {
     /** Codes des lexiques embarqués. */
     val SUPPORTED: List<String> = listOf(FRENCH, ENGLISH)
 
-    /** Nom du fichier de lexique d'une langue prise en charge (asset de l'application). */
-    fun fileName(language: String): String {
-        require(language in SUPPORTED) { "Langue de lexique inconnue : « $language »." }
-        return "$language.nglx"
+    /** Fichiers de lexique d'une langue prise en charge, dans l'ordre de fusion. */
+    fun files(language: String): List<LexiconFile> = when (language) {
+        FRENCH -> listOf(LexiconFile("fr-lexique.nglx", FRENCH, caseless = true), LexiconFile("fr-dicollecte.nglx", FRENCH))
+        ENGLISH -> listOf(LexiconFile("en.nglx", ENGLISH))
+        else -> throw IllegalArgumentException("Langue de lexique inconnue : « $language ».")
+    }
+
+    /** Tous les fichiers embarqués, langue par langue. */
+    val ALL_FILES: List<LexiconFile> get() = SUPPORTED.flatMap(::files)
+
+    /**
+     * Assemble les lexiques chargés de [language] (un par fichier de [files], dans le même ordre)
+     * en un [LexiconSet], les membres sans casse étant déclarés comme tels.
+     *
+     * @throws IllegalArgumentException si la langue est inconnue ou si le nombre de lexiques ne
+     *   correspond pas à ses fichiers.
+     */
+    fun assemble(language: String, lexicons: List<Lexicon>): LexiconSet {
+        val files = files(language)
+        require(lexicons.size == files.size) { "${files.size} lexiques attendus pour « $language », ${lexicons.size} reçus." }
+        return LexiconSet(lexicons, lexicons.filterIndexed { i, _ -> files[i].caseless })
     }
 
     /**
