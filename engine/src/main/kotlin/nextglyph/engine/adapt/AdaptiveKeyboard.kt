@@ -23,12 +23,13 @@ import nextglyph.engine.lexicon.Lexicon
 class AdaptiveKeyboard(
     val layout: KeyboardLayout,
     val config: AdaptationConfig = AdaptationConfig(),
+    spatial: TapSpatialModel = TapSpatialModel.NONE,
 ) {
 
     private val calculator = KeyWeightCalculator(layout, config)
     private val solver = LayoutSolver(layout, config)
     private val state = AdaptiveLayoutState(layout, config)
-    private val decoder = TapDecoder(layout, config.decoder)
+    private val decoder = TapDecoder(layout, config.decoder, spatial)
     private val weights = KeyWeights(layout)
     private val target = AdaptedLayout(layout)
     private val decoding = TapDecoding(layout)

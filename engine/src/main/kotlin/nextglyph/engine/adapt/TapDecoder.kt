@@ -89,11 +89,17 @@ class TapDecoding(val layout: KeyboardLayout) {
  *   hauteur) d'une lettre affichée produit cette lettre, même atténuée : c'est la garantie « un tap
  *   franchement au centre d'une touche atténuée produit cette lettre ».
  *
+ * **Modèle spatial personnalisé** ([spatial], §5.3) : pour chaque lettre, les deux centres sont décalés
+ * du décalage moyen appris et `σ` est multiplié par le facteur appris. Avec [TapSpatialModel.NONE]
+ * (ou un modèle vide : décalages nuls, facteurs 1), le résultat est identique bit à bit.
+ * Le noyau et la nature de la touche ne dépendent pas du modèle : seuls les scores changent.
+ *
  * Sans allocation ; non thread-safe (aucun état, mais [TapDecoding] est un tampon).
  */
 class TapDecoder(
     val layout: KeyboardLayout,
     val config: TapDecoderConfig = TapDecoderConfig(),
+    val spatial: TapSpatialModel = TapSpatialModel.NONE,
 ) {
 
     /**
@@ -135,8 +141,13 @@ class TapDecoder(
                 val shown = shownRow[k]
                 if (shown.key.kind == KeyKind.LETTER) {
                     val restRect = restRow[k]
-                    val sx = sigma * restRect.width
-                    val likelihood = alpha * gaussian(x, y, shown, sx, sy) + (1 - alpha) * gaussian(x, y, restRect, sx, sy)
+                    val letter = shown.key.label[0]
+                    val shiftX = spatial.offsetX(letter) * restRect.width
+                    val shiftY = spatial.offsetY(letter) * rest.rowHeight
+                    val sx = sigma * restRect.width * spatial.sigmaScaleX(letter)
+                    val sigmaY = sy * spatial.sigmaScaleY(letter)
+                    val likelihood = alpha * gaussian(x, y, shown.centerX + shiftX, shown.centerY + shiftY, sx, sigmaY) +
+                        (1 - alpha) * gaussian(x, y, restRect.centerX + shiftX, restRect.centerY + shiftY, sx, sigmaY)
                     // Une touche au repos a un poids relatif de 1 : a priori neutre.
                     val prior = if (weights == null) 1.0 else max(weights.relative[flat].toDouble(), config.minPrior.toDouble())
                     val score = likelihood * prior.pow(lambda)
@@ -158,9 +169,9 @@ class TapDecoder(
         return true
     }
 
-    private fun gaussian(x: Float, y: Float, rect: KeyRect, sx: Double, sy: Double): Double {
-        val dx = (x - rect.centerX) / sx
-        val dy = (y - rect.centerY) / sy
+    private fun gaussian(x: Float, y: Float, centerX: Float, centerY: Float, sx: Double, sy: Double): Double {
+        val dx = (x - centerX) / sx
+        val dy = (y - centerY) / sy
         return exp(-(dx * dx + dy * dy) / 2) / (sx * sy)
     }
 }

@@ -183,6 +183,7 @@ P(point | c) = α · N(point ; centre_affiché(c), σ) + (1 − α) · N(point ;
 
 - Le mélange `α` reflète le fait qu'un utilisateur rapide vise de mémoire (position de repos) et un utilisateur lent vise ce qu'il voit. Valeur initiale : `α = 0,5`.
 - `σ` est estimé par touche à partir de l'historique des frappes de l'utilisateur (modèle spatial personnalisé, hors mode incognito).
+- **Modèle spatial personnalisé** (`nextglyph.engine.learn.SpatialModel`, `docs/DECISIONS.md`, 2026-11-21). Pour chacune des 26 lettres, estimation en ligne du décalage moyen (x, y) et de la dispersion des frappes **validées** : une frappe est mise en attente, intégrée quand le mot est validé sans annulation, écartée si la lettre est effacée ou le mot annulé. Les valeurs sont relatives à la touche au repos (fractions de sa largeur et de la hauteur de rangée) ; une frappe hors du rectangle de sa touche est ignorée. Le décodeur décale les deux centres du décalage appris et multiplie `σ` par un facteur `[0,7 ; 1,6]` (dispersion mesurée / 0,23) ; décalage borné à 0,25 touche ; estimation ramenée vers le défaut (décalage 0, facteur 1) tant que l'échantillon est petit (`n / (n + 20)`) ; fenêtre de 300 frappes par lettre. Un modèle vide ne change pas le décodage. Aucun apprentissage en incognito, mot de passe, code PIN et pavés numériques.
 - `λ` (défaut : 0,6) limite l'influence du modèle de langue : un tap franchement au centre d'une touche atténuée doit produire cette lettre.
 - Le mode mot de passe et les pavés numériques utilisent `λ = 0` (décodage purement spatial).
 
@@ -217,7 +218,7 @@ Puis une espace automatique est insérée.
 
 **Annulation :** un appui sur ⌫ immédiatement après une validation automatique (curseur inchangé, aucune autre frappe) remplace le mot inséré par le texte tapé à l'origine, sans espace. Un deuxième ⌫ efface normalement. Une validation suivie d'un signe de ponctuation (§5.6) n'est plus annulable ainsi : le ⌫ efface d'abord le signe.
 
-**Apprentissage du refus :** si une même correction `t → w` est annulée `autocommit.rejectLimit` fois (défaut : 2), elle n'est plus proposée automatiquement (elle reste dans la barre). Il en va de même d'une restitution d'accent ou de majuscule annulée (`ecole → école`). Les compteurs sont en mémoire en M2, derrière une interface prévue pour la persistance (M4) ; aucun compteur n'est écrit en incognito ni dans le profil mot de passe.
+**Apprentissage du refus :** si une même correction `t → w` est annulée `autocommit.rejectLimit` fois (défaut : 2), elle n'est plus proposée automatiquement (elle reste dans la barre). Il en va de même d'une restitution d'accent ou de majuscule annulée (`ecole → école`). Les compteurs (au plus 2 000 paires, la moins récemment refusée étant oubliée la première) sont enregistrés avec le reste de l'état appris (`PersistentRejectionStore`, §10.5) ; aucun compteur n'est écrit en incognito ni dans le profil mot de passe.
 
 **Désactivation :** la validation par espace est inactive dans les profils mot de passe, e-mail, URL, numériques, avec `TYPE_TEXT_FLAG_NO_SUGGESTIONS`, et via un réglage utilisateur.
 
@@ -304,7 +305,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 ### 6.3 Utilisation
 
 - Chaque nom est indexé sous forme normalisée (`helene`) avec sa forme d'affichage (`Hélène`). Les noms composés (`Jean-Pierre`) sont indexés en entier.
-- Poids de base : équivalent à un mot de fréquence moyenne.
+- Poids de base : équivalent à un mot de fréquence moyenne (`contacts.baseShare`, 1e-5 de la masse du lexique), croissant avec le nombre de contacts qui portent le nom (`1 + ln n`, plafonné à 3).
 - **Bonus de contexte** (`contacts.contextBoost`, multiplicatif) :
   - champ de type `TYPE_TEXT_VARIATION_PERSON_NAME` ;
   - début de message ou de champ ;
@@ -312,6 +313,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
   - premier caractère tapé en majuscule ;
   - après un autre nom de contact (prénom → nom).
 - Un nom qui est aussi un mot courant (« Rose », « Pierre », « Marie », « Olive ») n'est mis en majuscule que si le contexte le justifie ; sinon le mot courant l'emporte.
+- **Réalisation** (`nextglyph.engine.contacts`, `docs/DECISIONS.md`, 2026-11-21). Chaque indice vrai ajoute un niveau (0 à 2) ; le poids des noms est multiplié par `contacts.contextBoost`^niveau (4 : ×1, ×4, ×16). Mots déclencheurs français et anglais (`bonjour`, `salut`, `coucou`, `cher`, `chère`, `avec`, `chez`, `à`, `pour`, `@`, `hello`, `hi`, `hey`, `dear`, `with`, `to`, `for`, `from`). « Majuscule tapée » : majuscule de l'utilisateur, pas la majuscule automatique de début de phrase. Au niveau 0, un nom qui est aussi un mot du lexique pèse au plus le quart de la fréquence de ce mot, et aucun nom ne peut être inséré par complétion ou correction (§5.5, cas 2) ; il reste proposé dans la barre. Les particules (`de`, `van`...) ne sont pas indexées ; les noms sont communs aux deux langues.
 
 ---
 
@@ -442,7 +444,9 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 
 - Un mot inconnu validé tel quel est mis en attente ; il entre dans le dictionnaire personnel après `learn.minOccurrences` (défaut : 2) validations sans annulation.
 - Un appui long sur une suggestion permet de la supprimer du dictionnaire personnel.
-- Stockage : base locale dans le stockage privé ; export/import manuels depuis les réglages.
+- Stockage : fichier local dans le stockage privé (`LearnedDataFile` : dictionnaire personnel, mémoire des refus, modèle spatial ; binaire versionné, une somme de contrôle par section, lecture tolérante : un fichier corrompu ou d'une version inconnue donne un état vide et un signalement, jamais un plantage). Export/import manuels depuis les réglages en TSV lisible (`PersonalDictionaryTsv` : `langue<TAB>mot<TAB>utilisations`).
+- Plafonds : 2 000 mots promus (le moins récemment utilisé est évincé) et 500 mots en attente (le moins récemment vu est oublié) ; 2 à 32 caractères, lettres, apostrophes et traits d'union ; majuscule initiale due au début de phrase ramenée en minuscules. L'annulation d'une validation oublie le mot en attente ; une suppression n'empêche pas de l'apprendre de nouveau. Rien n'est appris en incognito, mot de passe, e-mail, URL, champ numérique ni avec `NO_SUGGESTIONS`.
+- Intégration : les mots promus forment un lexique supplémentaire de la langue du mot dans le `LexiconSet` (fréquence : 1e-5 de la masse du lexique × `min(4, 1 + ln utilisations)`) ; il est reconstruit quand l'ensemble des mots change. Sans mot appris, la prédiction est exactement celle du lexique principal.
 - Chaque mot appris est rattaché à la langue estimée au moment de l'apprentissage (§10.6).
 
 ### 10.6 Bilinguisme français-anglais
@@ -503,7 +507,7 @@ docs/        Cette spécification, décisions d'architecture.
 - Pas de permission `INTERNET`, pas de SDK tiers, pas de télémétrie.
 - Permissions : `READ_CONTACTS` (optionnelle), `VIBRATE`.
 - Aucune journalisation du texte saisi, y compris en debug pour les profils mot de passe et code PIN.
-- Toutes les données apprises sont effaçables en un geste depuis les réglages.
+- Toutes les données apprises (mots promus et en attente, refus, modèle spatial) sont effaçables en un geste depuis les réglages (`LearnedData.clear()`).
 - Le dictionnaire personnel et le modèle spatial sont exclus des sauvegardes automatiques Android (`android:allowBackup`/`dataExtractionRules`), sauf choix contraire de l'utilisateur.
 
 ---
