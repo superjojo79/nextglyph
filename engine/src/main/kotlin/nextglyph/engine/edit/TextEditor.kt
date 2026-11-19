@@ -73,14 +73,24 @@ class TextEditor(private val config: EditConfig = EditConfig()) {
     /**
      * Touche espace tapée sans mot à valider. Double espace (§5.6) : si le texte se termine par une
      * seule espace ordinaire (automatique ou tapée) précédée d'une lettre, d'un chiffre ou d'un
-     * guillemet ou parenthèse fermant, elle devient `. `. Sinon, une espace est insérée.
+     * guillemet ou parenthèse fermant, elle devient `. `. Espace absorbée : juste après l'espace
+     * automatique qui suit un signe de ponctuation (`va ? `), l'espace tapée par habitude ne
+     * double pas l'espace ; elle est absorbée une fois (l'état passe à [SpaceOrigin.TYPED]).
+     * Sinon, une espace est insérée.
      */
     fun onSpace(ctx: EditContext): EditResult {
+        if (isAbsorbed(ctx)) return result(ctx, emptyList(), SpaceOrigin.TYPED)
         if (isDoubleSpace(ctx)) {
             val ops = listOf(EditOperation.DeleteBeforeCursor(1), EditOperation.InsertText(". "))
             return result(ctx, ops, SpaceOrigin.TYPED)
         }
         return result(ctx, listOf(EditOperation.InsertText(" ")), SpaceOrigin.TYPED)
+    }
+
+    private fun isAbsorbed(ctx: EditContext): Boolean {
+        val text = ctx.textBefore
+        if (ctx.state.trailingSpace != SpaceOrigin.AUTO || text.length < 2 || text[text.length - 1] != ' ') return false
+        return text[text.length - 2] in SIGNS_WITHOUT_SPACE_AFTER
     }
 
     private fun isDoubleSpace(ctx: EditContext): Boolean {

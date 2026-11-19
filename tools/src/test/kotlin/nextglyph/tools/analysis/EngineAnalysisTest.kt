@@ -113,6 +113,37 @@ class EngineAnalysisTest {
             assertThat(Files.readString(output)).contains("samplePercent=100, mixedSamplePercent=100", "## Corpus mixte")
             assertThat(out.toString(Charsets.UTF_8)).contains("M2 fr")
         }
+
+        @Test
+        fun `les fichiers français séparés par licence donnent les mêmes résultats que la liste unique`(@TempDir root: Path) {
+            write(root.resolve("wordlists"), "fr.tsv", frList)
+            write(root.resolve("wordlists"), "en.tsv", enList)
+            // Lexique : orthographes sans casse et fréquences ; Dicollecte : formes au plancher (comptées en plus).
+            write(root.resolve("wordlists"), "fr-lexique.tsv", frList)
+            write(root.resolve("wordlists"), "fr-dicollecte.tsv", listOf("tchatche\t1"))
+            write(root.resolve("corpus"), "fr-test.txt", frTest)
+            write(root.resolve("corpus"), "en-test.txt", enTest)
+            write(root.resolve("corpus"), "mixed-test.txt", frTest + enTest)
+            write(root.resolve("corpus"), "mixed-test-languages.txt", listOf("fr", "fr", "fr", "en", "en"))
+            fun report(flag: String): String {
+                val output = root.resolve("out/$flag.md")
+                val out = ByteArrayOutputStream()
+                AnalyzeCorpusCli.run(
+                    arrayOf(flag, root.resolve("wordlists").toString(), root.resolve("corpus").toString(), output.toString(), "100"),
+                    PrintStream(out, true, Charsets.UTF_8),
+                    PrintStream(ByteArrayOutputStream(), true, Charsets.UTF_8),
+                    engineConfig = small,
+                )
+                return Files.readString(output).lines().filter { it.startsWith("|") }.joinToString("\n") + out.toString(Charsets.UTF_8).let { if ("séparés" in it) "\nséparés" else "" }
+            }
+
+            val split = report(AnalyzeCorpusCli.ENGINE_FLAG)
+            val combined = report(AnalyzeCorpusCli.ENGINE_COMBINED_FLAG)
+
+            assertThat(split).endsWith("séparés")
+            assertThat(combined).doesNotContain("séparés")
+            assertThat(split.removeSuffix("\nséparés")).isEqualTo(combined)
+        }
     }
 
     @Nested

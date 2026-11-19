@@ -192,12 +192,14 @@ tasks.register<JavaExec>("analyzeEngine") {
     mainClass.set("nextglyph.tools.analysis.AnalyzeCorpusMainKt")
     maxHeapSize = "4g"
     val sample = providers.gradleProperty("analysisSample")
+    // -PanalysisCombined : liste française unique fr.tsv au lieu des fichiers séparés par licence.
+    val combined = providers.gradleProperty("analysisCombined").isPresent
     args(
         listOfNotNull(
-            "--engine",
+            if (combined) "--engine-combined" else "--engine",
             layout.buildDirectory.dir("wordlists").get().asFile.path,
             layout.buildDirectory.dir("corpus").get().asFile.path,
-            layout.buildDirectory.file("analysis/M2-engine-results.md").get().asFile.path,
+            layout.buildDirectory.file(if (combined) "analysis/M2-engine-combined-results.md" else "analysis/M2-engine-results.md").get().asFile.path,
             sample.orNull,
         ),
     )

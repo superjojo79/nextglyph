@@ -287,9 +287,28 @@ class TextEditorTest {
         @ParameterizedTest
         @ValueSource(strings = ["bonjour. ", "bonjour, ", "quoi ? ", "a  ", "x\n ", "😀 ", "- "])
         fun `pas de double espace après une ponctuation, une espace ou un symbole`(before: String) {
-            val result = editor.onSpace(fr(before))
+            val result = editor.onSpace(fr(before, typed()))
 
             assertThat(result.operations).containsExactly(EditOperation.InsertText(" "))
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["bonjour. ", "bonjour, ", "quoi ? ", "fin… ", "oui ; "])
+        fun `l'espace tapée juste après l'espace automatique d'un signe est absorbée une fois`(before: String) {
+            val first = editor.onSpace(fr(before))
+            val second = editor.onSpace(fr(before, first.state))
+
+            assertThat(first.operations).isEmpty()
+            assertThat(first.state).isEqualTo(typed())
+            assertThat(second.operations).containsExactly(EditOperation.InsertText(" "))
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["- ", "😀 ", " ", "a ", "dit » "])
+        fun `pas d'absorption après un autre caractère que la ponctuation`(before: String) {
+            val result = editor.onSpace(fr(before))
+
+            assertThat(result.operations).isNotEmpty()
         }
 
         @Test

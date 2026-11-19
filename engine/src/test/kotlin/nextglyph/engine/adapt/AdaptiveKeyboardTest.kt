@@ -180,6 +180,25 @@ class AdaptiveKeyboardTest {
         }
 
         @Test
+        fun `une source de distributions remplace le lexique et se recalcule à chaque installation`() {
+            val keyboard = keyboard(withLexicon = false)
+            val asked = mutableListOf<String>()
+            val source = DistributionSource { prefix -> asked += prefix; lexicon.distribution(prefix) }
+            keyboard.onPrefix("a", 1000L)
+
+            keyboard.setSource(source, 1000L)
+            keyboard.settle(1000L)
+            keyboard.onPrefix("a", 2000L)
+            keyboard.setSource(source, 3000L)
+            keyboard.settle(3000L)
+
+            assertThat(asked).containsExactly("a", "a")
+            assertThat(keyboard.source).isSameAs(source)
+            assertThat(keyboard.lexicon).isNull()
+            assertThat(keyboard.frame.isRest).isFalse()
+        }
+
+        @Test
         fun `le mode repos seul ramène aussitôt la disposition au repos`() {
             val keyboard = keyboard()
             keyboard.onPrefix("a", 1000L)

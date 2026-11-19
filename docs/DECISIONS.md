@@ -260,7 +260,7 @@ Package `nextglyph.engine.edit` (pur, sans Android) : `TextEditor` (`onWordCommi
 
 ---
 
-## 2026-11-20 — Prédiction, validation par espace et bilinguisme dans le moteur (M2)
+## 2026-11-19 — Prédiction, validation par espace et bilinguisme dans le moteur (M2)
 
 ### Contexte
 
@@ -323,3 +323,36 @@ Détail dans `docs/analysis/M2-engine.md` (`./gradlew :tools:analyzeEngine`, éc
 - **Valeurs `LayoutKind` supplémentaires pour chaque pavé** : mélange le choix de l'utilisateur et le rôle de la disposition.
 - **Pavé téléphone à 4 colonnes** : ne porte pas `+ , ;`, `⌫` et `↵` sans perdre la position fixe des chiffres.
 - **Conclure au refus du séparateur sans regarder le nombre en cours** : mémoriserait `.` à tort dès qu'un second séparateur est refusé.
+
+---
+
+## 2026-11-19 — Français séparé par licence ; saisie complète de M2 dans l'IME
+
+### Contexte
+
+`fr.nglx` mêlait Lexique 4.10 (CC BY-SA 4.0) et Dicollecte (MPL-2.0), deux licences incompatibles dans un même fichier (`docs/PROGRESS.md`, problèmes ouverts). Les packages `predict` et `edit` existaient dans le moteur, mais l'IME n'insérait encore que des lettres.
+
+### Décision
+
+**Un fichier par licence.** `:tools:buildWordLists` écrit en plus `fr-lexique.tsv` (toutes les orthographes de Lexique, en minuscules, fréquence × 100) et `fr-dicollecte.tsv` (toutes les formes de Dicollecte, casse comprise, au plancher 1) ; `:tools:buildLexicons` en fait `fr-lexique.nglx` (2,03 Mo) et `fr-dicollecte.nglx` (6,07 Mo), soit 7,73 Mio pour le français, dans le budget de 8 Mio par langue (vérifié sur la somme des fichiers d'une langue). Aucun fichier ne contient de données de l'autre source. `LexiconLanguage.files` décrit les fichiers de chaque langue ; `LexiconLanguage.assemble` les fusionne en un `LexiconSet`.
+
+**Membre sans casse.** Lexique ne distingue pas la casse : ses formes sont des orthographes. À la fusion, la fréquence d'une orthographe `s` d'un membre déclaré sans casse va à la forme `s` des autres membres si elle existe, sinon à chacune de leurs variantes de casse, sinon reste à `s` : c'est exactement la règle de l'ancienne liste unique (`paris` porte la fréquence, `Paris` le plancher ; `Marseille` la porte faute de `marseille`). Les masses des préfixes ne dépendent pas de la casse et restent des sommes. `LexiconSet.completions` renvoie désormais toutes les formes fusionnées des clés vues (une forme transférée n'est la meilleure d'aucun membre). Seul écart avec l'ancienne liste : une forme présente dans les deux sources compte le plancher (1, soit 0,01 occurrence par million) en plus. Vérification par `:tools:analyzeEngine` : voir « Mesures ».
+
+**Session de saisie dans le moteur** (`nextglyph.engine.session`, pur, testé avec un éditeur simulé) : `InputSession` reçoit les événements (touche, lettre accentuée, caractère, espace, ⌫, Entrée, case de barre, menu de langue, `⇪`, `onUpdateSelection`) et pilote un `SessionTarget` (interface au-dessus d'`InputConnection`). L'IME (`InputConnectionTarget`, `KeyboardView`, service) ne fait que câbler.
+
+- **Composition** : le mot en cours est en `setComposingText` ; toute validation passe par `finishComposingText` puis les opérations de `TextEdit` (`deleteSurroundingText`, `commitText`), chaque événement dans un seul `beginBatchEdit`/`endBatchEdit`. Après ⌫ ou annulation, le mot qui précède le curseur est remis en composition (`setComposingRegion`).
+- **Sélection** : la session tient la position attendue du curseur après chacune de ses modifications (file des positions en attente, les mises à jour pouvant arriver en retard) ; une mise à jour qui n'en fait pas partie est un déplacement externe : composition validée telle quelle, annulation et espace automatique oubliées. Position inconnue (champ sans `initialSelStart`) : toute mise à jour est acceptée.
+- **Validation** : espace → `Predictor.commitSpace` ; si le mot inséré finit par une apostrophe ou un trait d'union, pas d'espace (§5.8). Signe de la barre ou de la couche `?123` pendant un mot → `commitBeforePunctuation` puis `TextEditor.onPunctuation` (typographie selon la langue de la phrase) ; `'` et `-` à l'intérieur d'un mot restent dans la composition ; chiffres insérés tels quels ; autres symboles : le mot est validé d'abord. Une espace insérée devant du texte est mémorisée comme tapée (pas de remplacement par un signe).
+- **Espace absorbée** (évolution du §5.6) : après l'espace automatique d'un signe (`va ? `), une espace tapée ne double pas l'espace (une fois). Sans cela, l'habitude « signe puis espace » produisait deux espaces.
+- **Barre** : 3 cases (centre : le mot que l'espace insérera) ; ponctuation `, . ? ! : … '` quand le texte finit par l'espace automatique et qu'aucun mot n'est en cours ; raccourcis permanents en e-mail et URL. Libellé de l'espace `␣ mot`, indicateur `FR`/`EN` (`[FR]` si verrouillée).
+- **Profils** : `InputProfileResolver` (M3, moteur) choisit le comportement ; `SessionField` le traduit. Mot de passe et pavés : aucune lecture du texte (sauf les deux caractères du ⌫, comme en M1), chaque touche insérée telle quelle, disposition au repos. E-mail, URL : raccourcis, ni composition, ni majuscule, ni espace automatique, disposition au repos (pas encore de lexique des domaines). `NO_SUGGESTIONS` : ni barre ni validation, adaptation conservée. Incognito ou mot de passe : aucun refus mémorisé.
+- **Majuscules** : automatiques par `AutoCapitalization` sur le texte lu, manuelles par glissé vers le haut sur une lettre (seuil 0,6 rangée), verrouillées par appui long sur `ABC` (la couche `?123` livrée par M3 n'a pas de touche `⇪`).
+- **Menus d'appui long** (`KeyPopups`) : accents (`a e i o u y c`), ponctuation rapide sur `?123`, langues sur l'espace (verrouiller FR / EN, Auto), symboles voisins sur la couche `?123` (pour les caractères absents de ses 3 rangées), `⇪` sur `ABC`. Choix en glissant puis en levant le doigt.
+- **Adaptation** : `AdaptiveKeyboard.setSource` accepte n'importe quelle `DistributionSource` ; l'IME lui donne `Predictor.distribution` (mélange bilingue, §10.6), réinstallée à chaque nouvel état de langue.
+
+### Alternatives écartées
+
+- **`fr-dicollecte` réduit aux formes absentes de Lexique** : plus petit, mais le choix des formes dépendrait des données de Lexique, et la casse de Dicollecte serait perdue pour les mots communs.
+- **Casse recopiée de Dicollecte dans `fr-lexique`** : met des données MPL dans le fichier CC BY-SA.
+- **Logique de session dans l'IME** : non testable sur la JVM ; contraire à la règle « l'IME ne fait que câbler ».
+- **Deux espaces après `?` puis espace** (comportement littéral du §5.6) : surprenant pour qui tape l'espace par habitude.

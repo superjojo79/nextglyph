@@ -4,7 +4,7 @@
 |---|---|
 | Projet | Nextglyph, clavier adaptatif open source |
 | Statut | Brouillon v0.2 |
-| Date | 2026-11-20 |
+| Date | 2026-11-19 |
 | Licence | Apache-2.0 |
 | Plateforme cible | Android, minSdk 26 (Android 8.0) |
 | Langues V1 | Français et anglais |
@@ -137,7 +137,7 @@ Rangée 2 : @ # € % & - + ( ) /                                         10 u
 Rangée 3 : ABC | , . ! ? ' : | espace | ↵ | ⌫                          1 + 6 × 0,9 + 1,6 + 1 + 1 = 10 u
 ```
 
-`ABC` ramène aux lettres. Les caractères moins courants (`* " ; = [ ]`, etc.) ne sont pas sur cette couche en V1 : ils sont sur la disposition classique (§7.1), accessible par l'échappatoire du §4.
+`ABC` ramène aux lettres. Les caractères moins courants (`* " ; = [ ]`, etc.) ne sont pas sur cette couche en V1 : ils sont sur la disposition classique (§7.1), accessible par l'échappatoire du §4, et dans les menus d'appui long de la couche (symboles voisins : `-` → `_ – —`, `+` → `= * × ÷`, `(` → `[ { <`, `)` → `] } >`, `/` → `\ |`, `€` → `$ £ ¥`, `%` → `‰ ^ ~`, `&` → `§ °`, `'` → `" « » ’`, `,` et `:` → `;`, `.` → `… ·`, `?` → `¿`, `!` → `¡`). Appui long sur `ABC` : majuscule verrouillée `⇪` (§5.7).
 
 La touche `↵` est contextuelle d'après `imeOptions` : envoyer, rechercher, aller, suivant, terminé, ou saut de ligne si le champ est multiligne et n'a pas d'action.
 
@@ -251,6 +251,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 - `«` conserve l'espace qui le précède (`dit «`) et n'est pas suivi d'espace automatique ; `»` remplace l'espace automatique.
 - Pas d'insécable en début de champ ni de ligne, ni derrière une espace déjà présente, ni entre deux signes (`?!`, `...!`). Une espace tapée par l'utilisateur n'est jamais remplacée.
 - Le double espace s'applique à une espace ordinaire (automatique ou tapée) précédée d'une lettre, d'un chiffre ou d'un guillemet ou parenthèse fermant ; la majuscule suivante dépend du réglage du champ (`CAP_SENTENCES`).
+- **Espace absorbée** : une espace tapée juste après l'espace automatique qui suit un signe (`. , ; : ! ? …`) n'en ajoute pas une deuxième (`va ? ` puis espace reste `va ? `) ; une seule fois, la suivante est insérée.
 
 **Accès aux autres signes :**
 - Appui long ou glissement vers le haut sur `?123` : menu rapide `- ( ) " ; @ #`.
@@ -263,7 +264,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 - **Automatiques** selon `TYPE_TEXT_FLAG_CAP_SENTENCES` / `_WORDS` / `_CHARACTERS` et `InputConnection.getCursorCapsMode()` : début de champ, après `. ? ! …` suivis d'une espace.
 - Détail : début de ligne = début de phrase ; guillemets et parenthèses fermants peuvent s'intercaler entre le signe et l'espace ; pas de majuscule après une abréviation (liste courte, commune FR/EN, sans point final : `m mm mme mmes mlle mlles mr mrs ms dr pr prof me st ste sr jr vs etc cf env approx e.g i.e u.s`). `_WORDS` : après une espace ou un saut de ligne ; `_CHARACTERS` : toujours. Aucune majuscule automatique en e-mail, URL, mot de passe (§9.1).
 - **Manuelles** : glissement vers le haut sur une lettre → majuscule pour cette lettre.
-- **Verrouillage** : depuis la couche `?123` (touche `⇪`). L'état verrouillé est affiché en permanence.
+- **Verrouillage** : depuis la couche `?123` (appui long sur `ABC` : `⇪`, la couche n'ayant pas de touche `⇪`). L'état verrouillé est affiché en permanence (`⇪` sur `?123` et `ABC`, lettres en majuscules).
 - Les noms de contacts reçoivent leur majuscule à la validation (§6).
 - Anglais : le pronom `i` isolé devient `I`, ainsi que ses contractions (`I'm`, `I'll`, `I've`, `I'd`). Les jours, les mois et les noms de langues portent leur majuscule dans le lexique anglais (`monday` → `Monday`).
 
@@ -388,7 +389,7 @@ Pavé du §8.1 sans `−` ni séparateur, avec toutes les règles du profil mot 
 
 ### 9.1 E-mail et URL
 
-- Disposition compacte du §5.1, adaptation visuelle active sur le lexique des domaines et des contacts (e-mail) ou des domaines courants (URL).
+- Disposition compacte du §5.1, adaptation visuelle active sur le lexique des domaines et des contacts (e-mail) ou des domaines courants (URL). En attendant ce lexique (M4), la disposition reste au repos dans ces champs.
 - Barre permanente : `@` `.` `.com` `.fr` `-` `_` (e-mail) ou `/` `.` `.com` `.fr` `-` (URL).
 - Pas de validation par espace, pas d'espace automatique, pas de majuscule automatique, pas de typographie française.
 
@@ -403,7 +404,7 @@ Défini par `IME_FLAG_NO_PERSONALIZED_LEARNING` ou forcé par l'utilisateur. Le 
 ### 10.1 Lexique
 
 - Structure : trie compact (arbre radix) sur les formes normalisées ; choix, format et mesures dans `docs/DECISIONS.md` (2026-11-19).
-- Un lexique peut être réparti en plusieurs fichiers d'une même langue (sources sous licences différentes, dictionnaire personnel, contacts), fusionnés à la lecture sans copie : les fréquences d'une même forme s'additionnent, comme les masses des préfixes (`LexiconSet`, `docs/DECISIONS.md`, 2026-11-20).
+- Un lexique peut être réparti en plusieurs fichiers d'une même langue (sources sous licences différentes, dictionnaire personnel, contacts), fusionnés à la lecture sans copie : les fréquences d'une même forme s'additionnent, comme les masses des préfixes (`LexiconSet`, `docs/DECISIONS.md`, 2026-11-19). Le français est livré en deux fichiers, un par licence : `fr-lexique.nglx` (Lexique 4.10, orthographes sans casse et fréquences) et `fr-dicollecte.nglx` (formes de Dicollecte, fréquence plancher). Un membre « sans casse » donne la fréquence d'une orthographe : elle va à la forme minuscule des autres membres si elle existe, sinon à leurs variantes de casse (`docs/DATA.md`).
 - Chaque nœud stocke la somme des fréquences de son sous-arbre et la fréquence maximale d'une forme du sous-arbre (complétions best-first) ; chaque nœud terminal stocke ses formes d'affichage avec leur fréquence.
 - Ainsi, `P(c | p)` et `P(fin | p)` se calculent en O(1) par lettre après la descente sur `p`.
 - Format binaire mappé en mémoire (`mmap`), construit hors ligne par `tools/`.
@@ -481,6 +482,8 @@ docs/        Cette spécification, décisions d'architecture.
 - **Remplacements** (annulation, remplacement de l'espace automatique) : `deleteSurroundingText()` puis `commitText()`, regroupés entre `beginBatchEdit()` et `endBatchEdit()`.
 - **Actions** : `performEditorAction()` selon `imeOptions`.
 - **Rendu** : `View` custom dessinée sur `Canvas`, interpolation de la disposition par frame ; aucune allocation dans `onDraw`.
+- **Session de saisie** (`nextglyph.engine.session.InputSession`, moteur pur) : toute la logique ci-dessus (composition, lots, validation, annulation, ponctuation, majuscules, langues, barre) ; l'IME ne fait que relayer les événements de la vue et d'`InputConnection`. Les mises à jour de sélection qui suivent les propres modifications de la session sont reconnues (positions attendues) ; toute autre est un déplacement externe : composition validée telle quelle, annulation et espace automatique oubliées.
+- **Retour arrière** : dans le mot en composition, il raccourcit la composition ; ailleurs, il efface un caractère complet (émoji compris) puis remet en composition le mot qui précède le curseur s'il en est la fin.
 
 ### 11.3 Budgets de performance
 

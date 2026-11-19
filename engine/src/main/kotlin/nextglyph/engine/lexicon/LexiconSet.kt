@@ -1,5 +1,7 @@
 package nextglyph.engine.lexicon
 
+import java.util.Locale
+
 /**
  * Plusieurs lexiques d'une même langue lus comme un seul (spec §10.1, §10.5, §6.3).
  *
@@ -18,22 +20,39 @@ package nextglyph.engine.lexicon
  * complément de compte, jamais une copie. Le maximum, envisagé, rendrait les masses des nœuds
  * incohérentes avec les fréquences des formes.
  *
- * [completions] est exacte quand chaque forme n'appartient qu'à un membre (cas des fichiers
- * découpés par source) ; sinon la fréquence de chaque forme renvoyée reste exacte (sommée sur
- * tous les membres), mais une forme répartie entre plusieurs membres sans figurer dans les
- * meilleures formes d'aucun peut manquer (voir `docs/DECISIONS.md`).
+ * [completions] renvoie, pour chaque clé vue parmi les meilleures complétions d'au moins un
+ * membre, toutes ses formes fusionnées (fréquences exactes, sommées sur tous les membres). Elle est
+ * exacte quand chaque forme n'appartient qu'à un membre (cas des fichiers découpés par source) ;
+ * sinon une clé répartie entre plusieurs membres sans figurer dans les meilleures d'aucun peut
+ * manquer (voir `docs/DECISIONS.md`).
+ *
+ * **Membres sans casse** ([caseless]) : un fichier de fréquences qui ne distingue pas la casse
+ * (Lexique 4.10, toutes ses formes en minuscules) donne la fréquence d'une *orthographe*, pas d'une
+ * forme. À la fusion, la fréquence de son orthographe `s` va à la forme `s` des autres membres si
+ * elle existe (`paris` plutôt que `Paris`), sinon à chacune de leurs variantes de casse de `s`
+ * (`Marseille`), sinon reste à `s`. C'est la règle qu'appliquait la liste française unique avant
+ * son découpage par licence (`docs/DATA.md`) : formes et casse viennent de Dicollecte, fréquences
+ * de Lexique, sans qu'aucun fichier ne contienne de données de l'autre source.
  *
  * Immuable et sans état : utilisable depuis plusieurs fils d'exécution comme [Lexicon].
+ *
+ * @param caseless membres de [members] dont les formes sont des orthographes sans casse.
  */
-class LexiconSet(members: List<Lexicon>) {
+class LexiconSet(members: List<Lexicon>, caseless: Collection<Lexicon> = emptyList()) {
 
     /** Les lexiques fusionnés, dans l'ordre fourni. */
     val members: List<Lexicon> = members.toList()
+
+    /** Les membres sans casse (voir la documentation de la classe). */
+    val caseless: List<Lexicon> = caseless.toList()
+
+    private val cased: List<Lexicon> = this.members.filter { member -> this.caseless.none { it === member } }
 
     init {
         require(this.members.isNotEmpty()) { "Un ensemble de lexiques contient au moins un lexique." }
         val languages = this.members.map { primaryLanguage(it.languageTag) }.distinct()
         require(languages.size == 1) { "Les lexiques d'un ensemble doivent être d'une même langue : $languages." }
+        require(this.caseless.all { c -> this.members.any { it === c } }) { "Un membre sans casse doit faire partie de l'ensemble." }
     }
 
     constructor(vararg members: Lexicon) : this(members.toList())
@@ -48,7 +67,7 @@ class LexiconSet(members: List<Lexicon>) {
     val totalMass: Double = members.sumOf { it.distribution("").totalMass }
 
     /** Un nouvel ensemble avec [lexicon] en plus (dictionnaire personnel, contacts). */
-    operator fun plus(lexicon: Lexicon): LexiconSet = LexiconSet(members + lexicon)
+    operator fun plus(lexicon: Lexicon): LexiconSet = LexiconSet(members + lexicon, caseless)
 
     /**
      * Distribution de la lettre suivant [prefix] dans le lexique union : masses additionnées
@@ -84,8 +103,23 @@ class LexiconSet(members: List<Lexicon>) {
     fun displayForms(key: String): List<LexiconEntry> {
         if (members.size == 1) return members[0].displayForms(key)
         val merged = LinkedHashMap<String, Long>()
-        for (member in members) {
+        for (member in cased) {
             for (entry in member.displayForms(key)) merged.merge(entry.form, entry.frequency, ::saturatedSum)
+        }
+        if (caseless.isNotEmpty()) {
+            val casedForms = merged.keys.toList()
+            for (member in caseless) {
+                for (entry in member.displayForms(key)) {
+                    val spelling = entry.form.lowercase(Locale.ROOT)
+                    val variants = casedForms.filter { it.lowercase(Locale.ROOT) == spelling }
+                    val targets = when {
+                        spelling in variants -> listOf(spelling)
+                        variants.isNotEmpty() -> variants
+                        else -> listOf(entry.form)
+                    }
+                    for (target in targets) merged.merge(target, entry.frequency, ::saturatedSum)
+                }
+            }
         }
         return merged.map { LexiconEntry(it.key, key, it.value) }.sortedWith(ENTRY_ORDER)
     }
@@ -100,16 +134,13 @@ class LexiconSet(members: List<Lexicon>) {
     fun completions(prefix: String, limit: Int): List<LexiconEntry> {
         if (members.size == 1) return members[0].completions(prefix, limit)
         require(limit >= 0) { "La limite doit être positive ou nulle ($limit)." }
-        val seen = LinkedHashMap<Pair<String, String>, Long>()
+        val keys = LinkedHashSet<String>()
         for (member in members) {
-            for (entry in member.completions(prefix, limit)) seen.putIfAbsent(entry.key to entry.form, 0L)
+            for (entry in member.completions(prefix, limit)) keys += entry.key
         }
-        // Fréquence exacte de chaque forme vue : somme sur tous les membres.
-        val keys = seen.keys.map { it.first }.distinct()
-        val result = ArrayList<LexiconEntry>(seen.size)
-        for (key in keys) {
-            for (entry in displayForms(key)) if ((key to entry.form) in seen) result += entry
-        }
+        // Formes fusionnées de chaque clé vue, à leur fréquence exacte (somme sur tous les membres).
+        val result = ArrayList<LexiconEntry>()
+        for (key in keys) result += displayForms(key)
         result.sortWith(COMPLETION_ORDER)
         return if (result.size > limit) result.subList(0, limit).toList() else result
     }

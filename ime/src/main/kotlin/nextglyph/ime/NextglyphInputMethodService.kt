@@ -6,48 +6,64 @@ import android.os.Looper
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.view.inputmethod.InputMethodSubtype
-import nextglyph.engine.input.EnterBehavior
-import nextglyph.engine.input.KeyDispatcher
+import nextglyph.engine.adapt.DistributionSource
+import nextglyph.engine.layout.Key
+import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.layout.LayoutKind
-import nextglyph.engine.lexicon.Lexicon
 import nextglyph.engine.lexicon.LexiconLanguage
-import nextglyph.engine.text.WordPrefix
+import nextglyph.engine.lexicon.LexiconSet
+import nextglyph.engine.predict.InMemoryRejectionStore
+import nextglyph.engine.predict.Predictor
+import nextglyph.engine.profile.InputProfileResolver
+import nextglyph.engine.session.InputSession
+import nextglyph.engine.session.PopupAction
+import nextglyph.engine.session.SessionField
 import nextglyph.ime.lexicon.AssetLexicons
 import nextglyph.ime.lexicon.LexiconLoader
 import nextglyph.ime.view.KeyboardView
-import java.util.concurrent.Executor
+import java.util.Locale
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.math.abs
 
 /**
- * Service de méthode de saisie : affiche le clavier adaptatif et relaie les appuis à l'éditeur.
+ * Service de méthode de saisie : câble la vue ([KeyboardView]) et l'éditeur du champ
+ * ([InputConnectionTarget]) à la session de saisie du moteur ([InputSession]), qui décide de tout
+ * (spec §5, §9, §10.6, §11.2).
  *
- * - Le lexique de la langue active (sous-type courant : fr ou en) est chargé en arrière-plan ; le
- *   clavier reste neutre tant qu'il n'est pas prêt.
- * - Le préfixe du mot en cours est relu après chaque frappe et à chaque `onUpdateSelection` (curseur
- *   déplacé, sélection, suppression), puis transmis à la vue (spec §5.2, §11.2). Dans les champs
- *   où l'adaptation n'est pas permise (mot de passe, numérique...), le texte n'est jamais lu.
+ * - Les lexiques des deux langues (français : un fichier par licence ; anglais) sont chargés en
+ *   arrière-plan au démarrage ; le clavier reste neutre et sans suggestions tant qu'ils ne sont pas
+ *   prêts. La langue préférée de départ suit le sous-type, puis la locale système.
+ * - Le comportement par champ vient d'[InputProfileResolver] ; dans les champs qui ne lisent pas
+ *   le texte (mot de passe, pavés), la disposition reste au repos, sans suggestions (M3 à venir).
+ * - Aucun texte saisi n'est journalisé (§12).
  */
 class NextglyphInputMethodService : InputMethodService() {
 
-    private val dispatcher = KeyDispatcher(InputConnectionEditor { currentInputConnection })
-    private var enterBehavior: EnterBehavior = EnterBehavior.EnterKey
+    private val target = InputConnectionTarget { currentInputConnection }
+    private val session = InputSession(target)
+    private val rejections = InMemoryRejectionStore()
+    private val source = DistributionSource { prefix -> session.distribution(prefix) }
     private var keyboardView: KeyboardView? = null
-    private var adaptationAllowed = true
-    private var language = LexiconLanguage.ENGLISH
-    private var lexicon: Lexicon? = null
-    private var worker: java.util.concurrent.ExecutorService? = null
-    private var loader: LexiconLoader? = null
+    private var layoutKind = LayoutKind.QWERTY
+    private var lexicons: Map<String, LexiconSet>? = null
+    private var worker: ExecutorService? = null
+    private var loader: LexiconLoader<Map<String, LexiconSet>>? = null
 
     override fun onCreate() {
         super.onCreate()
+        layoutKind = LayoutKind.defaultForLanguage(resources.configuration.locales.get(0)?.language)
+        session.onStateChanged = { state -> keyboardView?.setState(state) }
         val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nextglyph-lexicon").apply { isDaemon = true } }
         worker = executor
         val handler = Handler(Looper.getMainLooper())
-        val lexicons = AssetLexicons(assets)
-        loader = LexiconLoader(lexicons::open, executor, Executor { handler.post(it) })
-        loadLexicon()
+        val assets = AssetLexicons(assets)
+        val open = { key: String -> assets.openAll(key.split(LANGUAGE_SEPARATOR)) }
+        loader = LexiconLoader(open, executor) { handler.post(it) }.also { loader ->
+            loader.load(LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)) { _, sets ->
+                lexicons = sets
+                installPredictor()
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -56,29 +72,39 @@ class NextglyphInputMethodService : InputMethodService() {
         super.onDestroy()
     }
 
-    override fun onCreateInputView(): View {
-        val systemLanguage = resources.configuration.locales.get(0)?.language
-        return KeyboardView(this).apply {
-            layoutKind = LayoutKind.defaultForLanguage(systemLanguage)
-            onKeyListener = KeyboardView.OnKeyListener { key ->
-                dispatcher.onKey(key, enterBehavior)
-                refreshPrefix(selectionLength = 0)
+    override fun onCreateInputView(): View = KeyboardView(this).apply {
+        layoutKind = this@NextglyphInputMethodService.layoutKind
+        languages = session.predictor?.languages.orEmpty()
+        listener = object : KeyboardView.Listener {
+            override fun onKey(key: Key, upper: Boolean) = session.onKey(key, upper)
+
+            override fun onPopup(action: PopupAction) = when (action) {
+                is PopupAction.Text -> onPopupText(action.text)
+                is PopupAction.LockLanguage -> session.lockLanguage(action.language)
+                PopupAction.CapsLock -> session.toggleCapsLock()
             }
-            setLexicon(lexicon)
-            keyboardView = this
+
+            override fun onBarItem(index: Int) = session.onBarItem(index)
         }
+        setSource(if (session.predictor != null) source else null)
+        setState(session.state)
+        keyboardView = this
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        enterBehavior = EnterBehaviorResolver.resolve(info.imeOptions, info.inputType)
-        adaptationAllowed = AdaptationPolicy.allowsAdaptation(info.inputType)
-        loadLexicon()
+        val profile = InputProfileResolver.resolve(info.inputType, info.imeOptions, info.privateImeOptions)
+        val field = SessionField(profile, EnterBehaviorResolver.resolve(info.imeOptions, info.inputType))
         keyboardView?.let { view ->
             view.resetAdaptation()
-            view.adaptationAllowed = adaptationAllowed
+            view.adaptationAllowed = field.adaptation
         }
-        refreshPrefix(selectionLength = 0)
+        session.onStartInput(field, info.initialSelStart, info.initialSelEnd)
+    }
+
+    override fun onFinishInput() {
+        session.onFinishInput()
+        super.onFinishInput()
     }
 
     override fun onUpdateSelection(
@@ -90,42 +116,33 @@ class NextglyphInputMethodService : InputMethodService() {
         candidatesEnd: Int,
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        refreshPrefix(selectionLength = abs(newSelEnd - newSelStart))
+        session.onSelectionUpdate(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
     }
 
-    override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype?) {
-        super.onCurrentInputMethodSubtypeChanged(newSubtype)
-        loadLexicon(newSubtype)
+    /** Lettre accentuée ou symbole choisi dans un menu d'appui long. */
+    private fun onPopupText(text: String) {
+        val lower = text.lowercase(Locale.ROOT)
+        if (text.length == 1 && text[0].isLetter()) session.onLetter(lower, upper = lower != text) else session.onCharacter(text)
     }
 
-    /** Charge (en arrière-plan) le lexique de la langue du sous-type courant, s'il a changé. */
-    private fun loadLexicon(subtype: InputMethodSubtype? = null) {
-        val current = subtype ?: getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
-        @Suppress("DEPRECATION")
-        val chosen = LexiconLanguage.choose(current?.locale, resources.configuration.locales.get(0)?.toLanguageTag())
-        if (chosen != language) {
-            // Le lexique de l'ancienne langue ne convient plus : clavier neutre jusqu'au nouveau.
-            language = chosen
-            lexicon = null
-            keyboardView?.setLexicon(null)
-        }
-        loader?.load(chosen) { loaded, result ->
-            if (loaded == language) {
-                lexicon = result
-                keyboardView?.setLexicon(result)
-                refreshPrefix(selectionLength = 0)
-            }
+    /** Lexiques chargés : prédicteur bilingue (§10.6) et adaptation par sa distribution mélangée. */
+    private fun installPredictor() {
+        val sets = lexicons ?: return
+        val predictor = Predictor(sets, KeyboardLayouts.of(layoutKind), rejections = rejections)
+        session.setPredictor(predictor, preferredLanguage())
+        keyboardView?.let { view ->
+            view.languages = predictor.languages
+            view.setSource(source)
+            view.setState(session.state)
         }
     }
 
-    /** Relit le texte avant le curseur et transmet le préfixe du mot en cours à la vue. */
-    private fun refreshPrefix(selectionLength: Int) {
-        val view = keyboardView ?: return
-        if (!adaptationAllowed) {
-            view.onPrefix(null)
-            return
-        }
-        val before = currentInputConnection?.getTextBeforeCursor(WordPrefix.LOOKBACK, 0)
-        view.onPrefix(WordPrefix.of(before, selectionLength, language))
+    private fun preferredLanguage(): String {
+        val subtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
+        return LexiconLanguage.choose(subtype?.languageTag, resources.configuration.locales.get(0)?.toLanguageTag())
+    }
+
+    private companion object {
+        const val LANGUAGE_SEPARATOR = "+"
     }
 }

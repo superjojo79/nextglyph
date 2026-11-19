@@ -114,6 +114,11 @@ class WordListPipeline(private val log: (String) -> Unit = {}) {
         )
         val french = prepareCorpus(inputs.tatoebaFr, Language.FR, corpusDir)
         finish(Language.FR, frResult.copy(counters = frCounters), french, listDir)
+        // Listes distribuées : une par licence (fr-lexique, fr-dicollecte), fusionnées par le moteur.
+        val split = FrenchWordList.split(dicollecte.forms, lexique.perMillion)
+        writeList(listDir.resolve("$FRENCH_LEXIQUE.tsv"), split.lexique.entries)
+        writeList(listDir.resolve("$FRENCH_DICOLLECTE.tsv"), split.dicollecte.entries)
+        log("Listes françaises séparées : ${split.lexique.entries.size} formes Lexique, ${split.dicollecte.entries.size} formes Dicollecte")
 
         log("SCOWL et corpus anglais")
         val scowl = ScowlReader.read(
@@ -138,6 +143,17 @@ class WordListPipeline(private val log: (String) -> Unit = {}) {
     }
 
     private class PreparedCorpus(val split: CorpusSplit, val ignored: Int)
+
+    private fun writeList(path: Path, entries: List<WordEntry>) =
+        writeLines(path, sortedForOutput(entries).map { "${it.display}\t${it.frequency}" })
+
+    companion object {
+        /** Liste française des formes et fréquences de Lexique 4.10 (CC BY-SA 4.0). */
+        const val FRENCH_LEXIQUE: String = "fr-lexique"
+
+        /** Liste française des formes de Dicollecte (MPL-2.0). */
+        const val FRENCH_DICOLLECTE: String = "fr-dicollecte"
+    }
 
     private fun prepareCorpus(file: Path, language: Language, corpusDir: Path): PreparedCorpus {
         log("Corpus ${language.code} : lecture de ${file.fileName}")

@@ -43,12 +43,12 @@ Vérifié sur émulateur Android 16 (AZERTY et QWERTY) : adaptation visible apr�
 |---|---|---|
 | Prédiction : ensemble de lexiques, candidats, bilinguisme, validation par espace (`nextglyph.engine.predict`) | En cours | — |
 | Édition : ponctuation, typographie française, majuscules (`nextglyph.engine.edit`) | En cours | — |
-| Intégration IME : barre de suggestions, libellé de l'espace, barre de ponctuation, couche `?123`, accents | À faire | — |
-| Séparation de `fr.nglx` par licence | À faire (après `LexiconSet`) | — |
+| Intégration IME : session de saisie (`nextglyph.engine.session`), barre de suggestions et de ponctuation, libellé de l'espace, bilinguisme, couche `?123`, accents, profils texte | Fait (vérifié sur émulateur) | — |
+| Séparation de `fr.nglx` par licence (`fr-lexique.nglx`, `fr-dicollecte.nglx`) | Fait | — |
 
 ## Problèmes ouverts
 
-- **Licence de `fr.nglx`** : Lexique (CC BY-SA 4.0) et Dicollecte (MPL-2.0) sont incompatibles dans un même fichier. Piste : un fichier par source, fusionnés à l'exécution par le moteur (M2). À trancher avant M5.
+- **Licences des lexiques français** : levé en M2, un fichier par source (`docs/DATA.md`) ; une relecture juridique de l'ensemble des attributions reste prévue avant M5.
 - **Instantané des données Tatoeba** : les exports changent chaque semaine ; il faut un instantané figé pour une recette F-Droid reproductible (avant M5).
 - **Fréquences anglaises** : tirées de Tatoeba (biais « Tom », « Mary ») ; chercher une meilleure source à licence compatible.
 - **Prototype** : n'implémente pas encore la correction des préfixes connus du §5.5 révisé ; ses valeurs par défaut sont alignées sur la spec.

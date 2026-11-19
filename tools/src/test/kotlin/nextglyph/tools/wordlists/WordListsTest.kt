@@ -45,6 +45,25 @@ class WordListsTest {
         }
 
         @Test
+        fun `français séparé par licence - chaque liste ne contient que sa source`() {
+            val split = FrenchWordList.split(
+                dicollecte = listOf("le", "Paris", "l’", "a", "l'"),
+                lexique = mapOf("le" to 12.34, "paris" to 10.0, "l'" to 5.0, "extra" to 0.004, "3d" to 1.0),
+            )
+
+            assertThat(frequencies(split.lexique)).containsExactlyInAnyOrderEntriesOf(
+                mapOf("le" to 1234L, "paris" to 1000L, "l'" to 500L, "extra" to 1L),
+            )
+            assertThat(frequencies(split.dicollecte)).containsExactlyInAnyOrderEntriesOf(
+                mapOf("le" to 1L, "Paris" to 1L, "l'" to 1L, "a" to 1L),
+            )
+            assertThat(split.lexique.exclusions.values.sum()).isEqualTo(1)
+            assertThat(split.lexique.counters).containsEntry("formes Lexique", 5)
+            assertThat(split.dicollecte.exclusions).containsEntry(FrenchWordList.EXCLUSION_DUPLICATE, 1)
+            assertThat(split.dicollecte.counters).containsEntry("formes Dicollecte", 4)
+        }
+
+        @Test
         fun `français - conversion des fréquences`() {
             assertThat(FrenchWordList.scaled(1.0)).isEqualTo(100L)
             assertThat(FrenchWordList.scaled(12.5)).isEqualTo(1250L)
@@ -221,6 +240,9 @@ class WordListsTest {
             assertThat(en.entries).isEmpty()
             assertThat(fr.exclusions).isEmpty()
             assertThat(en.exclusions).isEmpty()
+            val split = FrenchWordList.split(emptyList(), emptyMap())
+            assertThat(split.lexique.entries).isEmpty()
+            assertThat(split.dicollecte.entries).isEmpty()
         }
 
         @Test

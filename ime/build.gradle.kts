@@ -107,7 +107,7 @@ androidComponents {
     }
 }
 
-// Copie fr.nglx et en.nglx dans les assets de chaque variante. Les entrées viennent de la
+// Copie fr-lexique.nglx, fr-dicollecte.nglx et en.nglx (LexiconLanguage.ALL_FILES) dans les assets de chaque variante. Les entrées viennent de la
 // configuration « lexicons » : Gradle construit donc :tools:buildLexicons au besoin, sans copie manuelle.
 abstract class CopyLexiconsTask : DefaultTask() {
     @get:InputFiles
@@ -126,7 +126,7 @@ abstract class CopyLexiconsTask : DefaultTask() {
             from(lexicons.asFileTree.matching { include("*.nglx") })
             into(outputDir)
         }
-        val missing = listOf("fr.nglx", "en.nglx").filterNot { outputDir.file(it).get().asFile.isFile }
+        val missing = listOf("fr-lexique.nglx", "fr-dicollecte.nglx", "en.nglx").filterNot { outputDir.file(it).get().asFile.isFile }
         check(missing.isEmpty()) { "Lexiques absents de la sortie de :tools:buildLexicons : $missing" }
     }
 }
