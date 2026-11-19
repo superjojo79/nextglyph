@@ -68,3 +68,33 @@ Lancement local, émulateur ou appareil connecté (le clavier courant est rétab
 Résultat sur l'émulateur Android 16 le 2026-11-19 : 4 tests, 0 échec (environ 1 min, compilation comprise). Rapport : `ime/build/reports/androidTests/connected/debug/index.html`.
 
 Ce test n'est pas dans la CI : un job GitHub avec émulateur doit démarrer l'émulateur (plusieurs minutes) en plus de la compilation de l'IME et des lexiques, au-delà du budget de 10 minutes. Note : Gradle désinstalle l'application à la fin du test ; réinstaller l'APK de debug et refaire `ime enable` / `ime set` ensuite.
+
+## M4 : apprentissage, contacts, réglages, accessibilité (Android 16)
+
+Même émulateur (API 36, `fr-FR`), le **2026-11-19**. Saisie par `input tap` aux centres des touches, lus dans les **nœuds d'accessibilité virtuels** du clavier (`uiautomator dump` : un nœud `android.widget.Button` par touche, `content-desc` = « A », « Effacer », « Espace, insère zorglub », « Suggestion Zorglub »…). Fichiers lus par `adb shell run-as`. Captures : `shots/m4/` du dossier de travail de la session (non versionnées).
+
+| # | Vérification | Procédure | Attendu | Observé |
+|---|---|---|---|---|
+| M4-1 | Apprentissage d'un mot inconnu | Champ « Texte » : `zorglub␣zorglub␣`, puis `zorg` | `Zorglub zorglub ` ; ensuite barre `zorg / zorglub / organise`, espace `␣ zorglub` | ✔ (capture 01) |
+| M4-2 | Persistance | 3 s après, `no_backup/learned.ngls` ; `am force-stop`, puis `zorg` dans un autre champ | fichier de 911 octets ; `Zorglub` toujours proposé après redémarrage du processus | ✔ |
+| M4-3 | Réglages à chaud | Réglages : QWERTY, Élastique, hauteur 46 dp ; retour au panel (même PID du service) | disposition QWERTY, touche probable élargie, rangées plus hautes | ✔ (captures 03, 04) |
+| M4-4 | Export TSV | « Exporter le dictionnaire », sélecteur du système, Téléchargements | `nextglyph-dictionnaire.tsv` : en-tête puis `fr	zorglub	2` | ✔ |
+| M4-5 | Effacement | « Effacer les données apprises », confirmation | `learned.ngls` supprimé, « 0 mot appris. » | ✔ (capture 06) |
+| M4-6 | Import TSV | « Importer un dictionnaire », fichier exporté | « 1 mot importé, 0 ligne(s) ignorée(s). », fichier réécrit | ✔ (capture 07) |
+| M4-7 | Permission des contacts | Deux contacts créés par `content insert` (Gwendoline Rose, Maxence Pierre) ; interrupteur « Noms des contacts » | explication d'abord, puis demande du système ; accordée, réglage actif | ✔ (captures 08, 09) |
+| M4-8 | Prénom après « Bonjour » | Texte multiligne : `bonjour gwen`, puis `do` | barre avec `Gwendoline` ; puis espace `␣ Gwendoline` | ✔ (captures 10, 11) |
+| M4-9 | Nom-mot courant non imposé | ` le rose ` | `le rose ` (pas `Rose`) | ✔ |
+| M4-10 | Carnet modifié | Contact `Quentoril` ajouté pendant que la fonction est active, 5 s, `bonjour quento` | `Quentoril` proposé (`ContentObserver`) | ✔ |
+| M4-11 | Désactivation | Interrupteur coupé, `bonjour ysol` (contact `Ysolwen Brakmar`) | plus de `Ysolwen` ; avant : `␣ Ysolwen` | ✔ (capture 12 avant) |
+
+### Non vérifié sur l'émulateur
+
+- **TalkBack** : absent de l'image système (`pm list packages` ne le montre pas), et `enabled_accessibility_services` ne peut rien activer sans lui. Vérifié seulement : les nœuds virtuels exposés (libellés, limites, « Espace, insère … »), vus par `uiautomator`, qui passe par la même API. Non vérifiés : exploration au toucher, « relâcher pour saisir », annonce « Inséré : … », contour du focus.
+- **Retour haptique** : l'émulateur n'a pas de vibreur ; seul l'appel de `performHapticFeedback` est en place.
+- **Retrait de la permission depuis les réglages du système** : la coupure est prévue à `onResume` des réglages et à chaque `onStartInputView` ; non rejouée.
+
+### Écart constaté et corrigé
+
+- Premier essai : le service plantait à l'ouverture d'un champ (`IllegalStateException: Accessibility off`) en envoyant un événement d'accessibilité sans service actif. Les envois vérifient désormais `AccessibilityManager.isEnabled`.
+
+`./gradlew :ime:connectedDebugAndroidTest` relancé après M4 (réglages remis aux valeurs par défaut, le test calculant la géométrie avec 38 dp et la disposition de la locale) : 4 tests, 0 échec. L'apprentissage étant coupé en mot de passe, rien n'est écrit dans `dataDir`.

@@ -44,6 +44,21 @@ class ManifestTest {
 
     private val fieldTests = "nextglyph.ime.debug.FieldTestsActivity"
 
+    private val readContacts = "android.permission.READ_CONTACTS"
+
+    /** Permissions admises (§12) : contacts (optionnelle) et vibration. */
+    private val allowed = setOf(readContacts, "android.permission.VIBRATE")
+
+    /** Permissions dangereuses courantes (niveau `dangerous` d'Android), toutes interdites hormis READ_CONTACTS. */
+    private val dangerous = listOf(
+        "READ_CONTACTS", "WRITE_CONTACTS", "GET_ACCOUNTS", "READ_CALENDAR", "WRITE_CALENDAR", "CAMERA", "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION", "READ_PHONE_STATE", "CALL_PHONE",
+        "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_SMS", "SEND_SMS", "RECEIVE_SMS", "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "BODY_SENSORS",
+        "ACTIVITY_RECOGNITION", "POST_NOTIFICATIONS", "NEARBY_WIFI_DEVICES", "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN",
+        "INTERNET", "ACCESS_NETWORK_STATE",
+    ).map { "android.permission.$it" }
+
     @Nested
     inner class HappyPath {
         @Test
@@ -53,8 +68,18 @@ class ManifestTest {
         }
 
         @Test
-        fun `le manifeste fusionné ne déclare aucune permission pour l'instant`() {
-            assertThat(permissionsOf(mergedManifest())).isEmpty()
+        fun `seule READ_CONTACTS est déclarée, et VIBRATE au plus (§12)`() {
+            for (variant in listOf("debug", "release")) {
+                val permissions = permissionsOf(mergedManifest(variant))
+
+                assertThat(permissions).`as`(variant).contains(readContacts)
+                assertThat(permissions).`as`(variant).isSubsetOf(allowed)
+            }
+        }
+
+        @Test
+        fun `aucune autre permission dangereuse`() {
+            assertThat(permissionsOf(mergedManifest()) - readContacts).doesNotContainAnyElementsOf(dangerous)
         }
 
         @Test
@@ -123,6 +148,19 @@ class ManifestTest {
             )
 
             assertThat(activitiesOf(document)).containsExactly(fieldTests)
+        }
+
+        @Test
+        fun `le contrôle repère une permission dangereuse ajoutée`() {
+            val document = parse(
+                """<manifest xmlns:android="$android">
+                     <uses-permission android:name="$readContacts"/>
+                     <uses-permission android:name="android.permission.CAMERA"/>
+                   </manifest>""",
+            )
+
+            assertThat(permissionsOf(document) - readContacts).containsAnyElementsOf(dangerous)
+            assertThat(permissionsOf(document)).isNotEmpty().matches { !allowed.containsAll(it) }
         }
 
         @Test

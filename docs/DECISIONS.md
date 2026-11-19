@@ -422,3 +422,28 @@ Le moteur fournissait depuis M3 (moteur) `InputProfileResolver`, `SpecialLayouts
 - **Couche `?123` du mot de passe étirée sur six rangées** : touches de plus de 80 dp de haut, sans intérêt ; alignée en haut, `ABC` serait loin de `?123`.
 - **Libellé « Disposition classique » en entier** : ne tient pas dans une case du menu (8 cases sur 360 dp) ; « Classique » est réduit si besoin pour tenir.
 - **Garder la disposition classique pour tous les champs de l'application** : un champ correctement typé retomberait sur une disposition sans adaptation sans que la personne le demande.
+## 2026-11-19 — M4 dans l'IME : apprentissage, contacts, réglages, accessibilité
+
+### Contexte
+
+Le moteur fournissait le dictionnaire personnel, la mémoire des refus persistante, le modèle spatial, les contacts et leur persistance, sans rien de branché dans l'IME : la session utilisait un `InMemoryRejectionStore`, aucun mot n'était appris, l'écran de réglages ne faisait qu'expliquer l'activation, et TalkBack ne voyait qu'une vue opaque.
+
+### Décision
+
+- **Session** (`nextglyph.engine.session`, pur, testé) : `PredictionStack` réunit les prédicteurs (lexiques des langues actives, augmentés des mots promus puis des noms, un prédicteur par niveau de contexte des contacts) ; la session choisit le niveau à chaque prédiction d'après `ContactContext.read` (texte avant le curseur, champ, majuscule tapée). `SessionLearning` relie les événements au dictionnaire personnel et au modèle spatial (voir §10.5) ; la vue transmet la position de chaque frappe de lettre relativement à la touche au repos (`TapOffset`). Les règles de `LearningPolicy` restent la seule source de vérité (rien en incognito, mot de passe, code PIN, pavés ; pas de mots en e-mail ni en URL).
+- **Reconstruction en arrière-plan** : quand les mots promus, les contacts, les langues actives ou la disposition changent, l'IME copie le dictionnaire personnel sur le fil de l'interface (`PersonalDictionary.copy`, quelques millisecondes), construit la `PredictionStack` sur le fil des lexiques, puis l'installe ; une reconstruction plus récente rend les précédentes caduques. La frappe continue avec les anciens prédicteurs entre-temps.
+- **Persistance** (`LearnedStore`) : état sérialisé sur le fil de l'interface (quelques dizaines de kilo-octets au plus), écrit en arrière-plan par un fil unique, de façon atomique (`AtomicFiles` : fichier temporaire, `fsync`, `Files.move` atomique), 3 s après un changement, à la sortie du champ et à l'arrêt du service. `InputStream.readNBytes` n'existant sur Android qu'à partir de l'API 33, les lectures bornées du moteur passent par `ByteCodec.readAtMost`.
+- **Contacts : mémoire seulement.** Les noms sont relus du carnet (`ContactsContract.Data`, prénom, nom, deuxième prénom, surnom) au démarrage du clavier, à l'activation, et 2 s après une notification du `ContentObserver` ; ils ne sont jamais écrits sur le disque (le §6.2 prévoyait un stockage séparé : moins de données au repos, et la lecture du carnet est rapide). Permission `READ_CONTACTS` déclarée, demandée seulement depuis les réglages, après une explication ; refusée ou retirée, la fonction est coupée et les noms effacés.
+- **Réglages** : activité en vues du cadre Android (pas d'AndroidX : aucune dépendance nouvelle) ; `SharedPreferences` partagées avec le service (même processus) qui les écoute et applique tout à chaud : disposition, langues, langue préférée, mode d'adaptation, hauteur des rangées, validation par espace, prudence, typographie, double espace, contacts, retour haptique. **Variante anglaise** et **aperçu agrandi** non proposés (un seul lexique anglais ; pas d'aperçu). Lecture tolérante (`KeyboardSettings.read`) : toute valeur invalide prend la valeur par défaut.
+- **Retour haptique** : `performHapticFeedback` à l'appui d'une touche (`CLOCK_TICK`, `KEYBOARD_TAP`, `LONG_PRESS` selon l'intensité), aucune permission `VIBRATE`. Le réglage système « Retour tactile » reste prioritaire.
+- **Accessibilité** : `AccessibilityNodeProvider` maison (cadre Android) plutôt qu'`ExploreByTouchHelper` (androidx.customview) : une centaine de lignes, aucune dépendance. Les événements d'accessibilité ne sont envoyés que si l'`AccessibilityManager` est actif (sinon Android lève une exception — constaté sur l'émulateur au premier essai). Contour du focus TalkBack ajouté (couleurs vérifiées ≥ 3:1). La validation par espace annonce « Inséré : <mot> ».
+- **Suppression d'un mot appris** : appui long sur une suggestion de la barre (§10.5), confirmé par un message.
+
+### Alternatives écartées
+
+- **PreferenceFragment d'AndroidX** (Apache-2.0) : tire AndroidX Fragment, Core, Lifecycle… pour une quinzaine de réglages ; les vues du cadre suffisent.
+- **`PreferenceActivity` du cadre** : dépréciée ; les avertissements sont des erreurs.
+- **Écriture synchrone dans `onFinishInput`** : bloque le fil de l'interface sur le disque.
+- **`android.util.AtomicFile`** : garde une copie de secours plutôt qu'un renommage, et n'est pas testable sur la JVM.
+- **Persister le sous-lexique des contacts** : demandé par le §6.2, mais sans gain mesurable et avec des noms au repos sur le disque.
+- **Annoncer les lettres probables en premier** (§13) : demanderait un ordre des nœuds qui change à chaque frappe, déroutant à l'exploration ; reporté.

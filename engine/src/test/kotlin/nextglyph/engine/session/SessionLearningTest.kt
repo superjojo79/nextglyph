@@ -196,6 +196,39 @@ class SessionLearningTest {
         }
 
         @Test
+        fun `les 64 dernières lettres restent alignées sur leurs frappes`() {
+            repeat(64) { learning.onLetter("a", tap, text) }
+            repeat(6) { learning.onLetter("é", null, text) }
+
+            repeat(70) { learning.onErase() }
+            learning.onWordEnded()
+
+            assertThat(data.spatial.sampleCount('a')).isEqualTo(6)
+        }
+
+        @Test
+        fun `un choix dans la barre intègre d'abord le mot validé avant lui, puis peut être annulé`() {
+            typeWord("le")
+            learning.onValidated(literal("le"), language, text, false)
+
+            learning.onSuggestionPicked("zorglub", true, language, text, false)
+            learning.onErase()
+
+            assertThat(data.spatial.sampleCount('l')).isEqualTo(1)
+            assertThat(data.personal.pendingWords().map { it.form }).containsExactly("le")
+        }
+
+        @Test
+        fun `après la fin d'un mot, un retour arrière n'annule plus la validation précédente`() {
+            learning.onValidated(literal("zorglub"), language, text, false)
+
+            learning.onWordEnded()
+            learning.onErase()
+
+            assertThat(data.personal.pendingSize).isEqualTo(1)
+        }
+
+        @Test
         fun `deux validations sans lettre entre elles - la première est intégrée`() {
             typeWord("le")
             learning.onValidated(literal("le"), language, text, false)

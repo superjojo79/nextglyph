@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings (spec §14). -->
+    <string name="pref_section_keyboard">Keyboard</string>
+    <string name="pref_layout">Layout</string>
+    <string name="pref_layout_auto">System language</string>
+    <string name="pref_layout_azerty">AZERTY</string>
+    <string name="pref_layout_qwerty">QWERTY</string>
+    <string name="pref_adaptation">Adaptation mode</string>
+    <string name="pref_adaptation_off">Off</string>
+    <string name="pref_adaptation_calm">Calm</string>
+    <string name="pref_adaptation_calm_reinforced">Reinforced calm</string>
+    <string name="pref_adaptation_elastic">Elastic</string>
+    <string name="pref_row_height">Row height</string>
+    <string name="pref_row_height_value">%1$d dp</string>
+    <string name="pref_haptics">Haptic feedback</string>
+    <string name="pref_haptics_off">Off</string>
+    <string name="pref_haptics_light">Light</string>
+    <string name="pref_haptics_medium">Medium</string>
+    <string name="pref_haptics_strong">Strong</string>
+
+    <string name="pref_section_languages">Languages</string>
+    <string name="pref_languages">Active languages</string>
+    <string name="pref_languages_both">French and English</string>
+    <string name="pref_language_fr">French</string>
+    <string name="pref_language_en">English</string>
+    <string name="pref_preferred_language">Preferred starting language</string>
+    <string name="pref_preferred_auto">System language</string>
+
+    <string name="pref_section_typing">Typing</string>
+    <string name="pref_autocommit">Commit on space</string>
+    <string name="pref_autocommit_summary">Space completes or corrects the word when one candidate dominates. ⌫ right after undoes it.</string>
+    <string name="pref_prudence">Commit caution</string>
+    <string name="pref_prudence_cautious">Cautious</string>
+    <string name="pref_prudence_normal">Normal</string>
+    <string name="pref_prudence_bold">Bold</string>
+    <string name="pref_french_typography">French typography</string>
+    <string name="pref_french_typography_summary">Non-breaking space before ; ! ? : and inside quotes.</string>
+    <string name="pref_double_space">Double space → period</string>
+    <string name="pref_double_space_summary">Two spaces end the sentence with a period.</string>
+
+    <string name="pref_section_contacts">Contacts</string>
+    <string name="pref_contacts">Contact names</string>
+    <string name="pref_contacts_summary">Suggests the first and last names of your contacts. They stay on the device, in memory only; turning this off erases them at once.</string>
+    <string name="contacts_rationale">To suggest your contacts\' names, Nextglyph needs to read your address book. Only names are read; they never leave the device (Nextglyph has no network access) and are not saved. You can turn this off at any time.</string>
+    <string name="contacts_continue">Continue</string>
+    <string name="contacts_denied">Permission denied: contact names are not suggested.</string>
+
+    <string name="pref_section_learned">Learned data</string>
+    <string name="learned_loading">Loading…</string>
+    <plurals name="learned_summary">
+        <item quantity="one">%1$d learned word.</item>
+        <item quantity="other">%1$d learned words.</item>
+    </plurals>
+    <string name="pref_export">Export dictionary (TSV)</string>
+    <string name="pref_import">Import a dictionary (TSV)</string>
+    <string name="pref_clear">Erase learned data</string>
+    <string name="clear_confirm">Learned words, rejected corrections and the typing model will be erased. This cannot be undone.</string>
+    <string name="clear_action">Erase</string>
+    <string name="clear_done">Learned data erased.</string>
+    <string name="export_done">Dictionary exported.</string>
+    <string name="export_failed">Export failed.</string>
+    <string name="import_failed">Import failed: unreadable file.</string>
+    <string name="import_unsupported">Import failed: unknown file version.</string>
+    <plurals name="import_done">
+        <item quantity="one">%1$d word imported, %2$d line(s) skipped.</item>
+        <item quantity="other">%1$d words imported, %2$d line(s) skipped.</item>
+    </plurals>
+    <string name="learned_word_removed">\"%1$s\" removed from the personal dictionary.</string>
+
+    <!-- Accessibility (spec §13). -->
+    <string name="a11y_space">Space</string>
+    <string name="a11y_space_inserts">Space, inserts %1$s</string>
+    <string name="a11y_backspace">Delete</string>
+    <string name="a11y_enter">Enter</string>
+    <string name="a11y_enter_send">Send</string>
+    <string name="a11y_enter_search">Search</string>
+    <string name="a11y_enter_go">Go</string>
+    <string name="a11y_enter_next">Next</string>
+    <string name="a11y_enter_previous">Previous</string>
+    <string name="a11y_enter_done">Done</string>
+    <string name="a11y_symbols">Symbols</string>
+    <string name="a11y_letters">Letters</string>
+    <string name="a11y_shift">Shift</string>
+    <string name="a11y_shift_on">on</string>
+    <string name="a11y_shift_locked">locked</string>
+    <string name="a11y_suggestion">Suggestion %1$s</string>
+    <string name="a11y_inserted">Inserted: %1$s</string>
+</resources>

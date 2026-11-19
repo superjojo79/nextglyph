@@ -68,5 +68,12 @@
             android:layout_marginTop="8dp"
             android:minHeight="48dp"
             android:text="@string/settings_choose_keyboard" />
+
+        <!-- Réglages du §14, construits par SettingsActivity. -->
+        <LinearLayout
+            android:id="@+id/settings_preferences"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
     </LinearLayout>
 </ScrollView>

@@ -88,6 +88,14 @@ class ContactContextReadTest {
         }
 
         @Test
+        fun `mot en cours illisible (chiffres) - le texte entier précède`() {
+            val context = read("Bonjour 42")
+
+            assertThat(context.previousWord).isNull()
+            assertThat(context.atMessageStart).isFalse()
+        }
+
+        @Test
         fun `texte vide`() {
             assertThat(read("")).isEqualTo(ContactContext(atMessageStart = true))
         }
