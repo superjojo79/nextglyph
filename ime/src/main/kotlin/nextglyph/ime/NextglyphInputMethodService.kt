@@ -179,6 +179,10 @@ class NextglyphInputMethodService : InputMethodService() {
 
             override fun onEmoji(emoji: String) = onEmojiChosen(emoji)
 
+            override fun onCursorSteps(steps: Int) = moveCursor(steps)
+
+            override fun onDeleteWord() = session.onDeleteWord()
+
             override fun onBarItem(index: Int) = session.onBarItem(index)
 
             override fun onBarItemLongPress(index: Int) = forgetSuggestion(index)
@@ -297,6 +301,12 @@ class NextglyphInputMethodService : InputMethodService() {
         val now = SystemClock.uptimeMillis()
         connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, event.keyCode, 0, event.meta))
         connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, event.keyCode, 0, event.meta))
+    }
+
+    /** Glisser sur l'espace (§5.9) : flèches gauche ou droite, une par pas, comme sur un clavier physique. */
+    private fun moveCursor(steps: Int) {
+        val key = if (steps < 0) PcKey.LEFT else PcKey.RIGHT
+        repeat(kotlin.math.abs(steps)) { sendKeyEvent(PcKeyEvent(key.keyCode, 0)) }
     }
 
     private fun showModifiers() {

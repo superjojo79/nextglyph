@@ -13,6 +13,7 @@ import nextglyph.engine.input.EditOperation
 import nextglyph.engine.input.EnterBehavior
 import nextglyph.engine.input.TextEdit
 import nextglyph.engine.input.TextUnits
+import nextglyph.engine.input.WordDeletion
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.lexicon.Distribution
@@ -361,6 +362,38 @@ class InputSession(
                         cursor = UNKNOWN
                     }
                     reopenComposing()
+                }
+            }
+        }
+        refresh()
+    }
+
+    /**
+     * Glisser vers la gauche depuis ⌫ (§5.9, issue #33), un appel par pas : efface le mot précédent (espaces
+     * de fin comprises, [WordDeletion]) ou la sélection. Le mot en cours est abandonné pour l'apprentissage.
+     * Dans un champ qui ne lit pas le texte, envoie simplement la touche Retour arrière.
+     */
+    fun onDeleteWord() {
+        undo = null
+        editState = EditState.INITIAL
+        learning?.onWordAbandoned()
+        if (!field.readsText) {
+            target.sendBackspaceKey()
+            cursor = UNKNOWN
+            selectionLength = 0
+            refresh()
+            return
+        }
+        batch {
+            finishComposing()
+            if (selectionLength > 0) {
+                target.commitText("")
+                selectionLength = 0
+            } else {
+                val n = WordDeletion.length(target.textBeforeCursor(LOOKBACK))
+                if (n > 0) {
+                    target.deleteBefore(n)
+                    move(-n)
                 }
             }
         }

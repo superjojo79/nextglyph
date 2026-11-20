@@ -26,6 +26,7 @@ import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.adapt.TapDecoding
 import nextglyph.engine.edit.ShiftState
 import nextglyph.engine.emoji.EmojiCatalog
+import nextglyph.engine.input.DragSteps
 import nextglyph.engine.input.PcKey
 import nextglyph.engine.input.PcLayout
 import nextglyph.engine.input.PcModifier
@@ -87,6 +88,12 @@ class KeyboardView(context: Context) : View(context) {
 
         /** Émoji choisi dans le panneau (§5.11). */
         fun onEmoji(emoji: String)
+
+        /** Glisser horizontalement sur l'espace (§5.9) : déplacer le curseur de [steps] caractères (négatif : à gauche). */
+        fun onCursorSteps(steps: Int)
+
+        /** Glisser vers la gauche depuis ⌫ (§5.9) : effacer le mot précédent, une fois par pas. */
+        fun onDeleteWord()
     }
 
     var listener: Listener? = null
@@ -222,6 +229,9 @@ class KeyboardView(context: Context) : View(context) {
     private val pressedKey = IntArray(MAX_POINTERS) { NONE }
     private val downKey = arrayOfNulls<Key>(MAX_POINTERS)
     private val downY = FloatArray(MAX_POINTERS)
+
+    /** Gestes d'édition en cours par pointeur (§5.9) : glisser sur l'espace ou depuis ⌫. */
+    private val drags = arrayOfNulls<DragSteps>(MAX_POINTERS)
     private var barPointer = NONE
     private var barPressed = NONE
     private var barLongPressed = false
@@ -959,6 +969,10 @@ class KeyboardView(context: Context) : View(context) {
                 if (id < MAX_POINTERS) {
                     downKey[id] = decoded?.key
                     downY[id] = y
+                    drags[id] = decoded?.key?.kind?.takeIf { it in DRAG_KINDS }?.let {
+                        val unit = width / KeyboardLayout.ROW_UNITS
+                        DragSteps(x, y, unit * DRAG_ACTIVATION_UNITS, unit * if (it == KeyKind.SPACE) CURSOR_STEP_UNITS else WORD_STEP_UNITS)
+                    }
                 }
                 scheduleLongPress(id, decoded?.key, x, y)
             }
@@ -973,6 +987,7 @@ class KeyboardView(context: Context) : View(context) {
                         }
                         continue
                     }
+                    if (id < MAX_POINTERS && onDrag(id, event.getX(index), event.getY(index))) continue
                     if (id == longPressPointer && movedTooFar(event.getX(index), event.getY(index))) cancelPendingPopup()
                     if (id < MAX_POINTERS && pressedRow[id] != NONE) {
                         decode(event.getX(index), event.getY(index), rest)?.let { press(id, it.rowIndex, it.keyIndex) }
@@ -998,6 +1013,16 @@ class KeyboardView(context: Context) : View(context) {
                     commitPopup()
                     return true
                 }
+                if (id < MAX_POINTERS && drags[id]?.active == true) {
+                    // Geste d'édition terminé : la touche n'est pas tapée.
+                    drags[id] = null
+                    press(id, NONE, NONE)
+                    downKey[id] = null
+                    keyboard.pointerUp(now)
+                    invalidate()
+                    return true
+                }
+                if (id < MAX_POINTERS) drags[id] = null
                 val x = event.getX(index)
                 val y = event.getY(index)
                 val decoded = if (id < MAX_POINTERS) decode(x, y, rest) else null
@@ -1024,6 +1049,7 @@ class KeyboardView(context: Context) : View(context) {
                 pressedRow.fill(NONE)
                 pressedKey.fill(NONE)
                 downKey.fill(null)
+                drags.fill(null)
                 barPointer = NONE
                 barPressed = NONE
                 removeCallbacks(barLongPress)
@@ -1033,6 +1059,27 @@ class KeyboardView(context: Context) : View(context) {
                 invalidate()
             }
             else -> return false
+        }
+        return true
+    }
+
+    /**
+     * Pointeur [id] en `(x, y)` pendant un geste d'édition possible : vrai si le geste est actif (le
+     * déplacement ne doit plus changer la touche enfoncée). Chaque pas donne un léger retour haptique.
+     */
+    private fun onDrag(id: Int, x: Float, y: Float): Boolean {
+        val drag = drags[id] ?: return false
+        val steps = drag.move(x, y)
+        if (!drag.active) return false
+        if (id == longPressPointer) cancelPendingPopup()
+        if (steps != 0) {
+            when (downKey[id]?.kind) {
+                KeyKind.SPACE -> listener?.onCursorSteps(steps)
+                // Seul le glissement vers la gauche efface ; revenir vers la droite ne restaure rien.
+                KeyKind.BACKSPACE -> repeat(-steps) { listener?.onDeleteWord() }
+                else -> Unit
+            }
+            if (haptics != HapticLevel.OFF) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
         return true
     }
@@ -1181,6 +1228,12 @@ class KeyboardView(context: Context) : View(context) {
         /** Largeur du bouton `⚙` de la barre (issue #27). */
         private const val GEAR_DP = 40f
         private const val SWIPE_UP_ROWS = 0.6f
+
+        /** Gestes d'édition (§5.9) : touches concernées, seuil d'activation et longueur d'un pas, en unités. */
+        private val DRAG_KINDS = setOf(KeyKind.SPACE, KeyKind.BACKSPACE)
+        private const val DRAG_ACTIVATION_UNITS = 0.6f
+        private const val CURSOR_STEP_UNITS = 0.4f
+        private const val WORD_STEP_UNITS = 0.8f
 
         /** Touches qui réagissent au glissement vers le haut. */
         private val SWIPE_UP_KINDS = setOf(KeyKind.LETTER, KeyKind.SPACE)

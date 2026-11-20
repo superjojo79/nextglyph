@@ -288,8 +288,8 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 |---|---|
 | Glisser vers le haut sur une lettre | Majuscule |
 | Glisser vers le haut sur l'espace | Insère la suggestion centrale, même si elle ne domine pas (comme un tap sur elle), puis une espace ; sans suggestion, une espace |
-| Glisser vers la gauche depuis ⌫ | Efface le mot précédent (répété en continuant) |
-| Glisser horizontalement sur l'espace | Déplace le curseur |
+| Glisser vers la gauche depuis ⌫ | Efface le mot précédent (espaces de fin comprises ; à défaut de mot, un signe), puis un de plus tous les 0,8 u en continuant ; revenir vers la droite ne restaure rien (issue #33) |
+| Glisser horizontalement sur l'espace | Déplace le curseur d'un caractère tous les 0,4 u (flèches ← → envoyées au champ, mot en cours validé tel quel) ; le geste s'active après 0,6 u horizontal, plus qu'en vertical, et la touche n'est alors pas tapée (issue #33) |
 | Appui long sur `?123` | Menu ponctuation rapide / panneau « PC » (§5.10) / « Disposition classique » |
 | Appui long sur une lettre | Variantes accentuées |
 | Appui long sur `↵` | Panneau des émojis (§5.11), dans les profils qui affichent la barre de suggestions |
