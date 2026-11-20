@@ -109,7 +109,11 @@ class SettingsActivity : Activity() {
                 storedName(AdaptationMode.ELASTIC) to R.string.pref_adaptation_elastic,
             ),
         )
-        rowHeight(root, current.rowHeightDp)
+        slider(
+            root, R.string.pref_row_height, KeyboardSettings.KEY_ROW_HEIGHT,
+            KeyboardSettings.MIN_ROW_HEIGHT_DP..KeyboardSettings.MAX_ROW_HEIGHT_DP, current.rowHeightDp,
+        )
+        slider(root, R.string.pref_bottom_margin, KeyboardSettings.KEY_BOTTOM_MARGIN, 0..KeyboardSettings.MAX_BOTTOM_MARGIN_DP, current.bottomMarginDp)
         choice(
             root, R.string.pref_haptics, KeyboardSettings.KEY_HAPTICS, storedName(current.haptics),
             listOf(
@@ -333,21 +337,22 @@ class SettingsActivity : Activity() {
         return switch
     }
 
-    private fun rowHeight(root: LinearLayout, current: Int) {
-        label(root, R.string.pref_row_height)
+    /** Curseur d'un réglage en dp ([range]), enregistré sous [key] (hauteur des rangées, marge basse). */
+    private fun slider(root: LinearLayout, title: Int, key: String, range: IntRange, current: Int) {
+        label(root, title)
         val value = text(root, getString(R.string.pref_row_height_value, current))
         root.addView(
             SeekBar(this).apply {
-                max = KeyboardSettings.MAX_ROW_HEIGHT_DP - KeyboardSettings.MIN_ROW_HEIGHT_DP
-                progress = current - KeyboardSettings.MIN_ROW_HEIGHT_DP
+                max = range.last - range.first
+                progress = current - range.first
                 minimumHeight = dp(MIN_TOUCH_DP)
-                contentDescription = getString(R.string.pref_row_height)
+                contentDescription = getString(title)
                 setOnSeekBarChangeListener(
                     object : SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                            val dp = progress + KeyboardSettings.MIN_ROW_HEIGHT_DP
+                            val dp = progress + range.first
                             value.text = getString(R.string.pref_row_height_value, dp)
-                            if (fromUser) preferences.edit().putInt(KeyboardSettings.KEY_ROW_HEIGHT, dp).apply()
+                            if (fromUser) preferences.edit().putInt(key, dp).apply()
                         }
 
                         override fun onStartTrackingTouch(bar: SeekBar) = Unit

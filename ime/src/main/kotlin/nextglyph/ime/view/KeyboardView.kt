@@ -122,6 +122,17 @@ class KeyboardView(context: Context) : View(context) {
     /** Intensité du retour haptique à l'appui d'une touche (§14). */
     var haptics: HapticLevel = HapticLevel.MEDIUM
 
+    /** Marge basse réglée (§14), ajoutée aux encarts système ; appliquée aussitôt. */
+    var bottomMarginDp: Int = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            applyBottomPadding()
+        }
+
+    /** Encarts système du bas reçus en dernier, en pixels (§13). */
+    private var systemBottomInsetsPx: List<Int> = emptyList()
+
     private val descriptions = KeyDescriptions { id, arg -> if (arg == null) context.getString(id) else context.getString(id, arg) }
     private val hostRef = AccessibilityHost()
     private val accessibility = KeyboardAccessibility(this, hostRef)
@@ -481,17 +492,29 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
-        val bottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            insets.getInsets(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout()).bottom
+        systemBottomInsetsPx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Navigation par gestes avec les boutons du clavier : la barre est un encart captionBar() (#20).
+            listOf(
+                WindowInsets.Type.navigationBars(),
+                WindowInsets.Type.captionBar(),
+                WindowInsets.Type.tappableElement(),
+                WindowInsets.Type.displayCutout(),
+            ).map { insets.getInsets(it).bottom }
         } else {
             @Suppress("DEPRECATION")
-            insets.systemWindowInsetBottom
+            listOf(insets.systemWindowInsetBottom)
         }
+        applyBottomPadding()
+        return insets
+    }
+
+    /** Padding bas : encarts système et marge réglée (§13, §14). */
+    private fun applyBottomPadding() {
+        val bottom = BottomInset.resolve(systemBottomInsetsPx, Math.round(bottomMarginDp * density))
         if (bottom != paddingBottom) {
             setPadding(paddingLeft, paddingTop, paddingRight, bottom)
             requestLayout()
         }
-        return insets
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

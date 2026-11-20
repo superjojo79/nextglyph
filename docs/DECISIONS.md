@@ -447,3 +447,22 @@ Le moteur fournissait le dictionnaire personnel, la mémoire des refus persistan
 - **`android.util.AtomicFile`** : garde une copie de secours plutôt qu'un renommage, et n'est pas testable sur la JVM.
 - **Persister le sous-lexique des contacts** : demandé par le §6.2, mais sans gain mesurable et avec des noms au repos sur le disque.
 - **Annoncer les lettres probables en premier** (§13) : demanderait un ordre des nœuds qui change à chaque frappe, déroutant à l'exploration ; reporté.
+
+---
+
+## 2026-11-20 — Marge basse du clavier (issue #20)
+
+### Contexte
+
+Sur Galaxy S25 Ultra (navigation par gestes, boutons « changer de clavier » et « masquer le clavier » activés), la rangée du bas était recouverte par ces boutons et par la poignée de gestes : le clavier ne réservait aucune marge. Le padding bas ne lisait que `navigationBars() | displayCutout()`, vérifié seulement sur émulateur.
+
+### Décision
+
+- Padding bas = maximum des encarts du bas `navigationBars()`, `captionBar()`, `tappableElement()`, `displayCutout()` (`BottomInset`, testé sur la JVM). Quand le système dessine lui-même la barre des boutons du clavier dans la fenêtre de l'IME, il la déclare comme `captionBar()`, et non comme barre de navigation. Les encarts se superposent depuis le bord bas : maximum, pas somme.
+- Réglage **Marge basse** (0–48 dp, défaut 0) ajouté au padding, appliqué à chaud : filet de sécurité pour les surcouches de constructeur qui ne déclarent aucun encart, et choix de confort (« pouvoir paramétrer le positionnement »).
+
+### Alternatives écartées
+
+- **`mandatorySystemGestures()`** : réserverait la zone de gestes même quand le système ne dessine rien dessus ; la marge réglable couvre ce besoin.
+- **Hauteur de la barre de navigation lue dans les ressources du système** (`navigation_bar_height`) : identifiant interne, non garanti, signalé par lint.
+

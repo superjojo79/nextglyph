@@ -13,6 +13,7 @@
     <string name="pref_adaptation_elastic">Elastic</string>
     <string name="pref_row_height">Row height</string>
     <string name="pref_row_height_value">%1$d dp</string>
+    <string name="pref_bottom_margin">Bottom margin (above system buttons)</string>
     <string name="pref_haptics">Haptic feedback</string>
     <string name="pref_haptics_off">Off</string>
     <string name="pref_haptics_light">Light</string>
