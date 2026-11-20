@@ -34,6 +34,9 @@ sealed interface PopupAction {
 
     /** Affiche le panneau des émojis (§5.11). */
     data object EmojiPanel : PopupAction
+
+    /** Ouvre l'historique du presse-papiers (issue #35). */
+    data object Clipboard : PopupAction
 }
 
 /** Menu de l'appui long sur `?123`, selon la disposition affichée (§4, §5.6, §7.1). */
@@ -173,6 +176,9 @@ object KeyPopups {
     /** Libellé de la case qui ouvre les réglages. */
     const val SETTINGS_LABEL: String = "⚙"
 
+    /** Case du menu rapide qui ouvre l'historique du presse-papiers (issue #35). */
+    const val CLIPBOARD_LABEL: String = "📋"
+
     /** Libellés courts des modes d'adaptation (§5.2), dans l'ordre du cycle du menu rapide. */
     val ADAPTATION_LABELS: Map<AdaptationMode, String> = linkedMapOf(
         AdaptationMode.OFF to "Fixe",
@@ -200,6 +206,7 @@ object KeyPopups {
         }
         return listOf(
             PopupItem(SETTINGS_LABEL, PopupAction.OpenSettings),
+            PopupItem(CLIPBOARD_LABEL, PopupAction.Clipboard),
             PopupItem(ADAPTATION_LABELS.getValue(next), PopupAction.SetAdaptation(next)),
             PopupItem(other.name, PopupAction.SetLayout(other)),
         ) + classic

@@ -24,6 +24,27 @@ class EmojiPanelTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `presse-papiers - deux colonnes de textes, onglet 📋, tap sur un texte`() {
+            val clip = EmojiPanel(EmojiCatalog(emptyList()), 2, 3, "📋", fitText = true).apply {
+                recents = listOf("https://exemple.org", "Bonjour")
+                open()
+                layout(400f, 40f, 120f)
+            }
+
+            assertThat(clip.tabLabels).containsExactly("ABC", "📋", "⌫")
+            assertThat(clip.tap(250f, 50f)).isEqualTo(EmojiPanel.Action.Insert("Bonjour"))
+            assertThat(clip.cellAt(10f, 100f)).isEqualTo(-1)
+        }
+
+        @Test
+        fun `texte raccourci - une ligne, points de suspension`() {
+            val measure = { t: String -> t.length * 10f }
+
+            assertThat(EmojiPanel.fit("un\n deux", 100f, measure)).isEqualTo("un deux")
+            assertThat(EmojiPanel.fit("abcdefghijkl", 50f, measure)).isEqualTo("abcd…")
+        }
+
+        @Test
         fun `onglets - ABC, récents, premier émoji de chaque groupe, effacement`() {
             assertThat(panel().tabLabels).containsExactly("ABC", "🕘", "😀", "🐶", "⌫")
         }
@@ -69,6 +90,11 @@ class EmojiPanelTest {
     @Nested
     inner class ErrorCases {
         @Test
+        fun `texte raccourci - largeur trop petite, rien`() {
+            assertThat(EmojiPanel.fit("abc", 5f) { it.length * 10f }).isEmpty()
+        }
+
+        @Test
         fun `récents vides - ouverture sur le premier groupe`() {
             val panel = panel()
 
@@ -106,6 +132,15 @@ class EmojiPanelTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `texte raccourci - jamais au milieu d'un émoji, largeur exacte acceptée`() {
+            val measure = { t: String -> t.length * 10f }
+
+            assertThat(EmojiPanel.fit("ab😀cd", 40f, measure)).isEqualTo("ab…")
+            assertThat(EmojiPanel.fit("abcd", 40f, measure)).isEqualTo("abcd")
+            assertThat(EmojiPanel(catalog, 2, 3).columns * EmojiPanel(catalog, 2, 3).rows).isEqualTo(6)
+        }
+
         @Test
         fun `glissement trop court - tap au point d'appui`() {
             val panel = panel()

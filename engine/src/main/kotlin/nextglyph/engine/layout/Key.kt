@@ -34,6 +34,9 @@ enum class KeyKind {
 
     /** Touche du panneau PC (§5.10) : envoie un événement clavier, désigné par son libellé (`PcKey.of`). */
     PC,
+
+    /** Touche du panneau Navigation (issue #37) : déplacement, sélection, copier-coller, désignée par son libellé (`NavKey.of`). */
+    NAV,
 }
 
 /**
@@ -61,6 +64,7 @@ data class Key(val kind: KeyKind, val label: String, val restWidth: Float) {
             KeyKind.CHARACTER -> label
             KeyKind.SYMBOLS, KeyKind.ENTER, KeyKind.BACKSPACE, KeyKind.SHIFT, KeyKind.LETTERS, KeyKind.DECIMAL, KeyKind.EMPTY,
             KeyKind.PC,
+            KeyKind.NAV,
             -> null
         }
 

@@ -31,7 +31,7 @@ Un clavier mobile **compact** qui garde une disposition AZERTY ou QWERTY immédi
 - iOS (le moteur est toutefois écrit pour rester portable, cf. §11).
 - Toute fonctionnalité nécessitant le réseau.
 - Langues autres que le français et l'anglais (l'architecture doit cependant les permettre, cf. §10).
-- GIF, presse-papiers avancé (les émojis, d'abord exclus, sont couverts par le §5.11).
+- GIF, presse-papiers avancé (épinglage, synchronisation) ; les émojis (§5.11) et un historique simple du presse-papiers (§5.13) sont couverts.
 
 ---
 
@@ -203,7 +203,7 @@ La barre a trois états :
 
 Un tap sur une suggestion valide ce mot et ajoute une espace automatique. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
 
-**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. Les trois cases de suggestions se partagent le reste de la largeur.
+**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), `📋` (historique du presse-papiers, §5.13), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. À droite, un bouton `✥` de même largeur ouvre le panneau Navigation (§5.12) ; les trois cases de suggestions se partagent la largeur restante.
 
 ### 5.5 Validation par espace
 
@@ -288,8 +288,8 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 |---|---|
 | Glisser vers le haut sur une lettre | Majuscule |
 | Glisser vers le haut sur l'espace | Insère la suggestion centrale, même si elle ne domine pas (comme un tap sur elle), puis une espace ; sans suggestion, une espace |
-| Glisser vers la gauche depuis ⌫ | Efface le mot précédent (répété en continuant) |
-| Glisser horizontalement sur l'espace | Déplace le curseur |
+| Glisser vers la gauche depuis ⌫ | Efface le mot précédent (espaces de fin comprises ; à défaut de mot, un signe), puis un de plus tous les 0,8 u en continuant ; revenir vers la droite ne restaure rien (issue #33) |
+| Glisser horizontalement sur l'espace | Déplace le curseur d'un caractère tous les 0,4 u (flèches ← → envoyées au champ, mot en cours validé tel quel) ; le geste s'active après 0,6 u horizontal, plus qu'en vertical, et la touche n'est alors pas tapée (issue #33) |
 | Appui long sur `?123` | Menu ponctuation rapide / panneau « PC » (§5.10) / « Disposition classique » |
 | Appui long sur une lettre | Variantes accentuées |
 | Appui long sur `↵` | Panneau des émojis (§5.11), dans les profils qui affichent la barre de suggestions |
@@ -318,6 +318,28 @@ Issue #26. Ouvert par un appui long sur `↵` (un indice `☺` dans le coin de l
 - **Récents** : 32 au plus, le plus récent d'abord, enregistrés dans les préférences ; jamais alimentés en incognito ni dans un champ sans apprentissage (§9.2). Le panneau s'ouvre sur les récents s'il y en a, sinon sur le premier groupe.
 - **Données** : l'asset `emoji.txt` (groupe, émoji, version), généré par `./gradlew :tools:buildEmoji` depuis le paquet `unicode-emoji-json` (`docs/DATA.md`). Au chargement, seuls les émojis que la police du système sait dessiner (`Paint.hasGlyph`) sont proposés.
 - Pas de recherche par mot-clé ni de choix de couleur de peau en V1. Accessibilité : chaque onglet et chaque émoji est un nœud virtuel.
+
+### 5.12 Panneau Navigation
+
+Issue #37. Le bouton `✥` à droite de la barre (§5.4) remplace les lettres par le panneau Navigation ; un deuxième appui sur `✥`, ou `ABC`, ramène aux lettres.
+
+```
+Mot ←  ↑  Mot →  | Tout  Copier  Couper
+←      ↓  →      | Sélect.  Coller
+ABC  Début  Fin  | Suppr  ⌫
+```
+
+- Les flèches, `Début`, `Fin` et `Suppr` envoient de vrais événements clavier (comme le panneau PC, §5.10) ; `Mot ←` et `Mot →` sont `Ctrl` + flèche.
+- `Sélect.` bascule le mode Sélection (touche affichée enfoncée) : les déplacements portent alors `Maj` et étendent la sélection. `Tout`, `Copier`, `Couper` et `Coller` sont les actions d'édition de l'éditeur (`performContextMenuAction`) ; elles, et `Suppr`, quittent le mode Sélection, qui est aussi remis à zéro à chaque champ.
+- Le mot en cours est validé tel quel avant chaque action. Ni adaptation ni suggestions sur le panneau.
+
+### 5.13 Historique du presse-papiers
+
+Issue #35. Tant qu'il est le clavier actif, Nextglyph écoute les changements du presse-papiers (`OnPrimaryClipChangedListener`) et garde les 10 derniers textes copiés (le plus récent d'abord, sans doublon, 5 000 caractères au plus chacun).
+
+- **En mémoire seulement** : jamais écrit sur disque ni journalisé ; perdu quand le clavier s'arrête.
+- Non alimenté en incognito, dans un champ qui ne lit pas le texte (mot de passe, pavés) ni pour un contenu marqué sensible (`ClipDescription.EXTRA_IS_SENSITIVE`).
+- Ouvert par la case `📋` du menu rapide `⚙` (§5.4) : même panneau que les émojis (§5.11), onglets `ABC`, `📋`, `⌫`, grille de 2 × 3 textes sur une ligne, raccourcis avec `…`. Un tap insère le texte au curseur, après validation du mot en cours tel quel.
 
 ---
 
@@ -617,6 +639,12 @@ Ces résultats fixent les valeurs par défaut du §5.2 et du §5.5. Méthode, r�
 Liste d'applications et de pages web couvrant : champs numériques décimaux, téléphone, date, code PIN, mot de passe natif et web, e-mail, URL, recherche, messagerie multiligne, champs sans suggestions.
 
 **Panel intégré.** La variante debug de l'IME contient une activité « Champs de test » (`nextglyph.ime.debug.FieldTestsActivity`, absente de la release, vérifié par `ManifestTest`) : un `EditText` par profil, drapeau et action de `↵`, chacun suivi d'un écho du texte exact (points de code hors ASCII en clair) et de la dernière action d'éditeur reçue. Cas, résultats attendus et observés : `docs/FIELD-TESTS.md`.
+
+### 15.4 Mesures locales
+
+Issue #36. Le clavier tient des compteurs (`TypingStats`), **jamais de texte** : caractères tapés, frappes, ⌫, temps de frappe actif (somme des intervalles de 5 s au plus entre deux frappes), mots terminés (espace ou choix dans la barre), validations par espace qui ont inséré un autre mot, validations annulées, mots choisis dans la barre. Rien n'est compté en incognito ni dans les champs sans apprentissage (mot de passe, pavés, e-mail, URL, §9.2).
+
+Les réglages (section « Mesures de saisie ») affichent : vitesse en mots par minute (5 caractères par mot), part des frappes qui sont des ⌫, part des mots complétés ou corrigés par le clavier, part des validations automatiques annulées (objectif < 3 %, §15.2), avec un bouton de remise à zéro. Les compteurs sont enregistrés localement (préférences à part, à la sortie de chaque champ). Ils servent à calibrer l'étude utilisateur de M5 et à décider des suites de #30 et #32.
 
 ---
 

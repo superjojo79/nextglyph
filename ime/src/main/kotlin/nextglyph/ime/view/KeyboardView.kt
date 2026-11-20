@@ -26,6 +26,9 @@ import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.adapt.TapDecoding
 import nextglyph.engine.edit.ShiftState
 import nextglyph.engine.emoji.EmojiCatalog
+import nextglyph.engine.input.DragSteps
+import nextglyph.engine.input.NavKey
+import nextglyph.engine.input.NavLayout
 import nextglyph.engine.input.PcKey
 import nextglyph.engine.input.PcLayout
 import nextglyph.engine.input.PcModifier
@@ -87,6 +90,15 @@ class KeyboardView(context: Context) : View(context) {
 
         /** Émoji choisi dans le panneau (§5.11). */
         fun onEmoji(emoji: String)
+
+        /** Texte choisi dans l'historique du presse-papiers (issue #35). */
+        fun onClipText(text: String)
+
+        /** Glisser horizontalement sur l'espace (§5.9) : déplacer le curseur de [steps] caractères (négatif : à gauche). */
+        fun onCursorSteps(steps: Int)
+
+        /** Glisser vers la gauche depuis ⌫ (§5.9) : effacer le mot précédent, une fois par pas. */
+        fun onDeleteWord()
     }
 
     var listener: Listener? = null
@@ -222,6 +234,9 @@ class KeyboardView(context: Context) : View(context) {
     private val pressedKey = IntArray(MAX_POINTERS) { NONE }
     private val downKey = arrayOfNulls<Key>(MAX_POINTERS)
     private val downY = FloatArray(MAX_POINTERS)
+
+    /** Gestes d'édition en cours par pointeur (§5.9) : glisser sur l'espace ou depuis ⌫. */
+    private val drags = arrayOfNulls<DragSteps>(MAX_POINTERS)
     private var barPointer = NONE
     private var barPressed = NONE
     private var barLongPressed = false
@@ -310,9 +325,9 @@ class KeyboardView(context: Context) : View(context) {
         val labelChanged = enterLabel != this.enterLabel
         fieldKeyboard = keyboard
         this.enterLabel = enterLabel
-        // Nouveau champ : le panneau des émojis se referme.
+        // Nouveau champ : le panneau des émojis ou du presse-papiers se referme.
         if (emojiShown) {
-            emojiShown = false
+            gridPanel = null
             accessibility.invalidateNodes()
         }
         if (layoutsChanged) {
@@ -403,6 +418,29 @@ class KeyboardView(context: Context) : View(context) {
         showSymbols(true)
     }
 
+    /** Panneau Navigation (issue #37), ouvert par `✥` à droite de la barre ; un deuxième appui ramène aux lettres. */
+    private fun toggleNavKeys() {
+        if (fieldKeyboard.symbols == null) return
+        if (navShown) {
+            showSymbols(false)
+            return
+        }
+        keyboard.cancelPointers(now())
+        symbolsShown = false
+        setSymbolsLayer(NavLayout.LAYOUT)
+        showSymbols(true)
+    }
+
+    private val navShown: Boolean get() = symbolsShown && symbolsLayout === NavLayout.LAYOUT
+
+    /** Mode Sélection du panneau Navigation, affiché enfoncé sur `Sélect.` (issue #37). */
+    var navSelecting: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     private fun setSymbolsLayer(layout: KeyboardLayout?) {
         symbols?.cancelPointers(now())
         symbolsLayout = layout
@@ -412,7 +450,15 @@ class KeyboardView(context: Context) : View(context) {
 
     /** Panneau des émojis (§5.11) : créé à la première ouverture (lecture de l'asset, filtrage des glyphes). */
     private var emojiPanel: EmojiPanel? = null
-    private var emojiShown = false
+
+    /** Panneau du presse-papiers (issue #35) : même grille, deux colonnes de textes. */
+    private val clipPanel = EmojiPanel(
+        EmojiCatalog(emptyList()), CLIP_COLUMNS, CLIP_ROWS, KeyPopups.CLIPBOARD_LABEL, fitText = true,
+    )
+
+    /** Panneau affiché à la place de la barre et des touches (émojis ou presse-papiers), ou `null`. */
+    private var gridPanel: EmojiPanel? = null
+    private val emojiShown: Boolean get() = gridPanel != null
     private val emojiPaint = labelPaint(textPx(EMOJI_TEXT_SP))
 
     /** Émojis récents, du plus récent au plus ancien (§5.11). */
@@ -422,6 +468,29 @@ class KeyboardView(context: Context) : View(context) {
             emojiPanel?.recents = value
             if (emojiShown) invalidate()
         }
+
+    /** Historique du presse-papiers, du plus récent au plus ancien (issue #35). */
+    var clipTexts: List<String> = emptyList()
+        set(value) {
+            field = value
+            clipPanel.recents = value
+            if (gridPanel === clipPanel) invalidate()
+        }
+
+    /** Affiche l'historique du presse-papiers (issue #35). */
+    private fun showClipboard() {
+        if (gridPanel === clipPanel) return
+        closePopup()
+        cancelPendingPopup()
+        keyboard.cancelPointers(now())
+        clipPanel.recents = clipTexts
+        clipPanel.emptyText = context.getString(R.string.clipboard_empty)
+        clipPanel.open()
+        layoutEmoji()
+        gridPanel = clipPanel
+        accessibility.invalidateNodes()
+        invalidate()
+    }
 
     /** Affiche le panneau des émojis, ou revient aux lettres. */
     private fun showEmoji(shown: Boolean) {
@@ -435,7 +504,7 @@ class KeyboardView(context: Context) : View(context) {
             panel.open()
             layoutEmoji()
         }
-        emojiShown = shown
+        gridPanel = if (shown) emojiPanel else null
         accessibility.invalidateNodes()
         invalidate()
     }
@@ -448,13 +517,15 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun layoutEmoji() {
         emojiPanel?.layout(width.toFloat(), barPx, keysHeightPx(lettersLayout.rows.size))
+        clipPanel.layout(width.toFloat(), barPx, keysHeightPx(lettersLayout.rows.size))
     }
 
     private fun onEmojiAction(action: EmojiPanel.Action?) {
         when (action) {
             EmojiPanel.Action.Letters -> showEmoji(false)
             EmojiPanel.Action.Backspace -> listener?.onKey(Key(KeyKind.BACKSPACE, "⌫", 1f), false, null)
-            is EmojiPanel.Action.Insert -> listener?.onEmoji(action.emoji)
+            is EmojiPanel.Action.Insert ->
+                if (gridPanel === clipPanel) listener?.onClipText(action.emoji) else listener?.onEmoji(action.emoji)
             null -> Unit
         }
         invalidate()
@@ -484,7 +555,7 @@ class KeyboardView(context: Context) : View(context) {
         private val emojiRect = RectF()
 
         /** Panneau des émojis affiché : ses onglets puis les cases de la page sont les nœuds. */
-        private val emoji: EmojiPanel? get() = if (emojiShown) emojiPanel else null
+        private val emoji: EmojiPanel? get() = gridPanel
 
         private fun emojiBounds(panel: EmojiPanel, id: Int, out: android.graphics.Rect): Boolean {
             val tabs = panel.tabLabels.size
@@ -499,7 +570,7 @@ class KeyboardView(context: Context) : View(context) {
             return when {
                 id == 0 -> context.getString(R.string.a11y_letters)
                 id == tabs - 1 -> context.getString(R.string.a11y_backspace)
-                id == 1 -> context.getString(R.string.a11y_emoji_recents)
+                id == 1 -> context.getString(if (panel === clipPanel) R.string.a11y_clipboard else R.string.a11y_emoji_recents)
                 id < tabs -> panel.tabLabels[id]
                 else -> panel.pageItems().getOrNull(id - tabs)
             }
@@ -518,9 +589,12 @@ class KeyboardView(context: Context) : View(context) {
 
         // Le bouton `⚙` (issue #27) est le dernier nœud quand la barre est affichée.
         override val count: Int get() = emoji?.let { it.tabLabels.size + it.pageItems().size }
-            ?: (keyCount + if (fieldKeyboard.showsBar) barTexts.size + 1 else 0)
+            ?: (keyCount + if (fieldKeyboard.showsBar) barTexts.size + 2 else 0)
 
         private val gearId: Int get() = keyCount + barTexts.size
+
+        // Le bouton `✥` (issue #37) suit `⚙`.
+        private val navId: Int get() = gearId + 1
 
         private fun keyRow(id: Int): Int {
             var rest = id
@@ -548,6 +622,10 @@ class KeyboardView(context: Context) : View(context) {
                 out.set(0, 0, gearPx.toInt(), barPx.toInt())
                 return true
             }
+            if (id == navId) {
+                out.set((width - gearPx).toInt(), 0, width, barPx.toInt())
+                return true
+            }
             if (id >= keyCount) {
                 val slot = barSlotPx()
                 val i = id - keyCount
@@ -564,6 +642,7 @@ class KeyboardView(context: Context) : View(context) {
         override fun description(id: Int): String? {
             emoji?.let { return emojiDescription(it, id) }
             if (id == gearId) return context.getString(R.string.a11y_settings)
+            if (id == navId) return context.getString(R.string.a11y_navigation)
             if (id >= keyCount) return barItems.getOrNull(id - keyCount)?.let { descriptions.suggestion(it.text) }
             val r = keyRow(id)
             if (r == NONE) return null
@@ -591,6 +670,7 @@ class KeyboardView(context: Context) : View(context) {
             if (y < barPx) {
                 if (!fieldKeyboard.showsBar) return View.NO_ID
                 if (x < gearPx) return gearId
+                if (x >= width - gearPx) return navId
                 val i = barIndexAt(x)
                 return if (i == NONE || barItems[i] == null) View.NO_ID else keyCount + i
             }
@@ -606,6 +686,10 @@ class KeyboardView(context: Context) : View(context) {
             if (id < 0 || id >= count) return false
             if (id == gearId) {
                 listener?.onPopup(PopupAction.OpenSettings)
+                return true
+            }
+            if (id == navId) {
+                toggleNavKeys()
                 return true
             }
             if (id >= keyCount) {
@@ -697,8 +781,8 @@ class KeyboardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(backgroundColor)
         if (width <= 0) return
-        val panel = emojiPanel
-        if (emojiShown && panel != null) {
+        val panel = gridPanel
+        if (panel != null) {
             fillPaint.color = pressedColor
             fillPaint.alpha = Color.alpha(pressedColor)
             functionPaint.textSize = functionTextPx
@@ -766,17 +850,26 @@ class KeyboardView(context: Context) : View(context) {
         functionPaint.textSize = functionTextPx
         functionPaint.alpha = Color.alpha(labelColor)
         canvas.drawText(KeyPopups.SETTINGS_LABEL, gearPx / 2f, barPx / 2f + baselineOffset(functionPaint), functionPaint)
+        // `✥` à droite (issue #37), surligné pendant que le panneau Navigation est affiché.
+        if (navShown) {
+            val pad = BAR_PADDING_DP * density
+            keyRect.set(width - gearPx + pad, pad, width - pad, barPx - pad)
+            fillPaint.color = pressedColor
+            fillPaint.alpha = Color.alpha(pressedColor)
+            canvas.drawRoundRect(keyRect, cornerPx, cornerPx, fillPaint)
+        }
+        canvas.drawText(NAV_LABEL, width - gearPx / 2f, barPx / 2f + baselineOffset(functionPaint), functionPaint)
     }
 
     /** Largeur du bouton `⚙`, nulle sans barre. */
     private val gearPx: Float get() = if (fieldKeyboard.showsBar) GEAR_DP * density else 0f
 
-    /** Largeur d'une case de la barre, à droite du bouton `⚙`. */
-    private fun barSlotPx(): Float = if (barTexts.isEmpty()) 0f else (width - gearPx) / barTexts.size
+    /** Largeur d'une case de la barre, entre les boutons `⚙` et `✥` (de même largeur). */
+    private fun barSlotPx(): Float = if (barTexts.isEmpty()) 0f else (width - 2 * gearPx) / barTexts.size
 
     /** Case de la barre à l'abscisse [x], ou [NONE] (bouton `⚙`, barre vide). */
     private fun barIndexAt(x: Float): Int {
-        if (barTexts.isEmpty() || x < gearPx) return NONE
+        if (barTexts.isEmpty() || x < gearPx || x >= width - gearPx) return NONE
         return ((x - gearPx) / barSlotPx()).toInt().coerceIn(0, barTexts.size - 1)
     }
 
@@ -817,6 +910,7 @@ class KeyboardView(context: Context) : View(context) {
             // Majuscule active ou verrouillée : `⇧` toujours visible (§7.1).
             key.kind == KeyKind.SHIFT && shift != ShiftState.OFF -> pressedColor
             key.kind == KeyKind.PC && PcKey.of(key.label)?.modifier?.let { it in activeModifiers } == true -> pressedColor
+            key.kind == KeyKind.NAV && navSelecting && NavKey.of(key.label) == NavKey.SELECT -> pressedColor
             isLetterLike -> keyColor
             else -> functionKeyColor
         }
@@ -914,8 +1008,8 @@ class KeyboardView(context: Context) : View(context) {
     // Avec TalkBack, les touches sont des nœuds virtuels activés par ACTION_CLICK (KeyboardAccessibility, §13).
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val panel = emojiPanel
-        if (emojiShown && panel != null) {
+        val panel = gridPanel
+        if (panel != null) {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     panel.down(event.x, event.y)
@@ -940,6 +1034,11 @@ class KeyboardView(context: Context) : View(context) {
                         openSettingsMenu(id, x)
                         return true
                     }
+                    if (x >= width - gearPx) {
+                        hapticTap()
+                        toggleNavKeys()
+                        return true
+                    }
                     if (id < MAX_POINTERS && barTexts.isNotEmpty()) {
                         barPointer = id
                         barPressed = barIndexAt(x)
@@ -959,6 +1058,10 @@ class KeyboardView(context: Context) : View(context) {
                 if (id < MAX_POINTERS) {
                     downKey[id] = decoded?.key
                     downY[id] = y
+                    drags[id] = decoded?.key?.kind?.takeIf { it in DRAG_KINDS }?.let {
+                        val unit = width / KeyboardLayout.ROW_UNITS
+                        DragSteps(x, y, unit * DRAG_ACTIVATION_UNITS, unit * if (it == KeyKind.SPACE) CURSOR_STEP_UNITS else WORD_STEP_UNITS)
+                    }
                 }
                 scheduleLongPress(id, decoded?.key, x, y)
             }
@@ -973,6 +1076,7 @@ class KeyboardView(context: Context) : View(context) {
                         }
                         continue
                     }
+                    if (id < MAX_POINTERS && onDrag(id, event.getX(index), event.getY(index))) continue
                     if (id == longPressPointer && movedTooFar(event.getX(index), event.getY(index))) cancelPendingPopup()
                     if (id < MAX_POINTERS && pressedRow[id] != NONE) {
                         decode(event.getX(index), event.getY(index), rest)?.let { press(id, it.rowIndex, it.keyIndex) }
@@ -998,6 +1102,16 @@ class KeyboardView(context: Context) : View(context) {
                     commitPopup()
                     return true
                 }
+                if (id < MAX_POINTERS && drags[id]?.active == true) {
+                    // Geste d'édition terminé : la touche n'est pas tapée.
+                    drags[id] = null
+                    press(id, NONE, NONE)
+                    downKey[id] = null
+                    keyboard.pointerUp(now)
+                    invalidate()
+                    return true
+                }
+                if (id < MAX_POINTERS) drags[id] = null
                 val x = event.getX(index)
                 val y = event.getY(index)
                 val decoded = if (id < MAX_POINTERS) decode(x, y, rest) else null
@@ -1024,6 +1138,7 @@ class KeyboardView(context: Context) : View(context) {
                 pressedRow.fill(NONE)
                 pressedKey.fill(NONE)
                 downKey.fill(null)
+                drags.fill(null)
                 barPointer = NONE
                 barPressed = NONE
                 removeCallbacks(barLongPress)
@@ -1033,6 +1148,27 @@ class KeyboardView(context: Context) : View(context) {
                 invalidate()
             }
             else -> return false
+        }
+        return true
+    }
+
+    /**
+     * Pointeur [id] en `(x, y)` pendant un geste d'édition possible : vrai si le geste est actif (le
+     * déplacement ne doit plus changer la touche enfoncée). Chaque pas donne un léger retour haptique.
+     */
+    private fun onDrag(id: Int, x: Float, y: Float): Boolean {
+        val drag = drags[id] ?: return false
+        val steps = drag.move(x, y)
+        if (!drag.active) return false
+        if (id == longPressPointer) cancelPendingPopup()
+        if (steps != 0) {
+            when (downKey[id]?.kind) {
+                KeyKind.SPACE -> listener?.onCursorSteps(steps)
+                // Seul le glissement vers la gauche efface ; revenir vers la droite ne restaure rien.
+                KeyKind.BACKSPACE -> repeat(-steps) { listener?.onDeleteWord() }
+                else -> Unit
+            }
+            if (haptics != HapticLevel.OFF) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
         return true
     }
@@ -1121,6 +1257,7 @@ class KeyboardView(context: Context) : View(context) {
         when (action) {
             PopupAction.PcKeys -> showPcKeys()
             PopupAction.EmojiPanel -> showEmoji(true)
+            PopupAction.Clipboard -> showClipboard()
             else -> listener?.onPopup(action)
         }
     }
@@ -1172,6 +1309,10 @@ class KeyboardView(context: Context) : View(context) {
         private const val POPUP_ITEM_DP = 40f
         private const val POPUP_WIDE_DP = 64f
 
+        /** Grille du presse-papiers (issue #35). */
+        private const val CLIP_COLUMNS = 2
+        private const val CLIP_ROWS = 3
+
         /** Asset des émojis (`:tools:buildEmoji`, §5.11). */
         private const val EMOJI_ASSET = "emoji.txt"
 
@@ -1181,6 +1322,15 @@ class KeyboardView(context: Context) : View(context) {
         /** Largeur du bouton `⚙` de la barre (issue #27). */
         private const val GEAR_DP = 40f
         private const val SWIPE_UP_ROWS = 0.6f
+
+        /** Bouton du panneau Navigation, à droite de la barre (issue #37). */
+        const val NAV_LABEL: String = "✥"
+
+        /** Gestes d'édition (§5.9) : touches concernées, seuil d'activation et longueur d'un pas, en unités. */
+        private val DRAG_KINDS = setOf(KeyKind.SPACE, KeyKind.BACKSPACE)
+        private const val DRAG_ACTIVATION_UNITS = 0.6f
+        private const val CURSOR_STEP_UNITS = 0.4f
+        private const val WORD_STEP_UNITS = 0.8f
 
         /** Touches qui réagissent au glissement vers le haut. */
         private val SWIPE_UP_KINDS = setOf(KeyKind.LETTER, KeyKind.SPACE)

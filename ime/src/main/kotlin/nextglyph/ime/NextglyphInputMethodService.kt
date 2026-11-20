@@ -1,5 +1,6 @@
 package nextglyph.ime
 
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.SharedPreferences
 import android.inputmethodservice.InputMethodService
@@ -13,9 +14,14 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import nextglyph.engine.adapt.DistributionSource
+import nextglyph.engine.clipboard.ClipboardHistory
 import nextglyph.engine.contacts.ContactName
 import nextglyph.engine.emoji.EmojiRecents
 import nextglyph.engine.input.EnterBehavior
+import nextglyph.engine.input.ContextAction
+import nextglyph.engine.input.NavCommand
+import nextglyph.engine.input.NavKey
+import nextglyph.engine.input.NavSelection
 import nextglyph.engine.input.PcKey
 import nextglyph.engine.input.PcKeyEvent
 import nextglyph.engine.input.PcModifier
@@ -98,6 +104,14 @@ class NextglyphInputMethodService : InputMethodService() {
     /** Modificateurs collants du panneau PC (§5.10). */
     private val pcModifiers = PcModifiers()
 
+    /** Historique du presse-papiers (issue #35), en mémoire seulement. */
+    private val clipHistory = ClipboardHistory()
+    private var clipboard: ClipboardManager? = null
+    private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { onClipChanged() }
+
+    /** Mode Sélection du panneau Navigation (issue #37). */
+    private val navSelection = NavSelection()
+
     /** Émojis récents (§5.11), enregistrés dans les préférences ; jamais alimentés sans apprentissage. */
     private var emojiRecents = EmojiRecents()
 
@@ -121,6 +135,7 @@ class NextglyphInputMethodService : InputMethodService() {
             onLearningEvent()
         }
         session.onWordReplaced = { word -> keyboardView?.announceInserted(word) }
+        session.stats = services.stats
         val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nextglyph-lexicon").apply { isDaemon = true } }
         worker = executor
         val assets = AssetLexicons(assets)
@@ -137,9 +152,13 @@ class NextglyphInputMethodService : InputMethodService() {
         services.learned.load()
         services.syncContacts()
         emojiRecents = EmojiRecents.parse(services.preferences.getString(KEY_EMOJI_RECENTS, null))
+        clipboard = getSystemService(ClipboardManager::class.java)?.also { it.addPrimaryClipChangedListener(clipListener) }
     }
 
     override fun onDestroy() {
+        clipboard?.removePrimaryClipChangedListener(clipListener)
+        services.saveStats()
+        clipHistory.clear()
         services.preferences.unregisterOnSharedPreferenceChangeListener(preferencesListener)
         services.learned.removeListener(learnedListener)
         services.contacts.removeListener(contactsListener)
@@ -160,6 +179,7 @@ class NextglyphInputMethodService : InputMethodService() {
         services.learned.data?.let { spatialModel = it.spatial }
         languages = session.predictor?.languages.orEmpty()
         recentEmojis = emojiRecents.list
+        clipTexts = clipHistory.list
         listener = object : KeyboardView.Listener {
             override fun onKey(key: Key, upper: Boolean, offset: TapOffset?) = onKeyPressed(key, upper, offset)
 
@@ -175,9 +195,16 @@ class NextglyphInputMethodService : InputMethodService() {
                 PopupAction.PcKeys -> Unit
                 // Le panneau des émojis aussi.
                 PopupAction.EmojiPanel -> Unit
+                PopupAction.Clipboard -> Unit
             }
 
             override fun onEmoji(emoji: String) = onEmojiChosen(emoji)
+
+            override fun onClipText(text: String) = session.onClipText(text)
+
+            override fun onCursorSteps(steps: Int) = moveCursor(steps)
+
+            override fun onDeleteWord() = session.onDeleteWord()
 
             override fun onBarItem(index: Int) = session.onBarItem(index)
 
@@ -186,6 +213,19 @@ class NextglyphInputMethodService : InputMethodService() {
         setSource(if (session.predictor != null) source else null)
         setState(session.state)
         keyboardView = this
+    }
+
+    /**
+     * Presse-papiers modifié (issue #35) : le texte copié rejoint l'historique, sauf en incognito, dans un
+     * champ qui ne lit pas le texte (mot de passe, pavés) ou s'il est marqué sensible. Lecture permise à l'IME
+     * actif seulement ; une erreur de lecture est ignorée.
+     */
+    private fun onClipChanged() {
+        if (field.profile.incognito || !field.profile.readsText) return
+        val clip = runCatching { clipboard?.primaryClip }.getOrNull() ?: return
+        if (clip.description?.extras?.getBoolean(EXTRA_IS_SENSITIVE) == true || clip.itemCount == 0) return
+        val text = runCatching { clip.getItemAt(0).coerceToText(this)?.toString() }.getOrNull() ?: return
+        if (clipHistory.add(text)) keyboardView?.clipTexts = clipHistory.list
     }
 
     /** Insère [emoji] et, hors incognito et champs sans apprentissage, le place en tête des récents. */
@@ -212,10 +252,13 @@ class NextglyphInputMethodService : InputMethodService() {
             .withClassic(keepClassic)
         pcModifiers.reset()
         showModifiers()
+        navSelection.reset()
+        keyboardView?.navSelecting = false
         startField(enter, info.initialSelStart, info.initialSelEnd)
     }
 
     override fun onFinishInput() {
+        services.saveStats()
         session.onFinishInput()
         handler.removeCallbacks(save)
         if (::services.isInitialized) services.learned.saveIfChanged()
@@ -270,6 +313,7 @@ class NextglyphInputMethodService : InputMethodService() {
             KeyKind.DECIMAL -> onDecimalKey()
             KeyKind.SPACE -> if (upper) session.onSpaceSwipeUp() else session.onKey(key, upper, offset)
             KeyKind.PC -> onPcKey(key)
+            KeyKind.NAV -> onNavKey(key)
             else -> if (!sendModified(key)) session.onKey(key, upper, offset)
         }
     }
@@ -297,6 +341,33 @@ class NextglyphInputMethodService : InputMethodService() {
         val now = SystemClock.uptimeMillis()
         connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, event.keyCode, 0, event.meta))
         connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, event.keyCode, 0, event.meta))
+    }
+
+    /** Touche du panneau Navigation (issue #37) : événement clavier, ou action d'édition de l'éditeur. */
+    private fun onNavKey(key: Key) {
+        val nav = NavKey.of(key.label) ?: return
+        when (val command = navSelection.press(nav)) {
+            is NavCommand.Event -> sendKeyEvent(command.event)
+            is NavCommand.Context -> currentInputConnection?.let { connection ->
+                connection.finishComposingText()
+                connection.performContextMenuAction(
+                    when (command.action) {
+                        ContextAction.SELECT_ALL -> android.R.id.selectAll
+                        ContextAction.COPY -> android.R.id.copy
+                        ContextAction.CUT -> android.R.id.cut
+                        ContextAction.PASTE -> android.R.id.paste
+                    },
+                )
+            }
+            null -> Unit
+        }
+        keyboardView?.navSelecting = navSelection.selecting
+    }
+
+    /** Glisser sur l'espace (§5.9) : flèches gauche ou droite, une par pas, comme sur un clavier physique. */
+    private fun moveCursor(steps: Int) {
+        val key = if (steps < 0) PcKey.LEFT else PcKey.RIGHT
+        repeat(kotlin.math.abs(steps)) { sendKeyEvent(PcKeyEvent(key.keyCode, 0)) }
     }
 
     private fun showModifiers() {
@@ -428,5 +499,8 @@ class NextglyphInputMethodService : InputMethodService() {
         const val LANGUAGE_SEPARATOR = "+"
         const val SAVE_DELAY_MS = 3000L
         const val KEY_EMOJI_RECENTS = "emoji_recents"
+
+        /** `ClipDescription.EXTRA_IS_SENSITIVE` (API 33), en clair pour rester lisible dès l'API 26. */
+        const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
     }
 }

@@ -91,8 +91,19 @@
     <string name="a11y_shift_locked">verrouillée</string>
     <string name="a11y_suggestion">Suggestion %1$s</string>
     <string name="a11y_inserted">Inséré : %1$s</string>
+    <string name="pref_section_stats">Mesures de saisie</string>
+    <string name="pref_stats_empty">Pas encore de mesure.</string>
+    <string name="pref_stats_speed">Vitesse : %1$s mots par minute</string>
+    <string name="pref_stats_corrections">Corrections (⌫) : %1$s des frappes</string>
+    <string name="pref_stats_acceptance">Mots complétés ou corrigés par le clavier : %1$s</string>
+    <string name="pref_stats_undo">Validations automatiques annulées : %1$s</string>
+    <string name="pref_stats_privacy">Mesuré sur l\'appareil seulement ; aucun texte n\'est enregistré, rien en incognito ni en mot de passe.</string>
+    <string name="pref_stats_reset">Remettre les mesures à zéro</string>
     <string name="pref_section_gestures">Gestes</string>
-    <string name="pref_gestures_help">• Majuscule : glisser vers le haut sur une lettre.\n• Majuscules verrouillées : ?123, puis appui long sur ABC (⇪).\n• Accents : appui long sur une voyelle ou sur c.\n• Symboles voisins : sur la couche ?123, appui long sur un symbole ; le petit signe en coin indique le premier (_ sur -, = sur +…).\n• Valider la suggestion centrale : glisser vers le haut sur l\'espace.\n• Ponctuation rapide, touches PC (Ctrl, Alt, F1…F12) et disposition classique (avec ⇧) : appui long sur ?123.\n• Émojis : appui long sur ↵ (☺).\n• Réglages, mode et disposition : ⚙ à gauche de la barre de suggestions.\n• Langue : appui long sur l\'espace.\n• Retirer un mot appris : appui long sur la suggestion.</string>
+    <string name="pref_gestures_help">• Majuscule : glisser vers le haut sur une lettre.\n• Majuscules verrouillées : ?123, puis appui long sur ABC (⇪).\n• Accents : appui long sur une voyelle ou sur c.\n• Symboles voisins : sur la couche ?123, appui long sur un symbole ; le petit signe en coin indique le premier (_ sur -, = sur +…).\n• Valider la suggestion centrale : glisser vers le haut sur l\'espace.\n• Ponctuation rapide, touches PC (Ctrl, Alt, F1…F12) et disposition classique (avec ⇧) : appui long sur ?123.\n• Émojis : appui long sur ↵ (☺).\n• Réglages, presse-papiers (📋), mode et disposition : ⚙ à gauche de la barre de suggestions.\n• Flèches, sélection, copier-coller : ✥ à droite de la barre de suggestions.\n• Déplacer le curseur : glisser sur l\'espace vers la gauche ou la droite.\n• Effacer mot par mot : glisser vers la gauche depuis ⌫.\n• Langue : appui long sur l\'espace.\n• Retirer un mot appris : appui long sur la suggestion.</string>
+    <string name="a11y_navigation">Navigation : flèches, sélection, copier-coller</string>
+    <string name="a11y_clipboard">Historique du presse-papiers</string>
+    <string name="clipboard_empty">Les textes copiés apparaîtront ici.</string>
     <string name="a11y_settings">Réglages rapides</string>
     <string name="a11y_emoji_recents">Émojis récents</string>
 </resources>

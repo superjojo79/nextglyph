@@ -13,6 +13,7 @@ import nextglyph.engine.input.EditOperation
 import nextglyph.engine.input.EnterBehavior
 import nextglyph.engine.input.TextEdit
 import nextglyph.engine.input.TextUnits
+import nextglyph.engine.input.WordDeletion
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.lexicon.Distribution
@@ -27,6 +28,7 @@ import nextglyph.engine.predict.UndoToken
 import nextglyph.engine.profile.DecimalSeparatorPolicy
 import nextglyph.engine.profile.FieldKey
 import nextglyph.engine.profile.SeparatorEditor
+import nextglyph.engine.stats.TypingStats
 import nextglyph.engine.text.WordPrefix
 import java.util.Locale
 import kotlin.math.abs
@@ -62,6 +64,11 @@ class InputSession(
     /** Prédicteurs par niveau de contexte des contacts (§6.3), ou `null` tant qu'ils ne sont pas prêts. */
     var predictors: PredictionStack? = null
         private set
+
+    /** Mesures locales (issue #36), ou `null` ; alimentées seulement dans les champs qui apprennent (§9.2). */
+    var stats: TypingStats? = null
+
+    private val measuring: TypingStats? get() = stats?.takeIf { this.field.profile.learning && !this.field.profile.incognito }
 
     /** Apprentissage (§5.3, §10.5), ou `null` : rien n'est appris (données pas encore chargées). */
     var learning: SessionLearning? = null
@@ -207,7 +214,7 @@ class InputSession(
             KeyKind.ENTER -> onEnter()
             // Couches, majuscule du pavé mot de passe, séparateur décimal, emplacements vides :
             // gérés par l'IME (dispositions du profil, M3). Touches PC : événements clavier envoyés par l'IME (§5.10).
-            KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC -> Unit
+            KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC, KeyKind.NAV -> Unit
         }
     }
 
@@ -222,6 +229,7 @@ class InputSession(
         val auto = !upper && state.shift == ShiftState.ONCE && manualShift == ShiftState.OFF
         val capital = upper || state.shift != ShiftState.OFF
         val text = if (capital) letter.uppercase(Locale.ROOT) else letter
+        measuring?.onKey()
         learning?.onLetter(letter, offset, field.prediction)
         batch { typeIntoWord(text) }
         if (composing == text) {
@@ -240,6 +248,7 @@ class InputSession(
      */
     fun onCharacter(text: String) {
         require(text.isNotEmpty()) { "Un caractère ne peut pas être vide." }
+        measuring?.onKey()
         val sign = text.singleOrNull()
         when {
             !field.readsText || sign == null || sign.isDigit() -> plain(text, validate = false)
@@ -263,12 +272,19 @@ class InputSession(
         plain(text, validate = field.readsText)
     }
 
+    /** Texte de l'historique du presse-papiers (issue #35) : inséré comme un collage, après validation du mot en cours. */
+    fun onClipText(text: String) {
+        require(text.isNotEmpty()) { "Texte vide." }
+        plain(text, validate = field.readsText)
+    }
+
     /** Raccourci de la barre (e-mail, URL) : inséré tel quel. */
     fun onShortcut(text: String) = plain(text, validate = false)
 
     /** Touche espace : validation par espace (§5.5), double espace (§5.6). */
     fun onSpace() {
         undo = null
+        measuring?.onKey()
         if (!field.readsText) {
             plain(" ", validate = false)
             return
@@ -294,6 +310,7 @@ class InputSession(
                     if (p.inserted != p.word) replaced = p.inserted
                 }
                 learning?.onValidated(p, language, field.prediction, wordAutoCapital)
+                measuring?.onWord(autocommit = replaced != null)
             } else {
                 learning?.onWordEnded()
                 finishComposing()
@@ -313,6 +330,7 @@ class InputSession(
      * quelle, sans rien lire du champ.
      */
     fun onBackspace() {
+        measuring?.onBackspace()
         val pendingUndo = undo
         undo = null
         editState = EditState.INITIAL
@@ -328,6 +346,7 @@ class InputSession(
             val edit = predictor.undo(target.textBeforeCursor(LOOKBACK), pendingUndo.token, field.prediction)
             if (edit != null) {
                 learning?.onUndo()
+                measuring?.onUndo()
                 batch {
                     apply(edit)
                     reopenComposing()
@@ -361,6 +380,39 @@ class InputSession(
                         cursor = UNKNOWN
                     }
                     reopenComposing()
+                }
+            }
+        }
+        refresh()
+    }
+
+    /**
+     * Glisser vers la gauche depuis ⌫ (§5.9, issue #33), un appel par pas : efface le mot précédent (espaces
+     * de fin comprises, [WordDeletion]) ou la sélection. Le mot en cours est abandonné pour l'apprentissage.
+     * Dans un champ qui ne lit pas le texte, envoie simplement la touche Retour arrière.
+     */
+    fun onDeleteWord() {
+        measuring?.onBackspace()
+        undo = null
+        editState = EditState.INITIAL
+        learning?.onWordAbandoned()
+        if (!field.readsText) {
+            target.sendBackspaceKey()
+            cursor = UNKNOWN
+            selectionLength = 0
+            refresh()
+            return
+        }
+        batch {
+            finishComposing()
+            if (selectionLength > 0) {
+                target.commitText("")
+                selectionLength = 0
+            } else {
+                val n = WordDeletion.length(target.textBeforeCursor(LOOKBACK))
+                if (n > 0) {
+                    target.deleteBefore(n)
+                    move(-n)
                 }
             }
         }
@@ -495,6 +547,7 @@ class InputSession(
             // Le texte tapé, gardé alors qu'un candidat dominait : il n'est dans aucun lexique (cas 2 du §5.5).
             val unknown = item.typed && p.case == SpaceCase.DOMINANT
             learning?.onSuggestionPicked(item.text, unknown, language, field.prediction, wordAutoCapital)
+            measuring?.onPick()
             apply(commit.edit)
             setLanguage(commit.language)
             editState = EditState(if (atEnd()) SpaceOrigin.AUTO else SpaceOrigin.TYPED)

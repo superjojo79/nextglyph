@@ -88,6 +88,62 @@ class InputSessionTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `mesures - frappes, mot validé, annulation et choix dans la barre`() {
+            val s = setup()
+            val stats = nextglyph.engine.stats.TypingStats({ 0L })
+            s.session.stats = stats
+
+            s.type("bonj ")
+            s.backspace()
+            s.type(" comm")
+            s.bar("comment")
+
+            val c = stats.counters
+            assertThat(s.editor.toString()).isEqualTo("Bonjour comment ")
+            assertThat(c.autocommits).isEqualTo(2)
+            assertThat(c.chars).isEqualTo(10)
+            assertThat(c.backspaces).isEqualTo(1)
+            assertThat(c.words).isEqualTo(3)
+            assertThat(c.undone).isEqualTo(1)
+            assertThat(c.picks).isEqualTo(1)
+        }
+
+        @Test
+        fun `texte du presse-papiers - le mot en cours est validé, puis le texte inséré`() {
+            val s = setup()
+
+            s.type("bonj ")
+            s.session.onClipText("https://exemple.org")
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("Bonjour https://exemple.org")
+        }
+
+        @Test
+        fun `glisser depuis effacement - efface le mot précédent puis le suivant`() {
+            val s = setup("Il fait beau ")
+
+            s.session.onDeleteWord()
+            s.editor.deliver(s.session)
+            assertThat(s.editor.toString()).isEqualTo("Il fait ")
+            s.session.onDeleteWord()
+            s.editor.deliver(s.session)
+            assertThat(s.editor.toString()).isEqualTo("Il ")
+        }
+
+        @Test
+        fun `glisser depuis effacement pendant un mot - le mot en cours est effacé`() {
+            val s = setup("Il ")
+
+            s.type("bonj")
+            s.session.onDeleteWord()
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("Il ")
+            assertThat(s.editor.composeStart).isEqualTo(-1)
+        }
+
+        @Test
         fun `émoji - le mot en cours est validé sans espace, puis l'émoji inséré`() {
             val s = setup()
 
@@ -379,6 +435,36 @@ class InputSessionTest {
     @Nested
     inner class ErrorCases {
         @Test
+        fun `mesures - rien en mot de passe ni en incognito`() {
+            for (f in listOf(field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD), field(imeOptions = C.IME_FLAG_NO_PERSONALIZED_LEARNING))) {
+                val s = setup(field = f)
+                val stats = nextglyph.engine.stats.TypingStats({ 0L })
+                s.session.stats = stats
+
+                s.type("abc ")
+                s.backspace()
+
+                assertThat(stats.counters).isEqualTo(nextglyph.engine.stats.TypingStats.Counters())
+            }
+        }
+
+        @Test
+        fun `texte du presse-papiers vide refusé`() {
+            assertThatThrownBy { setup().session.onClipText("") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("vide")
+        }
+
+        @Test
+        fun `glisser depuis effacement dans un champ vide ou mot de passe - rien ou touche Retour arrière`() {
+            val empty = setup()
+            empty.session.onDeleteWord()
+            assertThat(empty.editor.toString()).isEmpty()
+
+            val password = setup("abc", field = field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD))
+            password.session.onDeleteWord()
+            assertThat(password.editor.calls).containsExactly("key:backspace")
+        }
+
+        @Test
         fun `émoji vide refusé`() {
             assertThatThrownBy { setup().session.onEmoji("") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("vide")
         }
@@ -472,6 +558,18 @@ class InputSessionTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `glisser depuis effacement avec une sélection - seule la sélection disparaît`() {
+            val s = setup("un deux trois")
+            s.session.onSelectionUpdate(3, 7, -1, -1)
+            s.editor.selStart = 3
+            s.editor.selEnd = 7
+
+            s.session.onDeleteWord()
+
+            assertThat(s.editor.toString()).isEqualTo("un  trois")
+        }
+
         @Test
         fun `émoji dans un champ qui ne lit pas le texte - inséré tel quel`() {
             val s = setup(field = field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD))
