@@ -18,6 +18,7 @@ Nextglyph est un clavier Android adaptatif, libre et open source. Il garde une d
 <li>Pavés dédiés pour les nombres, le téléphone, les dates et les codes PIN.</li>
 <li>Champs mot de passe : rien n'est lu, rien n'est appris.</li>
 <li>Dispositions pour les adresses e-mail et web, panneau d'émojis et touches PC.</li>
+<li>Curseur déplacé en glissant sur l'espace, effacement mot par mot, panneau de navigation et de sélection, historique du presse-papiers.</li>
 </ul>
 
 <b>Votre vie privée</b>

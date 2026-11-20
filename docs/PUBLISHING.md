@@ -129,7 +129,7 @@ Points à confirmer avec les relecteurs de F-Droid :
 4. Envoyer `ime-release.aab` (artefact du workflow Release) dans la piste de test fermé.
 5. **Fiche du store** : textes de `fastlane/metadata/android/fr-FR` et `en-US` (titre ≤ 30, description courte ≤ 80, description complète ≤ 4 000 caractères), captures, icône et bannière.
 6. **Politique de confidentialité** : `https://github.com/superjojo79/nextglyph/blob/main/docs/PRIVACY.md` (ou la même page servie par GitHub Pages).
-7. **Sécurité des données** : « L'application ne collecte ni ne partage aucune donnée utilisateur ». Le texte saisi, le dictionnaire personnel et les noms des contacts sont traités uniquement sur l'appareil et ne sont donc pas « collectés » au sens de Play ; chiffrement en transit : sans objet ; suppression des données : depuis les réglages.
+7. **Sécurité des données** : « L'application ne collecte ni ne partage aucune donnée utilisateur ». Le texte saisi, le dictionnaire personnel, l'historique du presse-papiers, les mesures de saisie et les noms des contacts sont traités uniquement sur l'appareil et ne sont donc pas « collectés » au sens de Play ; chiffrement en transit : sans objet ; suppression des données : depuis les réglages.
 8. **Autres déclarations** : pas de publicité ; classification du contenu (questionnaire IARC, aucune catégorie sensible) ; public cible 13 ans et plus ; pas d'application gouvernementale ni financière.
 9. **API cible** : `targetSdk = 37` dépasse l'exigence actuelle de Play ; à revérifier avant chaque publication (§18.4).
 

@@ -18,6 +18,7 @@ Nextglyph is an adaptive, free and open source Android keyboard. It keeps an AZE
 <li>Dedicated pads for numbers, phone numbers, dates and PIN codes.</li>
 <li>Password fields: nothing is read and nothing is learned.</li>
 <li>Layouts for email and web addresses, an emoji panel and PC keys.</li>
+<li>Move the cursor by sliding on the space bar, delete word by word, a navigation and selection panel, and clipboard history.</li>
 </ul>
 
 <b>Your privacy</b>

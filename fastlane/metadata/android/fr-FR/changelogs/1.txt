@@ -3,4 +3,5 @@ Première version publique.
 • Suggestions, validation par espace, typographie française, majuscules automatiques.
 • Pavés numérique, téléphone, date et PIN ; champs mot de passe protégés.
 • Apprentissage sur l'appareil, noms des contacts (facultatif), émojis, touches PC.
+• Gestes d'édition, panneau de navigation, presse-papiers.
 • Aucune permission réseau.
