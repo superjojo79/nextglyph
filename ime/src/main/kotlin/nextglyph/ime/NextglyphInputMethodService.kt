@@ -1,5 +1,6 @@
 package nextglyph.ime
 
+import android.content.Intent
 import android.content.SharedPreferences
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
@@ -37,6 +38,7 @@ import nextglyph.ime.learn.LearnedStore
 import nextglyph.ime.lexicon.AssetLexicons
 import nextglyph.ime.lexicon.LexiconLoader
 import nextglyph.ime.settings.KeyboardSettings
+import nextglyph.ime.settings.SettingsActivity
 import nextglyph.ime.view.KeyboardView
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -152,6 +154,9 @@ class NextglyphInputMethodService : InputMethodService() {
                 is PopupAction.LockLanguage -> session.lockLanguage(action.language)
                 PopupAction.CapsLock -> session.toggleCapsLock()
                 is PopupAction.ClassicLayout -> switchClassic(action.enabled)
+                PopupAction.OpenSettings -> openSettings()
+                is PopupAction.SetAdaptation -> savePreference(KeyboardSettings.KEY_ADAPTATION, KeyboardSettings.storedName(action.mode))
+                is PopupAction.SetLayout -> savePreference(KeyboardSettings.KEY_LAYOUT, KeyboardSettings.storedName(action.kind))
             }
 
             override fun onBarItem(index: Int) = session.onBarItem(index)
@@ -207,6 +212,16 @@ class NextglyphInputMethodService : InputMethodService() {
             view.adaptationAllowed = field.adaptation
         }
         session.onStartInput(field, selStart, selEnd)
+    }
+
+    /** Menu rapide `⚙` (issue #27) : ouvre l'activité des réglages. */
+    private fun openSettings() {
+        startActivity(Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    /** Menu rapide `⚙` : enregistre un réglage, appliqué aussitôt par l'écouteur des préférences (§14). */
+    private fun savePreference(key: String, value: String) {
+        services.preferences.edit().putString(key, value).apply()
     }
 
     /** Échappatoire « Disposition classique » (§4) : bascule, ou retour à la disposition du champ. */

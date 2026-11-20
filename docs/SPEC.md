@@ -201,6 +201,8 @@ La barre a trois états :
 
 Un tap sur une suggestion valide ce mot et ajoute une espace automatique. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
 
+**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. Les trois cases de suggestions se partagent le reste de la largeur.
+
 ### 5.5 Validation par espace
 
 À l'appui sur espace, avec un mot en cours `t` :

@@ -1,7 +1,9 @@
 package nextglyph.engine.session
 
+import nextglyph.engine.adapt.AdaptationMode
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
+import nextglyph.engine.layout.LayoutKind
 import java.util.Locale
 
 /** Effet d'une case de menu d'appui long. */
@@ -17,6 +19,15 @@ sealed interface PopupAction {
 
     /** Échappatoire du §4 : passe sur la disposition classique si [enabled], revient à la disposition du champ sinon. */
     data class ClassicLayout(val enabled: Boolean) : PopupAction
+
+    /** Ouvre l'activité des réglages (§14, issue #27). */
+    data object OpenSettings : PopupAction
+
+    /** Choisit le mode d'adaptation [mode] (§5.2, §14). */
+    data class SetAdaptation(val mode: AdaptationMode) : PopupAction
+
+    /** Choisit la disposition [kind] (§5.1, §14). */
+    data class SetLayout(val kind: LayoutKind) : PopupAction
 }
 
 /** Menu de l'appui long sur `?123`, selon la disposition affichée (§4, §5.6, §7.1). */
@@ -140,6 +151,41 @@ object KeyPopups {
         KeyKind.LETTERS -> CAPS_LOCK_LABEL
         KeyKind.SYMBOLS -> if (symbolsMenu == SymbolsMenu.NONE) null else MENU_HINT
         else -> null
+    }
+
+    /** Libellé de la case qui ouvre les réglages. */
+    const val SETTINGS_LABEL: String = "⚙"
+
+    /** Libellés courts des modes d'adaptation (§5.2), dans l'ordre du cycle du menu rapide. */
+    val ADAPTATION_LABELS: Map<AdaptationMode, String> = linkedMapOf(
+        AdaptationMode.OFF to "Fixe",
+        AdaptationMode.CALM to "Calme",
+        AdaptationMode.CALM_REINFORCED to "Renforcé",
+        AdaptationMode.ELASTIC to "Élastique",
+    )
+
+    /**
+     * Menu rapide du bouton `⚙` de la barre (issue #27), sans quitter le clavier :
+     *
+     * 1. `⚙` : ouvre les réglages (choisi par un simple tap, la première case étant sous le doigt) ;
+     * 2. le mode d'adaptation suivant dans l'ordre Fixe → Calme → Renforcé → Élastique → Fixe ;
+     * 3. l'autre disposition (AZERTY ↔ QWERTY) ;
+     * 4. selon [symbolsMenu], l'échappatoire « Classique » du §4 ou le retour « Adaptative ».
+     */
+    fun settingsMenu(mode: AdaptationMode, kind: LayoutKind, symbolsMenu: SymbolsMenu): List<PopupItem> {
+        val modes = ADAPTATION_LABELS.keys.toList()
+        val next = modes[(modes.indexOf(mode) + 1) % modes.size]
+        val other = if (kind == LayoutKind.AZERTY) LayoutKind.QWERTY else LayoutKind.AZERTY
+        val classic = when (symbolsMenu) {
+            SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC -> listOf(PopupItem(CLASSIC_LABEL, PopupAction.ClassicLayout(true)))
+            SymbolsMenu.BACK_FROM_CLASSIC -> listOf(PopupItem(ADAPTIVE_LABEL, PopupAction.ClassicLayout(false)))
+            else -> emptyList()
+        }
+        return listOf(
+            PopupItem(SETTINGS_LABEL, PopupAction.OpenSettings),
+            PopupItem(ADAPTATION_LABELS.getValue(next), PopupAction.SetAdaptation(next)),
+            PopupItem(other.name, PopupAction.SetLayout(other)),
+        ) + classic
     }
 
     private fun symbolsMenu(menu: SymbolsMenu): List<PopupItem> = when (menu) {

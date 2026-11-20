@@ -394,7 +394,10 @@ class KeyboardView(context: Context) : View(context) {
     private inner class AccessibilityHost : KeyboardAccessibility.Host {
         private val keyCount: Int get() = keyboardLayout.rows.sumOf { it.keys.size }
 
-        override val count: Int get() = keyCount + if (fieldKeyboard.showsBar) barTexts.size else 0
+        // Le bouton `⚙` (issue #27) est le dernier nœud quand la barre est affichée.
+        override val count: Int get() = keyCount + if (fieldKeyboard.showsBar) barTexts.size + 1 else 0
+
+        private val gearId: Int get() = keyCount + barTexts.size
 
         private fun keyRow(id: Int): Int {
             var rest = id
@@ -417,11 +420,15 @@ class KeyboardView(context: Context) : View(context) {
         override fun bounds(id: Int, out: android.graphics.Rect): Boolean {
             val rest = restGeometry ?: return false
             if (id < 0 || id >= count) return false
+            if (id == gearId) {
+                out.set(0, 0, gearPx.toInt(), barPx.toInt())
+                return true
+            }
             if (id >= keyCount) {
-                val slot = width.toFloat() / barTexts.size
+                val slot = barSlotPx()
                 val i = id - keyCount
                 if (barItems.getOrNull(i) == null) return false
-                out.set((i * slot).toInt(), 0, ((i + 1) * slot).toInt(), barPx.toInt())
+                out.set((gearPx + i * slot).toInt(), 0, (gearPx + (i + 1) * slot).toInt(), barPx.toInt())
                 return true
             }
             val rect = rest.rows[keyRow(id)][keyIndex(id)]
@@ -431,6 +438,7 @@ class KeyboardView(context: Context) : View(context) {
         }
 
         override fun description(id: Int): String? {
+            if (id == gearId) return context.getString(R.string.a11y_settings)
             if (id >= keyCount) return barItems.getOrNull(id - keyCount)?.let { descriptions.suggestion(it.text) }
             val r = keyRow(id)
             if (r == NONE) return null
@@ -449,9 +457,10 @@ class KeyboardView(context: Context) : View(context) {
         override fun nodeAt(x: Float, y: Float): Int {
             val rest = restGeometry ?: return View.NO_ID
             if (y < barPx) {
-                if (!fieldKeyboard.showsBar || barTexts.isEmpty()) return View.NO_ID
-                val i = (x / (width.toFloat() / barTexts.size)).toInt().coerceIn(0, barTexts.size - 1)
-                return if (barItems[i] == null) View.NO_ID else keyCount + i
+                if (!fieldKeyboard.showsBar) return View.NO_ID
+                if (x < gearPx) return gearId
+                val i = barIndexAt(x)
+                return if (i == NONE || barItems[i] == null) View.NO_ID else keyCount + i
             }
             val rect = rest.keyAt(x, y - layerTopPx) ?: return View.NO_ID
             if (rect.key.kind == KeyKind.EMPTY) return View.NO_ID
@@ -462,6 +471,10 @@ class KeyboardView(context: Context) : View(context) {
 
         override fun click(id: Int): Boolean {
             if (id < 0 || id >= count) return false
+            if (id == gearId) {
+                listener?.onPopup(PopupAction.OpenSettings)
+                return true
+            }
             if (id >= keyCount) {
                 listener?.onBarItem(id - keyCount)
                 return true
@@ -475,7 +488,7 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun measureBar() {
         if (width <= 0 || barTexts.isEmpty()) return
-        val slot = width.toFloat() / barTexts.size - 2 * BAR_PADDING_DP * density
+        val slot = barSlotPx() - 2 * BAR_PADDING_DP * density
         for (i in barTexts.indices) {
             val measured = barBoldPaint.measureText(barTexts[i])
             barScales[i] = if (measured <= slot || measured == 0f) 1f else maxOf(MIN_BAR_SCALE, slot / measured)
@@ -583,14 +596,16 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun drawBar(canvas: Canvas) {
+        if (fieldKeyboard.showsBar) drawGear(canvas)
         val count = barTexts.size
         if (count == 0) return
-        val slot = width.toFloat() / count
+        val slot = barSlotPx()
         val pad = BAR_PADDING_DP * density
         for (i in 0 until count) {
             val item = barItems[i] ?: continue
+            val left = gearPx + i * slot
             if (item.highlighted || i == barPressed) {
-                keyRect.set(i * slot + pad, pad, (i + 1) * slot - pad, barPx - pad)
+                keyRect.set(left + pad, pad, left + slot - pad, barPx - pad)
                 fillPaint.color = pressedColor
                 fillPaint.alpha = Color.alpha(pressedColor)
                 canvas.drawRoundRect(keyRect, cornerPx, cornerPx, fillPaint)
@@ -598,8 +613,43 @@ class KeyboardView(context: Context) : View(context) {
             val paint = if (item.highlighted || (barMode == BarMode.WORDS && i == CENTER_SLOT)) barBoldPaint else barPaint
             paint.textSize = barTextPx * barScales[i]
             paint.alpha = if (item.typed) KeyStyle.TYPED_ALPHA else Color.alpha(labelColor)
-            canvas.drawText(barTexts[i], (i + 0.5f) * slot, barPx / 2f + baselineOffset(paint), paint)
+            canvas.drawText(barTexts[i], left + slot / 2f, barPx / 2f + baselineOffset(paint), paint)
         }
+    }
+
+    /** Bouton `⚙` à gauche de la barre : menu rapide (issue #27). */
+    private fun drawGear(canvas: Canvas) {
+        functionPaint.textSize = functionTextPx
+        functionPaint.alpha = Color.alpha(labelColor)
+        canvas.drawText(KeyPopups.SETTINGS_LABEL, gearPx / 2f, barPx / 2f + baselineOffset(functionPaint), functionPaint)
+    }
+
+    /** Largeur du bouton `⚙`, nulle sans barre. */
+    private val gearPx: Float get() = if (fieldKeyboard.showsBar) GEAR_DP * density else 0f
+
+    /** Largeur d'une case de la barre, à droite du bouton `⚙`. */
+    private fun barSlotPx(): Float = if (barTexts.isEmpty()) 0f else (width - gearPx) / barTexts.size
+
+    /** Case de la barre à l'abscisse [x], ou [NONE] (bouton `⚙`, barre vide). */
+    private fun barIndexAt(x: Float): Int {
+        if (barTexts.isEmpty() || x < gearPx) return NONE
+        return ((x - gearPx) / barSlotPx()).toInt().coerceIn(0, barTexts.size - 1)
+    }
+
+    /**
+     * Ouvre le menu rapide sous le doigt [pointer] posé sur `⚙` : glisser puis relâcher choisit une case ; un
+     * simple tap choisit la première, `⚙` (réglages).
+     */
+    private fun openSettingsMenu(pointer: Int, x: Float) {
+        val items = KeyPopups.settingsMenu(adaptationMode, fieldKeyboard.main.kind, fieldKeyboard.symbolsMenu)
+        popupItems = items
+        popupPointer = pointer
+        popupItemWidth = min(width.toFloat() / items.size, POPUP_WIDE_DP * density)
+        popupLeft = 0f
+        popupTop = barPx
+        popupSelected = KeyPopups.indexAt(x, popupLeft, popupItemWidth, items.size)
+        hapticTap()
+        invalidate()
     }
 
     private fun drawKey(
@@ -728,9 +778,14 @@ class KeyboardView(context: Context) : View(context) {
                 val x = event.getX(index)
                 val y = event.getY(index)
                 if (y < barPx && popupItems.isEmpty() && fieldKeyboard.showsBar) {
+                    if (x < gearPx) {
+                        keyboard.pointerDown(now)
+                        openSettingsMenu(id, x)
+                        return true
+                    }
                     if (id < MAX_POINTERS && barTexts.isNotEmpty()) {
                         barPointer = id
-                        barPressed = (x / (width.toFloat() / barTexts.size)).toInt().coerceIn(0, barTexts.size - 1)
+                        barPressed = barIndexAt(x)
                         barLongPressed = false
                         postDelayed(barLongPress, longPressMs)
                         invalidate()
@@ -954,6 +1009,9 @@ class KeyboardView(context: Context) : View(context) {
         private const val MIN_BAR_SCALE = 0.6f
         private const val POPUP_ITEM_DP = 40f
         private const val POPUP_WIDE_DP = 64f
+
+        /** Largeur du bouton `⚙` de la barre (issue #27). */
+        private const val GEAR_DP = 40f
         private const val SWIPE_UP_ROWS = 0.6f
 
         /** Touches qui réagissent au glissement vers le haut. */
