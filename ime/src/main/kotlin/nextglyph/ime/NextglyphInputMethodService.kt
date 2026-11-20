@@ -1,10 +1,12 @@
 package nextglyph.ime
 
+import android.content.Intent
 import android.content.SharedPreferences
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
@@ -12,7 +14,12 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.contacts.ContactName
+import nextglyph.engine.emoji.EmojiRecents
 import nextglyph.engine.input.EnterBehavior
+import nextglyph.engine.input.PcKey
+import nextglyph.engine.input.PcKeyEvent
+import nextglyph.engine.input.PcModifier
+import nextglyph.engine.input.PcModifiers
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyboardLayouts
@@ -37,6 +44,7 @@ import nextglyph.ime.learn.LearnedStore
 import nextglyph.ime.lexicon.AssetLexicons
 import nextglyph.ime.lexicon.LexiconLoader
 import nextglyph.ime.settings.KeyboardSettings
+import nextglyph.ime.settings.SettingsActivity
 import nextglyph.ime.view.KeyboardView
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -87,6 +95,12 @@ class NextglyphInputMethodService : InputMethodService() {
     private var fieldKey = FieldKey("", 0)
     private var fieldInputType = 0
 
+    /** Modificateurs collants du panneau PC (§5.10). */
+    private val pcModifiers = PcModifiers()
+
+    /** Émojis récents (§5.11), enregistrés dans les préférences ; jamais alimentés sans apprentissage. */
+    private var emojiRecents = EmojiRecents()
+
     private val save = Runnable { services.learned.saveIfChanged() }
 
     private val preferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> applySettings() }
@@ -100,7 +114,7 @@ class NextglyphInputMethodService : InputMethodService() {
         decimalPolicy = DecimalSeparatorPolicy(DecimalSeparators.preferred(locale))
         settings = services.settings
         layoutKind = settings.layoutFor(locale?.language)
-        fieldKeyboard = FieldKeyboard.of(SessionField.DEFAULT.profile, layoutKind, textRowHeightDp = settings.rowHeightDp.toFloat())
+        fieldKeyboard = FieldKeyboard.of(SessionField.DEFAULT.profile, layoutKind, textRowHeightDp = settings.rowHeightDp.toFloat(), wideSpace = wideSpace())
         session.setEditConfig(settings.editConfig)
         session.onStateChanged = { state ->
             keyboardView?.setState(state)
@@ -122,6 +136,7 @@ class NextglyphInputMethodService : InputMethodService() {
         services.contacts.addListener(contactsListener)
         services.learned.load()
         services.syncContacts()
+        emojiRecents = EmojiRecents.parse(services.preferences.getString(KEY_EMOJI_RECENTS, null))
     }
 
     override fun onDestroy() {
@@ -144,6 +159,7 @@ class NextglyphInputMethodService : InputMethodService() {
         bottomMarginDp = settings.bottomMarginDp
         services.learned.data?.let { spatialModel = it.spatial }
         languages = session.predictor?.languages.orEmpty()
+        recentEmojis = emojiRecents.list
         listener = object : KeyboardView.Listener {
             override fun onKey(key: Key, upper: Boolean, offset: TapOffset?) = onKeyPressed(key, upper, offset)
 
@@ -152,7 +168,16 @@ class NextglyphInputMethodService : InputMethodService() {
                 is PopupAction.LockLanguage -> session.lockLanguage(action.language)
                 PopupAction.CapsLock -> session.toggleCapsLock()
                 is PopupAction.ClassicLayout -> switchClassic(action.enabled)
+                PopupAction.OpenSettings -> openSettings()
+                is PopupAction.SetAdaptation -> savePreference(KeyboardSettings.KEY_ADAPTATION, KeyboardSettings.storedName(action.mode))
+                is PopupAction.SetLayout -> savePreference(KeyboardSettings.KEY_LAYOUT, KeyboardSettings.storedName(action.kind))
+                // Le panneau PC est une couche de la vue, ouverte par la vue elle-même.
+                PopupAction.PcKeys -> Unit
+                // Le panneau des émojis aussi.
+                PopupAction.EmojiPanel -> Unit
             }
+
+            override fun onEmoji(emoji: String) = onEmojiChosen(emoji)
 
             override fun onBarItem(index: Int) = session.onBarItem(index)
 
@@ -161,6 +186,15 @@ class NextglyphInputMethodService : InputMethodService() {
         setSource(if (session.predictor != null) source else null)
         setState(session.state)
         keyboardView = this
+    }
+
+    /** Insère [emoji] et, hors incognito et champs sans apprentissage, le place en tête des récents. */
+    private fun onEmojiChosen(emoji: String) {
+        session.onEmoji(emoji)
+        if (!field.profile.learning || field.profile.incognito) return
+        emojiRecents.add(emoji)
+        services.preferences.edit().putString(KEY_EMOJI_RECENTS, emojiRecents.serialize()).apply()
+        keyboardView?.recentEmojis = emojiRecents.list
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
@@ -174,8 +208,10 @@ class NextglyphInputMethodService : InputMethodService() {
         fieldInputType = info.inputType
         val profile = InputProfileResolver.resolve(info.inputType, info.imeOptions, info.privateImeOptions)
         val enter = EnterBehaviorResolver.resolve(info.imeOptions, info.inputType)
-        fieldKeyboard = FieldKeyboard.of(profile, layoutKind, decimalPolicy.separatorFor(key), settings.rowHeightDp.toFloat())
+        fieldKeyboard = FieldKeyboard.of(profile, layoutKind, decimalPolicy.separatorFor(key), settings.rowHeightDp.toFloat(), wideSpace())
             .withClassic(keepClassic)
+        pcModifiers.reset()
+        showModifiers()
         startField(enter, info.initialSelStart, info.initialSelEnd)
     }
 
@@ -209,6 +245,16 @@ class NextglyphInputMethodService : InputMethodService() {
         session.onStartInput(field, selStart, selEnd)
     }
 
+    /** Menu rapide `⚙` (issue #27) : ouvre l'activité des réglages. */
+    private fun openSettings() {
+        startActivity(Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    /** Menu rapide `⚙` : enregistre un réglage, appliqué aussitôt par l'écouteur des préférences (§14). */
+    private fun savePreference(key: String, value: String) {
+        services.preferences.edit().putString(key, value).apply()
+    }
+
     /** Échappatoire « Disposition classique » (§4) : bascule, ou retour à la disposition du champ. */
     private fun switchClassic(enabled: Boolean) {
         val next = fieldKeyboard.withClassic(enabled)
@@ -222,8 +268,39 @@ class NextglyphInputMethodService : InputMethodService() {
         when (key.kind) {
             KeyKind.SHIFT -> session.onShiftKey(SystemClock.uptimeMillis(), ViewConfiguration.getDoubleTapTimeout().toLong())
             KeyKind.DECIMAL -> onDecimalKey()
-            else -> session.onKey(key, upper, offset)
+            KeyKind.SPACE -> if (upper) session.onSpaceSwipeUp() else session.onKey(key, upper, offset)
+            KeyKind.PC -> onPcKey(key)
+            else -> if (!sendModified(key)) session.onKey(key, upper, offset)
         }
+    }
+
+    /** Touche du panneau PC (§5.10) : événement clavier, ou bascule de `Ctrl` / `Alt`. */
+    private fun onPcKey(key: Key) {
+        val pc = PcKey.of(key.label) ?: return
+        pcModifiers.press(pc, SystemClock.uptimeMillis(), ViewConfiguration.getDoubleTapTimeout().toLong())?.let(::sendKeyEvent)
+        showModifiers()
+    }
+
+    /** Lettre ou chiffre tapé pendant qu'un modificateur PC est actif : `Ctrl+C`... (§5.10). Vrai si envoyé. */
+    private fun sendModified(key: Key): Boolean {
+        if (key.kind != KeyKind.LETTER && key.kind != KeyKind.CHARACTER) return false
+        val event = key.label.singleOrNull()?.let(pcModifiers::character) ?: return false
+        sendKeyEvent(event)
+        showModifiers()
+        return true
+    }
+
+    private fun sendKeyEvent(event: PcKeyEvent) {
+        val connection = currentInputConnection ?: return
+        // Le mot en cours est validé tel quel : l'événement agit sur le texte réel du champ.
+        connection.finishComposingText()
+        val now = SystemClock.uptimeMillis()
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, event.keyCode, 0, event.meta))
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, event.keyCode, 0, event.meta))
+    }
+
+    private fun showModifiers() {
+        keyboardView?.activeModifiers = PcModifier.entries.filter { pcModifiers.state(it) != PcModifiers.State.OFF }.toSet()
     }
 
     private fun onDecimalKey() {
@@ -289,7 +366,8 @@ class NextglyphInputMethodService : InputMethodService() {
         lexiconRevision = data?.personal?.lexiconRevision ?: Long.MIN_VALUE
         val personal = data?.personal?.copy()
         val contacts: List<ContactName> = services.contacts.contacts
-        val layout = KeyboardLayouts.of(layoutKind)
+        // Géométrie de repos du décodeur : celle qui est affichée, espace large compris (§5.1).
+        val layout = KeyboardLayouts.of(layoutKind).let { if (wideSpace()) KeyboardLayouts.widenSpace(it) else it }
         val rejections = data?.rejections ?: InMemoryRejectionStore()
         val generation = ++stackGeneration
         executor.execute {
@@ -323,19 +401,23 @@ class NextglyphInputMethodService : InputMethodService() {
             view.bottomMarginDp = settings.bottomMarginDp
         }
         val kindChanged = kind != layoutKind
-        if (kindChanged || settings.rowHeightDp != previous.rowHeightDp ||
+        if (kindChanged || settings.rowHeightDp != previous.rowHeightDp || settings.wideSpace != previous.wideSpace ||
             settings.autocommit != previous.autocommit || settings.prudence != previous.prudence
         ) {
             layoutKind = kind
-            fieldKeyboard = FieldKeyboard.of(fieldKeyboard.requested, kind, fieldKeyboard.decimalLabel, settings.rowHeightDp.toFloat())
+            fieldKeyboard = FieldKeyboard.of(fieldKeyboard.requested, kind, fieldKeyboard.decimalLabel, settings.rowHeightDp.toFloat(), wideSpace())
             session.onFinishInput()
             startField(field.enter, -1, -1)
         }
         val languagesChanged = settings.languages != previous.languages || settings.preferredLanguage != previous.preferredLanguage
         if (languagesChanged) resetLanguage = true
-        if (kindChanged || languagesChanged) rebuildPredictors()
+        if (kindChanged || languagesChanged || settings.wideSpace != previous.wideSpace) rebuildPredictors()
         if (settings.contacts != previous.contacts) services.syncContacts()
     }
+
+    /** « Espace large » (§5.1) : réglage actif et écran d'au moins 400 dp de large. */
+    private fun wideSpace(): Boolean =
+        settings.wideSpace && resources.configuration.screenWidthDp >= KeyboardLayouts.WIDE_SPACE_MIN_SCREEN_DP
 
     private fun preferredLanguage(): String {
         val subtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
@@ -345,5 +427,6 @@ class NextglyphInputMethodService : InputMethodService() {
     private companion object {
         const val LANGUAGE_SEPARATOR = "+"
         const val SAVE_DELAY_MS = 3000L
+        const val KEY_EMOJI_RECENTS = "emoji_recents"
     }
 }

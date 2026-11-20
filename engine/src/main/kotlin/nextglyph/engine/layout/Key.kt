@@ -31,6 +31,9 @@ enum class KeyKind {
 
     /** Emplacement vide d'un pavé : réserve la position, ne réagit pas (§8.1). */
     EMPTY,
+
+    /** Touche du panneau PC (§5.10) : envoie un événement clavier, désigné par son libellé (`PcKey.of`). */
+    PC,
 }
 
 /**
@@ -56,7 +59,9 @@ data class Key(val kind: KeyKind, val label: String, val restWidth: Float) {
             KeyKind.LETTER -> label
             KeyKind.SPACE -> " "
             KeyKind.CHARACTER -> label
-            KeyKind.SYMBOLS, KeyKind.ENTER, KeyKind.BACKSPACE, KeyKind.SHIFT, KeyKind.LETTERS, KeyKind.DECIMAL, KeyKind.EMPTY -> null
+            KeyKind.SYMBOLS, KeyKind.ENTER, KeyKind.BACKSPACE, KeyKind.SHIFT, KeyKind.LETTERS, KeyKind.DECIMAL, KeyKind.EMPTY,
+            KeyKind.PC,
+            -> null
         }
 
     companion object {

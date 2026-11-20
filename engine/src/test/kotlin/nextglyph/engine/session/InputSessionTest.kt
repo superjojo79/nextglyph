@@ -88,6 +88,32 @@ class InputSessionTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `émoji - le mot en cours est validé sans espace, puis l'émoji inséré`() {
+            val s = setup()
+
+            s.type("bonj")
+            s.session.onEmoji("👋🏽")
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("Bonjour👋🏽")
+        }
+
+        @Test
+        fun `glisser vers le haut sur l'espace - insère la suggestion centrale même si elle ne domine pas`() {
+            val s = setup()
+
+            s.type("bo")
+            val center = s.session.state.bar.items[InputSession.CENTER_ITEM]
+            assertThat(center?.text).isEqualTo("Bonjour")
+            assertThat(s.session.state.spaceLabel).isNull()
+            s.session.onSpaceSwipeUp()
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("Bonjour ")
+            assertThat(s.session.state.bar.mode).isEqualTo(BarMode.PUNCTUATION)
+        }
+
+        @Test
         fun `bonj, virgule, ça va, point d'interrogation par la barre - phrase complète et typographie française`() {
             val s = setup()
 
@@ -353,6 +379,22 @@ class InputSessionTest {
     @Nested
     inner class ErrorCases {
         @Test
+        fun `émoji vide refusé`() {
+            assertThatThrownBy { setup().session.onEmoji("") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("vide")
+        }
+
+        @Test
+        fun `glisser vers le haut sur l'espace sans mot en cours - vaut un appui sur l'espace`() {
+            val s = setup()
+
+            s.type("bonjour ")
+            s.session.onSpaceSwipeUp()
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo(s.run { val o = setup(); o.type("bonjour  "); o.editor.toString() })
+        }
+
+        @Test
         fun `lettre ou caractère vide refusés`() {
             val s = setup()
 
@@ -430,6 +472,27 @@ class InputSessionTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `émoji dans un champ qui ne lit pas le texte - inséré tel quel`() {
+            val s = setup(field = field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD))
+
+            s.session.onEmoji("😀")
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("😀")
+        }
+
+        @Test
+        fun `glisser vers le haut sur l'espace dans un champ sans suggestions - une espace`() {
+            val s = setup(field = field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_FLAG_NO_SUGGESTIONS))
+
+            s.type("bo")
+            s.session.onSpaceSwipeUp()
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("bo ")
+        }
+
         @Test
         fun `mises à jour de sélection en retard - reconnues, rien n'est réinitialisé`() {
             val s = setup(field = field(C.TYPE_CLASS_TEXT))

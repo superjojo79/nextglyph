@@ -205,3 +205,28 @@ tasks.register<JavaExec>("analyzeEngine") {
     )
     outputs.upToDateWhen { false }
 }
+
+// ---------------------------------------------------------------------------
+// Émojis (issue #26, package nextglyph.tools.emoji, testé).
+// ---------------------------------------------------------------------------
+
+// Régénère ime/src/main/assets/emoji.txt à partir de data-by-group.json du paquet npm
+// unicode-emoji-json (source, version et SHA-256 : docs/DATA.md) : -PemojiJson=<chemin>.
+tasks.register<JavaExec>("buildEmoji") {
+    group = "data"
+    description = "Régénère l'asset des émojis (-PemojiJson=<data-by-group.json>)."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.emoji.BuildEmojiMainKt")
+    val json = providers.gradleProperty("emojiJson")
+    args(
+        listOfNotNull(
+            json.orNull,
+            rootProject.layout.projectDirectory.file("ime/src/main/assets/emoji.txt").asFile.path,
+        ),
+    )
+    outputs.upToDateWhen { false }
+}
+
+pitest {
+    excludedClasses.add("nextglyph.tools.emoji.BuildEmojiMainKt")
+}

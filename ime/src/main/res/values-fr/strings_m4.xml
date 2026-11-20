@@ -14,6 +14,8 @@
     <string name="pref_row_height">Hauteur des rangées</string>
     <string name="pref_row_height_value">%1$d dp</string>
     <string name="pref_bottom_margin">Marge basse (au-dessus des boutons système)</string>
+    <string name="pref_wide_space">Espace large</string>
+    <string name="pref_wide_space_summary">\?123, ↵ et ⌫ plus étroites, barre d\'espace plus large (écrans d\'au moins 400 dp).</string>
     <string name="pref_haptics">Retour haptique</string>
     <string name="pref_haptics_off">Désactivé</string>
     <string name="pref_haptics_light">Léger</string>
@@ -89,4 +91,8 @@
     <string name="a11y_shift_locked">verrouillée</string>
     <string name="a11y_suggestion">Suggestion %1$s</string>
     <string name="a11y_inserted">Inséré : %1$s</string>
+    <string name="pref_section_gestures">Gestes</string>
+    <string name="pref_gestures_help">• Majuscule : glisser vers le haut sur une lettre.\n• Majuscules verrouillées : ?123, puis appui long sur ABC (⇪).\n• Accents : appui long sur une voyelle ou sur c.\n• Symboles voisins : sur la couche ?123, appui long sur un symbole ; le petit signe en coin indique le premier (_ sur -, = sur +…).\n• Valider la suggestion centrale : glisser vers le haut sur l\'espace.\n• Ponctuation rapide, touches PC (Ctrl, Alt, F1…F12) et disposition classique (avec ⇧) : appui long sur ?123.\n• Émojis : appui long sur ↵ (☺).\n• Réglages, mode et disposition : ⚙ à gauche de la barre de suggestions.\n• Langue : appui long sur l\'espace.\n• Retirer un mot appris : appui long sur la suggestion.</string>
+    <string name="a11y_settings">Réglages rapides</string>
+    <string name="a11y_emoji_recents">Émojis récents</string>
 </resources>

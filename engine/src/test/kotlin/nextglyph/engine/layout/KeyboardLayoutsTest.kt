@@ -14,6 +14,18 @@ class KeyboardLayoutsTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `espace large AZERTY - symboles, entrée et effacement à 0,8 u, espace à 2,2 u`() {
+            val row = KeyboardLayouts.widenSpace(KeyboardLayouts.AZERTY).rows[2]
+
+            assertThat(row.keys.filter { it.kind != KeyKind.LETTER }.map { it.kind to it.restWidth }).containsExactly(
+                KeyKind.SYMBOLS to 0.8f,
+                KeyKind.SPACE to 2.2f,
+                KeyKind.ENTER to 0.8f,
+                KeyKind.BACKSPACE to 0.8f,
+            )
+        }
+
+        @Test
         fun `AZERTY a les lettres du §5-1`() {
             val rows = KeyboardLayouts.AZERTY.rows
 
@@ -69,6 +81,19 @@ class KeyboardLayoutsTest {
 
     @Nested
     inner class ErrorCases {
+        @Test
+        fun `espace large - rangées sans espace et largeurs déjà étroites inchangées`() {
+            val narrow = KeyboardLayout(
+                LayoutKind.AZERTY,
+                listOf(KeyRow(listOf(Key(KeyKind.ENTER, "↵", 0.5f), Key(KeyKind.SPACE, "", 9f), Key(KeyKind.BACKSPACE, "⌫", 0.5f)))),
+            )
+            val widened = KeyboardLayouts.widenSpace(KeyboardLayouts.QWERTY)
+
+            assertThat(widened.rows[0]).isSameAs(KeyboardLayouts.QWERTY.rows[0])
+            assertThat(widened.rows[1]).isSameAs(KeyboardLayouts.QWERTY.rows[1])
+            assertThat(KeyboardLayouts.widenSpace(narrow).rows[0].restWidths).containsExactly(0.5f, 9f, 0.5f)
+        }
+
         @ParameterizedTest
         @EnumSource(LayoutKind::class)
         fun `chaque touche fonctionnelle est présente exactement une fois`(kind: LayoutKind) {
@@ -91,6 +116,21 @@ class KeyboardLayoutsTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `espace large QWERTY - entrée hors rangée, espace à 2,1 u, rôle, genre et retrait conservés`() {
+            val widened = KeyboardLayouts.widenSpace(KeyboardLayouts.QWERTY)
+            val row = widened.rows[2]
+
+            assertThat(row.keys.single { it.kind == KeyKind.SPACE }.restWidth).isCloseTo(2.1f, Offset.offset(1e-4f))
+            assertThat(row.restUnits).isCloseTo(10f, Offset.offset(1e-3f))
+            assertThat(widened.kind).isEqualTo(LayoutKind.QWERTY)
+            assertThat(widened.role).isEqualTo(LayoutRole.TEXT)
+            assertThat(KeyboardLayouts.widenSpace(SpecialLayouts.textSymbols()).role).isEqualTo(LayoutRole.TEXT_SYMBOLS)
+            val inset = KeyboardLayout(LayoutKind.AZERTY, listOf(KeyRow(listOf(Key(KeyKind.SPACE, "", 8f), Key(KeyKind.ENTER, "↵", 1f)), leadingInset = 1f)))
+            assertThat(KeyboardLayouts.widenSpace(inset).rows[0].leadingInset).isEqualTo(1f)
+            assertThat(KeyboardLayouts.WIDE_SPACE_MIN_SCREEN_DP).isEqualTo(400)
+        }
+
         @ParameterizedTest
         @EnumSource(LayoutKind::class)
         fun `chaque rangée fait 10 u retrait compris`(kind: LayoutKind) {

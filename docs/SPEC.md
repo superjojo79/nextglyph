@@ -31,7 +31,7 @@ Un clavier mobile **compact** qui garde une disposition AZERTY ou QWERTY immédi
 - iOS (le moteur est toutefois écrit pour rester portable, cf. §11).
 - Toute fonctionnalité nécessitant le réseau.
 - Langues autres que le français et l'anglais (l'architecture doit cependant les permettre, cf. §10).
-- Emojis, GIF, presse-papiers avancé.
+- GIF, presse-papiers avancé (les émojis, d'abord exclus, sont couverts par le §5.11).
 
 ---
 
@@ -139,6 +139,10 @@ Rangée 3 : ABC | , . ! ? ' : | espace | ↵ | ⌫                          1 + 
 
 `ABC` ramène aux lettres. Les caractères moins courants (`* " ; = [ ]`, etc.) ne sont pas sur cette couche en V1 : ils sont sur la disposition classique (§7.1), accessible par l'échappatoire du §4, et dans les menus d'appui long de la couche (symboles voisins : `-` → `_ – —`, `+` → `= * × ÷`, `(` → `[ { <`, `)` → `] } >`, `/` → `\ |`, `€` → `$ £ ¥`, `%` → `‰ ^ ~`, `&` → `§ °`, `'` → `" « » ’`, `,` et `:` → `;`, `.` → `… ·`, `?` → `¿`, `!` → `¡`). Appui long sur `ABC` : majuscule verrouillée `⇪` (§5.7).
 
+**Espace large** (réglage, issue #23). Sur les écrans d'au moins 400 dp de large, le réglage « Espace large » réduit `?123` (ou `ABC`), `↵` et `⌫` de la rangée de l'espace à 0,8 u ; l'espace reprend la largeur libérée (2,2 u en AZERTY et sur la couche `?123`, 2,1 u en QWERTY où `↵` est en rangée 2). Les lettres de la rangée 3 se décalent d'autant ; le décodeur utilise la même géométrie de repos. Désactivé par défaut ; sans effet sur le mot de passe, la disposition classique et les pavés.
+
+**Indices.** Une touche qui a un menu d'appui long affiche dans son coin un petit indice (contraste ≥ 3:1, §13) : sur la couche `?123`, le premier symbole voisin (`_` sur `-`, `=` sur `+`…) ; `⇪` sur `ABC` ; `…` sur `?123` quand son menu n'est pas vide. Les lettres n'en ont pas (variantes accentuées attendues). Les réglages ont une section « Gestes » qui résume les gestes du §5.9 (issue #21).
+
 La touche `↵` est contextuelle d'après `imeOptions` : envoyer, rechercher, aller, suivant, terminé, ou saut de ligne si le champ est multiligne et n'a pas d'action. Libellés : `➤` envoyer, `⌕` rechercher, `➔` aller, `⇥` suivant, `⇤` précédent, `✓` terminé, `↵` saut de ligne, touche Entrée ou action inconnue (`EnterKeyLabel`). Même règle sur toutes les dispositions (mot de passe, pavés).
 
 ### 5.2 Adaptation visuelle
@@ -197,7 +201,9 @@ La barre a trois états :
 | Juste après une validation | Ponctuation (§5.6). |
 | Champ vide / début de texte | Mots probables en début de phrase (prédiction du mot suivant, V2), sinon vide. |
 
-Un tap sur une suggestion valide ce mot et ajoute une espace automatique.
+Un tap sur une suggestion valide ce mot et ajoute une espace automatique. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
+
+**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. Les trois cases de suggestions se partagent le reste de la largeur.
 
 ### 5.5 Validation par espace
 
@@ -281,10 +287,37 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 | Geste | Effet |
 |---|---|
 | Glisser vers le haut sur une lettre | Majuscule |
+| Glisser vers le haut sur l'espace | Insère la suggestion centrale, même si elle ne domine pas (comme un tap sur elle), puis une espace ; sans suggestion, une espace |
 | Glisser vers la gauche depuis ⌫ | Efface le mot précédent (répété en continuant) |
 | Glisser horizontalement sur l'espace | Déplace le curseur |
-| Appui long sur `?123` | Menu ponctuation rapide / « Disposition classique » |
+| Appui long sur `?123` | Menu ponctuation rapide / panneau « PC » (§5.10) / « Disposition classique » |
 | Appui long sur une lettre | Variantes accentuées |
+| Appui long sur `↵` | Panneau des émojis (§5.11), dans les profils qui affichent la barre de suggestions |
+
+### 5.10 Panneau des touches PC
+
+Pour les usages techniques (SSH, RDP, TeamViewer ; issue #28). Ouvert depuis le menu d'appui long de `?123` (case « PC », profils à disposition compacte), il remplace la couche `?123` ; `ABC` ramène aux lettres.
+
+```
+Rangée 1 : Échap Tab Ctrl Alt Début Fin PgPr PgSv Inser Suppr        10 × 1 u
+Rangée 2 : F1 … F10                                                  10 × 1 u
+Rangée 3 : ABC | F11 F12 ← ↑ ↓ → | C+A+Sup | ⌫                       1,5 + 6 + 1,5 + 1 = 10 u
+```
+
+- Chaque touche envoie un vrai événement clavier (`InputConnection.sendKeyEvent`, appui puis relâchement), après validation du mot en cours tel quel.
+- `Ctrl` et `Alt` sont **collants** : un tap les active pour la prochaine touche, deux taps rapides les verrouillent, un tap les relâche ; actifs, ils sont affichés enfoncés. Pendant qu'un modificateur est actif, une lettre ou un chiffre tapé sur les lettres ou la couche `?123` part en événement clavier avec le modificateur (`Ctrl+C`, `Ctrl+V`, `Alt+F4`…). Les modificateurs sont relâchés à chaque changement de champ.
+- `C+A+Sup` envoie `Ctrl+Alt+Suppr` en une touche ; les clients RDP l'interceptent souvent et ont alors leur propre bouton.
+- Ni adaptation, ni suggestions, ni apprentissage sur le panneau.
+
+### 5.11 Panneau des émojis
+
+Issue #26. Ouvert par un appui long sur `↵` (un indice `☺` dans le coin de la touche le signale), seulement dans les profils qui affichent la barre de suggestions (texte : jamais en mot de passe, pavés ni URL). Il remplace la barre et les touches, à hauteur égale :
+
+- **Onglets** (hauteur de la barre) : `ABC` (retour aux lettres), `🕘` (récents), un onglet par groupe Unicode (son premier émoji ; le groupe « composants » est exclu), `⌫` (efface comme la touche).
+- **Grille** de 8 × 3 émojis ; glisser horizontalement change de page (numéro `n/N` en bas à droite). Un tap insère l'émoji au curseur, après validation du mot en cours tel quel.
+- **Récents** : 32 au plus, le plus récent d'abord, enregistrés dans les préférences ; jamais alimentés en incognito ni dans un champ sans apprentissage (§9.2). Le panneau s'ouvre sur les récents s'il y en a, sinon sur le premier groupe.
+- **Données** : l'asset `emoji.txt` (groupe, émoji, version), généré par `./gradlew :tools:buildEmoji` depuis le paquet `unicode-emoji-json` (`docs/DATA.md`). Au chargement, seuls les émojis que la police du système sait dessiner (`Paint.hasGlyph`) sont proposés.
+- Pas de recherche par mot-clé ni de choix de couleur de peau en V1. Accessibilité : chaque onglet et chaque émoji est un nœud virtuel.
 
 ---
 
@@ -542,6 +575,7 @@ docs/        Cette spécification, décisions d'architecture.
 | Mode d'adaptation | Désactivé / Calme / Calme renforcé / Élastique | Calme renforcé |
 | Hauteur des rangées | 34–46 dp | 38 dp |
 | Marge basse | 0–48 dp, ajoutée aux encarts système (§13) | 0 dp |
+| Espace large | `?123`, `↵`, `⌫` à 0,8 u, espace élargie, écrans ≥ 400 dp (§5.1) | Désactivé |
 | Validation par espace | Oui / Non | Oui |
 | Prudence de la validation | Prudente / Normale / Audacieuse (modifie les seuils du §5.5) | Normale |
 | Typographie française | Oui / Non | Oui |

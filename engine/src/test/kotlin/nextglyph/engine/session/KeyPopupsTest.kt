@@ -1,7 +1,9 @@
 package nextglyph.engine.session
 
+import nextglyph.engine.adapt.AdaptationMode
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
+import nextglyph.engine.layout.LayoutKind
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -14,6 +16,36 @@ class KeyPopupsTest {
 
     @Nested
     inner class HappyPath {
+        @Test
+        fun `appui long sur entrée - panneau des émojis, avec son indice`() {
+            val enter = Key(KeyKind.ENTER, "↵", 1f)
+
+            assertThat(KeyPopups.forKey(enter, false, bilingual, emoji = true)).containsExactly(PopupItem("☺", PopupAction.EmojiPanel))
+            assertThat(KeyPopups.hint(enter, emoji = true)).isEqualTo("☺")
+        }
+
+        @Test
+        fun `indices - premier symbole voisin, majuscule verrouillée sur ABC, menu des symboles`() {
+            assertThat(KeyPopups.hint(Key.character('-'))).isEqualTo("_")
+            assertThat(KeyPopups.hint(Key.character('+'))).isEqualTo("=")
+            assertThat(KeyPopups.hint(Key(KeyKind.LETTERS, "ABC", 1f))).isEqualTo("⇪")
+            assertThat(KeyPopups.hint(Key(KeyKind.SYMBOLS, "?123", 1f))).isEqualTo("…")
+            assertThat(KeyPopups.hint(Key(KeyKind.SYMBOLS, "?123", 1f), SymbolsMenu.BACK_FROM_CLASSIC)).isEqualTo("…")
+        }
+
+        @Test
+        fun `menu rapide - réglages, mode suivant, autre disposition, échappatoire classique`() {
+            val menu = KeyPopups.settingsMenu(AdaptationMode.CALM_REINFORCED, LayoutKind.AZERTY, SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC)
+
+            assertThat(menu.map { it.label }).containsExactly("⚙", "Élastique", "QWERTY", "Classique")
+            assertThat(menu.map { it.action }).containsExactly(
+                PopupAction.OpenSettings,
+                PopupAction.SetAdaptation(AdaptationMode.ELASTIC),
+                PopupAction.SetLayout(LayoutKind.QWERTY),
+                PopupAction.ClassicLayout(true),
+            )
+        }
+
         @Test
         fun `appui long sur e et c - variantes accentuées`() {
             assertThat(KeyPopups.forKey(Key.letter('e'), false, bilingual).map { it.label }).containsExactly("é", "è", "ê", "ë")
@@ -35,12 +67,13 @@ class KeyPopupsTest {
         }
 
         @Test
-        fun `profil texte - la ponctuation rapide puis l'échappatoire Classique en dernière case`() {
+        fun `profil texte - la ponctuation rapide, le panneau PC puis l'échappatoire Classique en dernière case`() {
             val items = KeyPopups.forKey(Key(KeyKind.SYMBOLS, "?123", 1f), false, bilingual, SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC)
 
-            assertThat(items).hasSize(8)
+            assertThat(items).hasSize(9)
             assertThat(items.last()).isEqualTo(PopupItem("Classique", PopupAction.ClassicLayout(true)))
-            assertThat(items.dropLast(1).map { it.label }).containsExactly("-", "(", ")", "\"", ";", "@", "#")
+            assertThat(items[7]).isEqualTo(PopupItem("PC", PopupAction.PcKeys))
+            assertThat(items.dropLast(2).map { it.label }).containsExactly("-", "(", ")", "\"", ";", "@", "#")
         }
 
         @Test
@@ -93,6 +126,30 @@ class KeyPopupsTest {
 
     @Nested
     inner class ErrorCases {
+        @Test
+        fun `entrée sans panneau des émojis - ni menu ni indice`() {
+            val enter = Key(KeyKind.ENTER, "↵", 1f)
+
+            assertThat(KeyPopups.forKey(enter, false, bilingual)).isEmpty()
+            assertThat(KeyPopups.hint(enter)).isNull()
+        }
+
+        @Test
+        fun `pas d'indice - lettres, symbole sans voisin, touches de fonction`() {
+            assertThat(KeyPopups.hint(Key.letter('e'))).isNull()
+            assertThat(KeyPopups.hint(Key.character('@'))).isNull()
+            assertThat(KeyPopups.hint(Key(KeyKind.SPACE, "", 1.6f))).isNull()
+            assertThat(KeyPopups.hint(Key(KeyKind.BACKSPACE, "⌫", 1f))).isNull()
+        }
+
+        @Test
+        fun `menu rapide sans échappatoire - seulement réglages, mode et disposition`() {
+            val menu = KeyPopups.settingsMenu(AdaptationMode.OFF, LayoutKind.QWERTY, SymbolsMenu.QUICK_PUNCTUATION)
+
+            assertThat(menu.map { it.label }).containsExactly("⚙", "Calme", "AZERTY")
+            assertThat(KeyPopups.settingsMenu(AdaptationMode.OFF, LayoutKind.QWERTY, SymbolsMenu.NONE)).hasSize(3)
+        }
+
         @ParameterizedTest
         @ValueSource(chars = ['z', 'b', 'q'])
         fun `consonne sans variante - pas de menu`(letter: Char) {
@@ -119,6 +176,28 @@ class KeyPopupsTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `touche des symboles sans menu (mot de passe) - pas d'indice`() {
+            assertThat(KeyPopups.hint(Key(KeyKind.SYMBOLS, "?123", 1.5f), SymbolsMenu.NONE)).isNull()
+        }
+
+        @Test
+        fun `chaque symbole voisin a un indice égal à son premier voisin`() {
+            for ((symbol, neighbours) in KeyPopups.SYMBOLS) {
+                assertThat(KeyPopups.hint(Key.character(symbol[0]))).isEqualTo(neighbours.first())
+            }
+        }
+
+        @Test
+        fun `menu rapide - le cycle des modes revient au début, retour de la disposition classique`() {
+            val menu = KeyPopups.settingsMenu(AdaptationMode.ELASTIC, LayoutKind.AZERTY, SymbolsMenu.BACK_FROM_CLASSIC)
+
+            assertThat(menu[1].action).isEqualTo(PopupAction.SetAdaptation(AdaptationMode.OFF))
+            assertThat(menu[1].label).isEqualTo("Fixe")
+            assertThat(menu.last()).isEqualTo(PopupItem("Adaptative", PopupAction.ClassicLayout(false)))
+            assertThat(KeyPopups.settingsMenu(AdaptationMode.CALM, LayoutKind.AZERTY, SymbolsMenu.NONE)[1].label).isEqualTo("Renforcé")
+        }
+
         @Test
         fun `une seule langue - pas de menu sur l'espace`() {
             assertThat(KeyPopups.forKey(Key(KeyKind.SPACE, "", 1.6f), false, listOf("fr"))).isEmpty()

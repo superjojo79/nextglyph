@@ -66,4 +66,10 @@ are part of en.nglx)
   License: Creative Commons Attribution 2.0 France
   https://creativecommons.org/licenses/by/2.0/fr/
 
+unicode-emoji-json 0.9.0 (emoji list, ime/src/main/assets/emoji.txt)
+  Copyright (c) 2019 Mu-An Chiou, https://github.com/muan/unicode-emoji-json
+  License: MIT. Derived from Unicode emoji data, Copyright (c) Unicode, Inc.,
+  under the Unicode License v3, https://www.unicode.org/license.txt
+  Changes: reduced to group, emoji and version; "component" group removed.
+
 Details, URLs and checksums: docs/DATA.md and tools/data/sources.json.

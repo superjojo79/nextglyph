@@ -142,6 +142,16 @@ Réserves à lever avant la première publication :
 - **SCOWL** : voir la remarque sur la mention COCA (relecture juridique).
 - **Prototype web** : `prototype/data/fr.json` et `en.json` (générés par `:tools:exportPrototypeData`) sont un sous-ensemble des mêmes données ; ils portent les mêmes licences, ne sont pas versionnés et ne sont pas distribués. Le prototype n'est pas livré aux utilisateurs.
 
+## Émojis
+
+L'asset `ime/src/main/assets/emoji.txt` (environ 42 Ko, versionné) liste les émojis du panneau (§5.11) : une ligne `groupe<TAB>émoji<TAB>version`, dans l'ordre Unicode, sans le groupe « composants ».
+
+| Nom, version | URL | SHA-256 | Taille | Licence |
+|---|---|---|---|---|
+| `unicode-emoji-json` 0.9.0 (npm), fichier `data-by-group.json` | https://registry.npmjs.org/unicode-emoji-json/-/unicode-emoji-json-0.9.0.tgz | `ae7efacb55533385bf8767d613dbd36c71226669759d95919a6e9059f5e4c401` | 71 855 o | MIT (Mu-An Chiou) ; données d'origine Unicode, sous la Unicode License v3 |
+
+Régénération : extraire l'archive puis `./gradlew :tools:buildEmoji -PemojiJson=<chemin>/package/data-by-group.json` (logique dans `nextglyph.tools.emoji`, testée). Attribution reprise dans `NOTICE`.
+
 ## Points d'attention pour F-Droid
 
 - **Reproductibilité des sommes de contrôle.** Les exports Tatoeba sont écrasés chaque semaine : après quelques jours, `fetchData` échoue sur l'empreinte (comportement voulu). La recette F-Droid ne doit pas en dépendre. Solution recommandée : publier un instantané (≤ 100 Mo, autorisé par CC BY) comme pièce jointe d'une release du dépôt et pointer `sources.json` vers lui. Même précaution pour tout fichier hébergé sur un site non versionné (le zip Lexique a été modifié le 17 novembre 2026).

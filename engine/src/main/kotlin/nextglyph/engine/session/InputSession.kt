@@ -206,8 +206,8 @@ class InputSession(
             KeyKind.BACKSPACE -> onBackspace()
             KeyKind.ENTER -> onEnter()
             // Couches, majuscule du pavé mot de passe, séparateur décimal, emplacements vides :
-            // gérés par l'IME (dispositions du profil, M3).
-            KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY -> Unit
+            // gérés par l'IME (dispositions du profil, M3). Touches PC : événements clavier envoyés par l'IME (§5.10).
+            KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC -> Unit
         }
     }
 
@@ -252,6 +252,15 @@ class InputSession(
             sign in EditConfig.SUPPORTED_SIGNS -> onPunctuation(sign)
             else -> plain(text, validate = true)
         }
+    }
+
+    /**
+     * Émoji choisi dans le panneau (§5.11) : le mot en cours est d'abord validé comme devant un signe
+     * (§5.5, sans espace), puis l'émoji est inséré tel quel, quelle que soit sa longueur.
+     */
+    fun onEmoji(text: String) {
+        require(text.isNotEmpty()) { "Un émoji ne peut pas être vide." }
+        plain(text, validate = field.readsText)
     }
 
     /** Raccourci de la barre (e-mail, URL) : inséré tel quel. */
@@ -392,6 +401,17 @@ class InputSession(
             BarMode.SHORTCUTS -> onShortcut(item.text)
             BarMode.EMPTY -> Unit
         }
+    }
+
+    /**
+     * Glisser vers le haut sur l'espace (§5.9) : insère la suggestion centrale de la barre de mots, même si
+     * elle ne domine pas, comme un tap sur elle (§5.4). Sans suggestion centrale (pas de mot en cours, barre
+     * de ponctuation ou de raccourcis), le geste vaut un appui sur l'espace.
+     */
+    fun onSpaceSwipeUp() {
+        val bar = state.bar
+        val center = bar.items.getOrNull(CENTER_ITEM)
+        if (bar.mode == BarMode.WORDS && center != null) pickSuggestion(center) else onSpace()
     }
 
     /** Menu de l'espace : verrouille [code], ou revient au mode automatique si `null` (§10.6). */
@@ -676,6 +696,9 @@ class InputSession(
     private fun Suggestion.toItem() = BarItem(text, highlighted, isTyped)
 
     companion object {
+        /** Case centrale de la barre de mots : le mot que l'espace insérera (§5.4). */
+        const val CENTER_ITEM: Int = 1
+
         /** Caractères demandés avant le curseur. */
         const val LOOKBACK: Int = WordPrefix.LOOKBACK
 

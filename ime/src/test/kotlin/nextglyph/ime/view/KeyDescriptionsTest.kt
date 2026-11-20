@@ -45,6 +45,7 @@ class KeyDescriptionsTest {
             assertThat(describe(KeyKind.SHIFT, "⇧")).isEqualTo("majuscule")
             assertThat(describe(KeyKind.CHARACTER, "?")).isEqualTo("?")
             assertThat(describe(KeyKind.DECIMAL, ",")).isEqualTo(",")
+            assertThat(describe(KeyKind.PC, "Échap")).isEqualTo("Échap")
         }
 
         @Test
