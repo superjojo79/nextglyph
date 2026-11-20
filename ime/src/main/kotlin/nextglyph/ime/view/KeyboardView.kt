@@ -91,6 +91,9 @@ class KeyboardView(context: Context) : View(context) {
         /** Émoji choisi dans le panneau (§5.11). */
         fun onEmoji(emoji: String)
 
+        /** Texte choisi dans l'historique du presse-papiers (issue #35). */
+        fun onClipText(text: String)
+
         /** Glisser horizontalement sur l'espace (§5.9) : déplacer le curseur de [steps] caractères (négatif : à gauche). */
         fun onCursorSteps(steps: Int)
 
@@ -322,9 +325,9 @@ class KeyboardView(context: Context) : View(context) {
         val labelChanged = enterLabel != this.enterLabel
         fieldKeyboard = keyboard
         this.enterLabel = enterLabel
-        // Nouveau champ : le panneau des émojis se referme.
+        // Nouveau champ : le panneau des émojis ou du presse-papiers se referme.
         if (emojiShown) {
-            emojiShown = false
+            gridPanel = null
             accessibility.invalidateNodes()
         }
         if (layoutsChanged) {
@@ -447,7 +450,15 @@ class KeyboardView(context: Context) : View(context) {
 
     /** Panneau des émojis (§5.11) : créé à la première ouverture (lecture de l'asset, filtrage des glyphes). */
     private var emojiPanel: EmojiPanel? = null
-    private var emojiShown = false
+
+    /** Panneau du presse-papiers (issue #35) : même grille, deux colonnes de textes. */
+    private val clipPanel = EmojiPanel(
+        EmojiCatalog(emptyList()), CLIP_COLUMNS, CLIP_ROWS, KeyPopups.CLIPBOARD_LABEL, fitText = true,
+    )
+
+    /** Panneau affiché à la place de la barre et des touches (émojis ou presse-papiers), ou `null`. */
+    private var gridPanel: EmojiPanel? = null
+    private val emojiShown: Boolean get() = gridPanel != null
     private val emojiPaint = labelPaint(textPx(EMOJI_TEXT_SP))
 
     /** Émojis récents, du plus récent au plus ancien (§5.11). */
@@ -457,6 +468,29 @@ class KeyboardView(context: Context) : View(context) {
             emojiPanel?.recents = value
             if (emojiShown) invalidate()
         }
+
+    /** Historique du presse-papiers, du plus récent au plus ancien (issue #35). */
+    var clipTexts: List<String> = emptyList()
+        set(value) {
+            field = value
+            clipPanel.recents = value
+            if (gridPanel === clipPanel) invalidate()
+        }
+
+    /** Affiche l'historique du presse-papiers (issue #35). */
+    private fun showClipboard() {
+        if (gridPanel === clipPanel) return
+        closePopup()
+        cancelPendingPopup()
+        keyboard.cancelPointers(now())
+        clipPanel.recents = clipTexts
+        clipPanel.emptyText = context.getString(R.string.clipboard_empty)
+        clipPanel.open()
+        layoutEmoji()
+        gridPanel = clipPanel
+        accessibility.invalidateNodes()
+        invalidate()
+    }
 
     /** Affiche le panneau des émojis, ou revient aux lettres. */
     private fun showEmoji(shown: Boolean) {
@@ -470,7 +504,7 @@ class KeyboardView(context: Context) : View(context) {
             panel.open()
             layoutEmoji()
         }
-        emojiShown = shown
+        gridPanel = if (shown) emojiPanel else null
         accessibility.invalidateNodes()
         invalidate()
     }
@@ -483,13 +517,15 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun layoutEmoji() {
         emojiPanel?.layout(width.toFloat(), barPx, keysHeightPx(lettersLayout.rows.size))
+        clipPanel.layout(width.toFloat(), barPx, keysHeightPx(lettersLayout.rows.size))
     }
 
     private fun onEmojiAction(action: EmojiPanel.Action?) {
         when (action) {
             EmojiPanel.Action.Letters -> showEmoji(false)
             EmojiPanel.Action.Backspace -> listener?.onKey(Key(KeyKind.BACKSPACE, "⌫", 1f), false, null)
-            is EmojiPanel.Action.Insert -> listener?.onEmoji(action.emoji)
+            is EmojiPanel.Action.Insert ->
+                if (gridPanel === clipPanel) listener?.onClipText(action.emoji) else listener?.onEmoji(action.emoji)
             null -> Unit
         }
         invalidate()
@@ -519,7 +555,7 @@ class KeyboardView(context: Context) : View(context) {
         private val emojiRect = RectF()
 
         /** Panneau des émojis affiché : ses onglets puis les cases de la page sont les nœuds. */
-        private val emoji: EmojiPanel? get() = if (emojiShown) emojiPanel else null
+        private val emoji: EmojiPanel? get() = gridPanel
 
         private fun emojiBounds(panel: EmojiPanel, id: Int, out: android.graphics.Rect): Boolean {
             val tabs = panel.tabLabels.size
@@ -534,7 +570,7 @@ class KeyboardView(context: Context) : View(context) {
             return when {
                 id == 0 -> context.getString(R.string.a11y_letters)
                 id == tabs - 1 -> context.getString(R.string.a11y_backspace)
-                id == 1 -> context.getString(R.string.a11y_emoji_recents)
+                id == 1 -> context.getString(if (panel === clipPanel) R.string.a11y_clipboard else R.string.a11y_emoji_recents)
                 id < tabs -> panel.tabLabels[id]
                 else -> panel.pageItems().getOrNull(id - tabs)
             }
@@ -745,8 +781,8 @@ class KeyboardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(backgroundColor)
         if (width <= 0) return
-        val panel = emojiPanel
-        if (emojiShown && panel != null) {
+        val panel = gridPanel
+        if (panel != null) {
             fillPaint.color = pressedColor
             fillPaint.alpha = Color.alpha(pressedColor)
             functionPaint.textSize = functionTextPx
@@ -972,8 +1008,8 @@ class KeyboardView(context: Context) : View(context) {
     // Avec TalkBack, les touches sont des nœuds virtuels activés par ACTION_CLICK (KeyboardAccessibility, §13).
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val panel = emojiPanel
-        if (emojiShown && panel != null) {
+        val panel = gridPanel
+        if (panel != null) {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     panel.down(event.x, event.y)
@@ -1221,6 +1257,7 @@ class KeyboardView(context: Context) : View(context) {
         when (action) {
             PopupAction.PcKeys -> showPcKeys()
             PopupAction.EmojiPanel -> showEmoji(true)
+            PopupAction.Clipboard -> showClipboard()
             else -> listener?.onPopup(action)
         }
     }
@@ -1271,6 +1308,10 @@ class KeyboardView(context: Context) : View(context) {
         private const val MIN_BAR_SCALE = 0.6f
         private const val POPUP_ITEM_DP = 40f
         private const val POPUP_WIDE_DP = 64f
+
+        /** Grille du presse-papiers (issue #35). */
+        private const val CLIP_COLUMNS = 2
+        private const val CLIP_ROWS = 3
 
         /** Asset des émojis (`:tools:buildEmoji`, §5.11). */
         private const val EMOJI_ASSET = "emoji.txt"

@@ -88,6 +88,17 @@ class InputSessionTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `texte du presse-papiers - le mot en cours est validé, puis le texte inséré`() {
+            val s = setup()
+
+            s.type("bonj ")
+            s.session.onClipText("https://exemple.org")
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("Bonjour https://exemple.org")
+        }
+
+        @Test
         fun `glisser depuis effacement - efface le mot précédent puis le suivant`() {
             val s = setup("Il fait beau ")
 
@@ -402,6 +413,11 @@ class InputSessionTest {
 
     @Nested
     inner class ErrorCases {
+        @Test
+        fun `texte du presse-papiers vide refusé`() {
+            assertThatThrownBy { setup().session.onClipText("") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("vide")
+        }
+
         @Test
         fun `glisser depuis effacement dans un champ vide ou mot de passe - rien ou touche Retour arrière`() {
             val empty = setup()

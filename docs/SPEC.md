@@ -31,7 +31,7 @@ Un clavier mobile **compact** qui garde une disposition AZERTY ou QWERTY immédi
 - iOS (le moteur est toutefois écrit pour rester portable, cf. §11).
 - Toute fonctionnalité nécessitant le réseau.
 - Langues autres que le français et l'anglais (l'architecture doit cependant les permettre, cf. §10).
-- GIF, presse-papiers avancé (les émojis, d'abord exclus, sont couverts par le §5.11).
+- GIF, presse-papiers avancé (épinglage, synchronisation) ; les émojis (§5.11) et un historique simple du presse-papiers (§5.13) sont couverts.
 
 ---
 
@@ -203,7 +203,7 @@ La barre a trois états :
 
 Un tap sur une suggestion valide ce mot et ajoute une espace automatique. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
 
-**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. À droite, un bouton `✥` de même largeur ouvre le panneau Navigation (§5.12) ; les trois cases de suggestions se partagent la largeur restante.
+**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), `📋` (historique du presse-papiers, §5.13), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. À droite, un bouton `✥` de même largeur ouvre le panneau Navigation (§5.12) ; les trois cases de suggestions se partagent la largeur restante.
 
 ### 5.5 Validation par espace
 
@@ -332,6 +332,14 @@ ABC  Début  Fin  | Suppr  ⌫
 - Les flèches, `Début`, `Fin` et `Suppr` envoient de vrais événements clavier (comme le panneau PC, §5.10) ; `Mot ←` et `Mot →` sont `Ctrl` + flèche.
 - `Sélect.` bascule le mode Sélection (touche affichée enfoncée) : les déplacements portent alors `Maj` et étendent la sélection. `Tout`, `Copier`, `Couper` et `Coller` sont les actions d'édition de l'éditeur (`performContextMenuAction`) ; elles, et `Suppr`, quittent le mode Sélection, qui est aussi remis à zéro à chaque champ.
 - Le mot en cours est validé tel quel avant chaque action. Ni adaptation ni suggestions sur le panneau.
+
+### 5.13 Historique du presse-papiers
+
+Issue #35. Tant qu'il est le clavier actif, Nextglyph écoute les changements du presse-papiers (`OnPrimaryClipChangedListener`) et garde les 10 derniers textes copiés (le plus récent d'abord, sans doublon, 5 000 caractères au plus chacun).
+
+- **En mémoire seulement** : jamais écrit sur disque ni journalisé ; perdu quand le clavier s'arrête.
+- Non alimenté en incognito, dans un champ qui ne lit pas le texte (mot de passe, pavés) ni pour un contenu marqué sensible (`ClipDescription.EXTRA_IS_SENSITIVE`).
+- Ouvert par la case `📋` du menu rapide `⚙` (§5.4) : même panneau que les émojis (§5.11), onglets `ABC`, `📋`, `⌫`, grille de 2 × 3 textes sur une ligne, raccourcis avec `…`. Un tap insère le texte au curseur, après validation du mot en cours tel quel.
 
 ---
 

@@ -37,9 +37,10 @@ class KeyPopupsTest {
         fun `menu rapide - réglages, mode suivant, autre disposition, échappatoire classique`() {
             val menu = KeyPopups.settingsMenu(AdaptationMode.CALM_REINFORCED, LayoutKind.AZERTY, SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC)
 
-            assertThat(menu.map { it.label }).containsExactly("⚙", "Élastique", "QWERTY", "Classique")
+            assertThat(menu.map { it.label }).containsExactly("⚙", "📋", "Élastique", "QWERTY", "Classique")
             assertThat(menu.map { it.action }).containsExactly(
                 PopupAction.OpenSettings,
+                PopupAction.Clipboard,
                 PopupAction.SetAdaptation(AdaptationMode.ELASTIC),
                 PopupAction.SetLayout(LayoutKind.QWERTY),
                 PopupAction.ClassicLayout(true),
@@ -146,8 +147,8 @@ class KeyPopupsTest {
         fun `menu rapide sans échappatoire - seulement réglages, mode et disposition`() {
             val menu = KeyPopups.settingsMenu(AdaptationMode.OFF, LayoutKind.QWERTY, SymbolsMenu.QUICK_PUNCTUATION)
 
-            assertThat(menu.map { it.label }).containsExactly("⚙", "Calme", "AZERTY")
-            assertThat(KeyPopups.settingsMenu(AdaptationMode.OFF, LayoutKind.QWERTY, SymbolsMenu.NONE)).hasSize(3)
+            assertThat(menu.map { it.label }).containsExactly("⚙", "📋", "Calme", "AZERTY")
+            assertThat(KeyPopups.settingsMenu(AdaptationMode.OFF, LayoutKind.QWERTY, SymbolsMenu.NONE)).hasSize(4)
         }
 
         @ParameterizedTest
@@ -192,10 +193,10 @@ class KeyPopupsTest {
         fun `menu rapide - le cycle des modes revient au début, retour de la disposition classique`() {
             val menu = KeyPopups.settingsMenu(AdaptationMode.ELASTIC, LayoutKind.AZERTY, SymbolsMenu.BACK_FROM_CLASSIC)
 
-            assertThat(menu[1].action).isEqualTo(PopupAction.SetAdaptation(AdaptationMode.OFF))
-            assertThat(menu[1].label).isEqualTo("Fixe")
+            assertThat(menu[2].action).isEqualTo(PopupAction.SetAdaptation(AdaptationMode.OFF))
+            assertThat(menu[2].label).isEqualTo("Fixe")
             assertThat(menu.last()).isEqualTo(PopupItem("Adaptative", PopupAction.ClassicLayout(false)))
-            assertThat(KeyPopups.settingsMenu(AdaptationMode.CALM, LayoutKind.AZERTY, SymbolsMenu.NONE)[1].label).isEqualTo("Renforcé")
+            assertThat(KeyPopups.settingsMenu(AdaptationMode.CALM, LayoutKind.AZERTY, SymbolsMenu.NONE)[2].label).isEqualTo("Renforcé")
         }
 
         @Test

@@ -265,6 +265,12 @@ class InputSession(
     }
 
     /** Raccourci de la barre (e-mail, URL) : inséré tel quel. */
+    /** Texte de l'historique du presse-papiers (issue #35) : inséré comme un collage, après validation du mot en cours. */
+    fun onClipText(text: String) {
+        require(text.isNotEmpty()) { "Texte vide." }
+        plain(text, validate = field.readsText)
+    }
+
     fun onShortcut(text: String) = plain(text, validate = false)
 
     /** Touche espace : validation par espace (§5.5), double espace (§5.6). */
