@@ -1,6 +1,7 @@
 package nextglyph.engine.session
 
 import nextglyph.engine.layout.KeyboardLayout
+import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.layout.KeyboardMetrics
 import nextglyph.engine.layout.LayoutKind
 import nextglyph.engine.layout.SpecialLayouts
@@ -26,6 +27,7 @@ import nextglyph.engine.profile.ProfileLayouts
  * @property rowHeightDp hauteur d'une rangée : 44 dp pour les pavés (§8), [textRowHeightDp] sinon.
  * @property showsBar barre au-dessus des touches (profils à disposition compacte seulement).
  * @property symbolsMenu contenu du menu d'appui long sur `?123`.
+ * @property wideSpace réglage « Espace large » (§5.1) : appliqué aux dispositions compactes seulement.
  * @property id identifiant de la paire ([main], [symbols]) : deux claviers de même [id] ont les mêmes dispositions.
  */
 class FieldKeyboard private constructor(
@@ -34,13 +36,16 @@ class FieldKeyboard private constructor(
     private val kind: LayoutKind,
     val decimalLabel: Char,
     private val textRowHeightDp: Float,
+    val wideSpace: Boolean,
 ) {
     val profile: InputProfile = if (classic) InputProfileResolver.classic(requested) else requested
 
-    val main: KeyboardLayout = ProfileLayouts.of(profile, kind, decimalLabel)
+    private val widen: Boolean = wideSpace && profile.layout == ProfileLayout.COMPACT
+
+    val main: KeyboardLayout = ProfileLayouts.of(profile, kind, decimalLabel).let { if (widen) KeyboardLayouts.widenSpace(it) else it }
 
     val symbols: KeyboardLayout? = when (profile.layout) {
-        ProfileLayout.COMPACT -> SpecialLayouts.textSymbols(kind)
+        ProfileLayout.COMPACT -> SpecialLayouts.textSymbols(kind).let { if (widen) KeyboardLayouts.widenSpace(it) else it }
         ProfileLayout.PASSWORD -> SpecialLayouts.passwordSymbols(kind)
         ProfileLayout.NUMBER_PAD, ProfileLayout.PHONE_PAD, ProfileLayout.DATE_TIME_PAD, ProfileLayout.PIN_PAD -> null
     }
@@ -61,7 +66,7 @@ class FieldKeyboard private constructor(
     val id: String = buildString {
         append(main.role).append('/').append(main.kind)
         append('/').append(profile.numberSigned).append('/').append(profile.numberDecimal).append('/').append(decimalLabel)
-        append('/').append(profile.dateTimeVariant)
+        append('/').append(profile.dateTimeVariant).append('/').append(widen)
     }
 
     /**
@@ -69,14 +74,14 @@ class FieldKeyboard private constructor(
      * celui demandé, ou si le profil n'a pas de disposition compacte.
      */
     fun withClassic(enabled: Boolean): FieldKeyboard =
-        if (enabled == classic || !canUseClassic) this else FieldKeyboard(requested, enabled, kind, decimalLabel, textRowHeightDp)
+        if (enabled == classic || !canUseClassic) this else FieldKeyboard(requested, enabled, kind, decimalLabel, textRowHeightDp, wideSpace)
 
     /**
      * Le même champ avec le séparateur décimal [label] (appris par `DecimalSeparatorPolicy`, §8.1) ; `this` si
      * c'est déjà le sien.
      */
     fun withDecimalLabel(label: Char): FieldKeyboard =
-        if (label == decimalLabel) this else FieldKeyboard(requested, classic, kind, label, textRowHeightDp)
+        if (label == decimalLabel) this else FieldKeyboard(requested, classic, kind, label, textRowHeightDp, wideSpace)
 
     companion object {
         /**
@@ -85,12 +90,14 @@ class FieldKeyboard private constructor(
          * @param kind disposition des lettres choisie par l'utilisateur (AZERTY / QWERTY).
          * @param decimalLabel séparateur décimal affiché sur le pavé numérique (§8.1).
          * @param textRowHeightDp hauteur des rangées hors pavés (réglage, §13).
+         * @param wideSpace réglage « Espace large » actif et écran assez large (§5.1).
          */
         fun of(
             profile: InputProfile,
             kind: LayoutKind,
             decimalLabel: Char = ',',
             textRowHeightDp: Float = KeyboardMetrics.DEFAULT_ROW_HEIGHT_DP,
-        ): FieldKeyboard = FieldKeyboard(profile, false, kind, decimalLabel, textRowHeightDp)
+            wideSpace: Boolean = false,
+        ): FieldKeyboard = FieldKeyboard(profile, false, kind, decimalLabel, textRowHeightDp, wideSpace)
     }
 }

@@ -114,6 +114,7 @@ class SettingsActivity : Activity() {
             KeyboardSettings.MIN_ROW_HEIGHT_DP..KeyboardSettings.MAX_ROW_HEIGHT_DP, current.rowHeightDp,
         )
         slider(root, R.string.pref_bottom_margin, KeyboardSettings.KEY_BOTTOM_MARGIN, 0..KeyboardSettings.MAX_BOTTOM_MARGIN_DP, current.bottomMarginDp)
+        toggle(root, R.string.pref_wide_space, R.string.pref_wide_space_summary, KeyboardSettings.KEY_WIDE_SPACE, current.wideSpace)
         choice(
             root, R.string.pref_haptics, KeyboardSettings.KEY_HAPTICS, storedName(current.haptics),
             listOf(

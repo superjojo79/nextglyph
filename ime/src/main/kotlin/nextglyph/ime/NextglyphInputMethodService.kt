@@ -114,7 +114,7 @@ class NextglyphInputMethodService : InputMethodService() {
         decimalPolicy = DecimalSeparatorPolicy(DecimalSeparators.preferred(locale))
         settings = services.settings
         layoutKind = settings.layoutFor(locale?.language)
-        fieldKeyboard = FieldKeyboard.of(SessionField.DEFAULT.profile, layoutKind, textRowHeightDp = settings.rowHeightDp.toFloat())
+        fieldKeyboard = FieldKeyboard.of(SessionField.DEFAULT.profile, layoutKind, textRowHeightDp = settings.rowHeightDp.toFloat(), wideSpace = wideSpace())
         session.setEditConfig(settings.editConfig)
         session.onStateChanged = { state ->
             keyboardView?.setState(state)
@@ -208,7 +208,7 @@ class NextglyphInputMethodService : InputMethodService() {
         fieldInputType = info.inputType
         val profile = InputProfileResolver.resolve(info.inputType, info.imeOptions, info.privateImeOptions)
         val enter = EnterBehaviorResolver.resolve(info.imeOptions, info.inputType)
-        fieldKeyboard = FieldKeyboard.of(profile, layoutKind, decimalPolicy.separatorFor(key), settings.rowHeightDp.toFloat())
+        fieldKeyboard = FieldKeyboard.of(profile, layoutKind, decimalPolicy.separatorFor(key), settings.rowHeightDp.toFloat(), wideSpace())
             .withClassic(keepClassic)
         pcModifiers.reset()
         showModifiers()
@@ -366,7 +366,8 @@ class NextglyphInputMethodService : InputMethodService() {
         lexiconRevision = data?.personal?.lexiconRevision ?: Long.MIN_VALUE
         val personal = data?.personal?.copy()
         val contacts: List<ContactName> = services.contacts.contacts
-        val layout = KeyboardLayouts.of(layoutKind)
+        // Géométrie de repos du décodeur : celle qui est affichée, espace large compris (§5.1).
+        val layout = KeyboardLayouts.of(layoutKind).let { if (wideSpace()) KeyboardLayouts.widenSpace(it) else it }
         val rejections = data?.rejections ?: InMemoryRejectionStore()
         val generation = ++stackGeneration
         executor.execute {
@@ -400,19 +401,23 @@ class NextglyphInputMethodService : InputMethodService() {
             view.bottomMarginDp = settings.bottomMarginDp
         }
         val kindChanged = kind != layoutKind
-        if (kindChanged || settings.rowHeightDp != previous.rowHeightDp ||
+        if (kindChanged || settings.rowHeightDp != previous.rowHeightDp || settings.wideSpace != previous.wideSpace ||
             settings.autocommit != previous.autocommit || settings.prudence != previous.prudence
         ) {
             layoutKind = kind
-            fieldKeyboard = FieldKeyboard.of(fieldKeyboard.requested, kind, fieldKeyboard.decimalLabel, settings.rowHeightDp.toFloat())
+            fieldKeyboard = FieldKeyboard.of(fieldKeyboard.requested, kind, fieldKeyboard.decimalLabel, settings.rowHeightDp.toFloat(), wideSpace())
             session.onFinishInput()
             startField(field.enter, -1, -1)
         }
         val languagesChanged = settings.languages != previous.languages || settings.preferredLanguage != previous.preferredLanguage
         if (languagesChanged) resetLanguage = true
-        if (kindChanged || languagesChanged) rebuildPredictors()
+        if (kindChanged || languagesChanged || settings.wideSpace != previous.wideSpace) rebuildPredictors()
         if (settings.contacts != previous.contacts) services.syncContacts()
     }
+
+    /** « Espace large » (§5.1) : réglage actif et écran d'au moins 400 dp de large. */
+    private fun wideSpace(): Boolean =
+        settings.wideSpace && resources.configuration.screenWidthDp >= KeyboardLayouts.WIDE_SPACE_MIN_SCREEN_DP
 
     private fun preferredLanguage(): String {
         val subtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype

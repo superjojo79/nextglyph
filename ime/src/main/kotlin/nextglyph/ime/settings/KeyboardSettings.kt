@@ -27,6 +27,8 @@ enum class HapticLevel {
  * @property contacts réglage « Noms des contacts » : effectif seulement avec la permission (§6.1).
  * @property bottomMarginDp marge ajoutée sous la dernière rangée, en plus des encarts système, de 0 à
  *   [MAX_BOTTOM_MARGIN_DP] dp (§13, §14) : remonte le clavier au-dessus des boutons système.
+ * @property wideSpace réglage « Espace large » (§5.1, §14) : effectif sur les écrans d'au moins
+ *   `KeyboardLayouts.WIDE_SPACE_MIN_SCREEN_DP` dp.
  */
 data class KeyboardSettings(
     val layout: LayoutKind? = null,
@@ -41,6 +43,7 @@ data class KeyboardSettings(
     val contacts: Boolean = false,
     val haptics: HapticLevel = HapticLevel.MEDIUM,
     val bottomMarginDp: Int = 0,
+    val wideSpace: Boolean = false,
 ) {
     init {
         require(rowHeightDp in MIN_ROW_HEIGHT_DP..MAX_ROW_HEIGHT_DP) { "Hauteur de rangée hors de $MIN_ROW_HEIGHT_DP..$MAX_ROW_HEIGHT_DP : $rowHeightDp." }
@@ -76,6 +79,7 @@ data class KeyboardSettings(
         const val KEY_ADAPTATION = "adaptation_mode"
         const val KEY_ROW_HEIGHT = "row_height_dp"
         const val KEY_BOTTOM_MARGIN = "bottom_margin_dp"
+        const val KEY_WIDE_SPACE = "wide_space"
         const val KEY_AUTOCOMMIT = "autocommit"
         const val KEY_PRUDENCE = "prudence"
         const val KEY_FRENCH_TYPOGRAPHY = "french_typography"
@@ -91,7 +95,7 @@ data class KeyboardSettings(
 
         /** Tous les réglages, dans l'ordre de l'écran. */
         val KEYS: List<String> = listOf(
-            KEY_LAYOUT, KEY_LANGUAGES, KEY_PREFERRED_LANGUAGE, KEY_ADAPTATION, KEY_ROW_HEIGHT, KEY_BOTTOM_MARGIN, KEY_AUTOCOMMIT,
+            KEY_LAYOUT, KEY_LANGUAGES, KEY_PREFERRED_LANGUAGE, KEY_ADAPTATION, KEY_ROW_HEIGHT, KEY_BOTTOM_MARGIN, KEY_WIDE_SPACE, KEY_AUTOCOMMIT,
             KEY_PRUDENCE, KEY_FRENCH_TYPOGRAPHY, KEY_DOUBLE_SPACE, KEY_CONTACTS, KEY_HAPTICS,
         )
 
@@ -121,6 +125,7 @@ data class KeyboardSettings(
                 contacts = boolean(KEY_CONTACTS, defaults.contacts),
                 haptics = enumOrNull<HapticLevel>(string(KEY_HAPTICS)) ?: defaults.haptics,
                 bottomMarginDp = (values(KEY_BOTTOM_MARGIN) as? Int)?.takeIf { it in 0..MAX_BOTTOM_MARGIN_DP } ?: defaults.bottomMarginDp,
+                wideSpace = boolean(KEY_WIDE_SPACE, defaults.wideSpace),
             )
         }
 

@@ -139,6 +139,8 @@ Rangée 3 : ABC | , . ! ? ' : | espace | ↵ | ⌫                          1 + 
 
 `ABC` ramène aux lettres. Les caractères moins courants (`* " ; = [ ]`, etc.) ne sont pas sur cette couche en V1 : ils sont sur la disposition classique (§7.1), accessible par l'échappatoire du §4, et dans les menus d'appui long de la couche (symboles voisins : `-` → `_ – —`, `+` → `= * × ÷`, `(` → `[ { <`, `)` → `] } >`, `/` → `\ |`, `€` → `$ £ ¥`, `%` → `‰ ^ ~`, `&` → `§ °`, `'` → `" « » ’`, `,` et `:` → `;`, `.` → `… ·`, `?` → `¿`, `!` → `¡`). Appui long sur `ABC` : majuscule verrouillée `⇪` (§5.7).
 
+**Espace large** (réglage, issue #23). Sur les écrans d'au moins 400 dp de large, le réglage « Espace large » réduit `?123` (ou `ABC`), `↵` et `⌫` de la rangée de l'espace à 0,8 u ; l'espace reprend la largeur libérée (2,2 u en AZERTY et sur la couche `?123`, 2,1 u en QWERTY où `↵` est en rangée 2). Les lettres de la rangée 3 se décalent d'autant ; le décodeur utilise la même géométrie de repos. Désactivé par défaut ; sans effet sur le mot de passe, la disposition classique et les pavés.
+
 **Indices.** Une touche qui a un menu d'appui long affiche dans son coin un petit indice (contraste ≥ 3:1, §13) : sur la couche `?123`, le premier symbole voisin (`_` sur `-`, `=` sur `+`…) ; `⇪` sur `ABC` ; `…` sur `?123` quand son menu n'est pas vide. Les lettres n'en ont pas (variantes accentuées attendues). Les réglages ont une section « Gestes » qui résume les gestes du §5.9 (issue #21).
 
 La touche `↵` est contextuelle d'après `imeOptions` : envoyer, rechercher, aller, suivant, terminé, ou saut de ligne si le champ est multiligne et n'a pas d'action. Libellés : `➤` envoyer, `⌕` rechercher, `➔` aller, `⇥` suivant, `⇤` précédent, `✓` terminé, `↵` saut de ligne, touche Entrée ou action inconnue (`EnterKeyLabel`). Même règle sur toutes les dispositions (mot de passe, pavés).
@@ -573,6 +575,7 @@ docs/        Cette spécification, décisions d'architecture.
 | Mode d'adaptation | Désactivé / Calme / Calme renforcé / Élastique | Calme renforcé |
 | Hauteur des rangées | 34–46 dp | 38 dp |
 | Marge basse | 0–48 dp, ajoutée aux encarts système (§13) | 0 dp |
+| Espace large | `?123`, `↵`, `⌫` à 0,8 u, espace élargie, écrans ≥ 400 dp (§5.1) | Désactivé |
 | Validation par espace | Oui / Non | Oui |
 | Prudence de la validation | Prudente / Normale / Audacieuse (modifie les seuils du §5.5) | Normale |
 | Typographie française | Oui / Non | Oui |

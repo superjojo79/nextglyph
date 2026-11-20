@@ -33,6 +33,7 @@ class KeyboardSettingsTest {
             assertThat(settings.contacts).isFalse()
             assertThat(settings.haptics).isEqualTo(HapticLevel.MEDIUM)
             assertThat(settings.bottomMarginDp).isZero()
+            assertThat(settings.wideSpace).isFalse()
         }
 
         @Test
@@ -50,13 +51,14 @@ class KeyboardSettingsTest {
                 KeyboardSettings.KEY_CONTACTS to true,
                 KeyboardSettings.KEY_HAPTICS to "off",
                 KeyboardSettings.KEY_BOTTOM_MARGIN to 24,
+                KeyboardSettings.KEY_WIDE_SPACE to true,
             )
 
             assertThat(settings).isEqualTo(
                 KeyboardSettings(
                     LayoutKind.QWERTY, listOf("en"), "en", AdaptationMode.ELASTIC, 44, false, Prudence.BOLD,
                     frenchTypography = false, doubleSpacePeriod = false, contacts = true, haptics = HapticLevel.OFF,
-                    bottomMarginDp = 24,
+                    bottomMarginDp = 24, wideSpace = true,
                 ),
             )
             assertThat(settings.editConfig.frenchTypography).isFalse()
@@ -80,7 +82,7 @@ class KeyboardSettingsTest {
         @Test
         fun `nom enregistré d'une énumération`() {
             assertThat(KeyboardSettings.storedName(AdaptationMode.CALM_REINFORCED)).isEqualTo("calm_reinforced")
-            assertThat(KeyboardSettings.KEYS).hasSize(12).doesNotHaveDuplicates()
+            assertThat(KeyboardSettings.KEYS).hasSize(13).doesNotHaveDuplicates()
         }
     }
 

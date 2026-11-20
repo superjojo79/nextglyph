@@ -19,8 +19,24 @@ class FieldKeyboardTest {
 
     private val text = C.TYPE_CLASS_TEXT or C.TYPE_TEXT_FLAG_CAP_SENTENCES
 
+    private fun spaceWidth(layout: nextglyph.engine.layout.KeyboardLayout?) =
+        layout!!.rows.flatMap { it.keys }.single { it.kind == KeyKind.SPACE }.restWidth
+
     @Nested
     inner class HappyPath {
+        @Test
+        fun `espace large - lettres et symboles élargis, passage par l'échappatoire et le séparateur conservé`() {
+            val profile = InputProfileResolver.resolve(text, 0, null)
+            val k = FieldKeyboard.of(profile, LayoutKind.AZERTY, wideSpace = true)
+
+            assertThat(k.wideSpace).isTrue()
+            assertThat(spaceWidth(k.main)).isCloseTo(2.2f, org.assertj.core.data.Offset.offset(1e-4f))
+            assertThat(spaceWidth(k.symbols)).isCloseTo(2.2f, org.assertj.core.data.Offset.offset(1e-4f))
+            assertThat(k.withClassic(true).withClassic(false).wideSpace).isTrue()
+            assertThat(k.withDecimalLabel('.').wideSpace).isTrue()
+            assertThat(spaceWidth(k.withClassic(true).withClassic(false).main)).isCloseTo(2.2f, org.assertj.core.data.Offset.offset(1e-4f))
+        }
+
         @Test
         fun `texte - disposition compacte, couche des symboles, barre et échappatoire proposée`() {
             val k = keyboard(text)
@@ -110,6 +126,16 @@ class FieldKeyboardTest {
     @Nested
     inner class ErrorCases {
         @Test
+        fun `espace large sans effet sur le mot de passe et la disposition classique`() {
+            val password = FieldKeyboard.of(InputProfileResolver.resolve(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD, 0, null), LayoutKind.AZERTY, wideSpace = true)
+            val classic = FieldKeyboard.of(InputProfileResolver.resolve(text, 0, null), LayoutKind.AZERTY, wideSpace = true).withClassic(true)
+
+            assertThat(password.id).isEqualTo(keyboard(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD).id)
+            assertThat(classic.id).isEqualTo(keyboard(text).withClassic(true).id)
+            assertThat(spaceWidth(classic.main)).isEqualTo(spaceWidth(keyboard(text).withClassic(true).main))
+        }
+
+        @Test
         fun `le même séparateur décimal garde le même clavier`() {
             val k = keyboard(C.TYPE_CLASS_NUMBER or C.TYPE_NUMBER_FLAG_DECIMAL)
 
@@ -137,6 +163,15 @@ class FieldKeyboardTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `espace large - identifiant distinct, défaut désactivé`() {
+            val profile = InputProfileResolver.resolve(text, 0, null)
+
+            assertThat(keyboard(text).wideSpace).isFalse()
+            assertThat(FieldKeyboard.of(profile, LayoutKind.AZERTY, wideSpace = true).id).isNotEqualTo(keyboard(text).id)
+            assertThat(spaceWidth(keyboard(text).main)).isEqualTo(1.6f)
+        }
+
         @Test
         fun `les identifiants distinguent les variantes des pavés et les dispositions`() {
             val ids = listOf(
