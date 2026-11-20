@@ -15,6 +15,15 @@ class KeyPopupsTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `indices - premier symbole voisin, majuscule verrouillée sur ABC, menu des symboles`() {
+            assertThat(KeyPopups.hint(Key.character('-'))).isEqualTo("_")
+            assertThat(KeyPopups.hint(Key.character('+'))).isEqualTo("=")
+            assertThat(KeyPopups.hint(Key(KeyKind.LETTERS, "ABC", 1f))).isEqualTo("⇪")
+            assertThat(KeyPopups.hint(Key(KeyKind.SYMBOLS, "?123", 1f))).isEqualTo("…")
+            assertThat(KeyPopups.hint(Key(KeyKind.SYMBOLS, "?123", 1f), SymbolsMenu.BACK_FROM_CLASSIC)).isEqualTo("…")
+        }
+
+        @Test
         fun `appui long sur e et c - variantes accentuées`() {
             assertThat(KeyPopups.forKey(Key.letter('e'), false, bilingual).map { it.label }).containsExactly("é", "è", "ê", "ë")
             assertThat(KeyPopups.forKey(Key.letter('c'), false, bilingual))
@@ -93,6 +102,14 @@ class KeyPopupsTest {
 
     @Nested
     inner class ErrorCases {
+        @Test
+        fun `pas d'indice - lettres, symbole sans voisin, touches de fonction`() {
+            assertThat(KeyPopups.hint(Key.letter('e'))).isNull()
+            assertThat(KeyPopups.hint(Key.character('@'))).isNull()
+            assertThat(KeyPopups.hint(Key(KeyKind.SPACE, "", 1.6f))).isNull()
+            assertThat(KeyPopups.hint(Key(KeyKind.BACKSPACE, "⌫", 1f))).isNull()
+        }
+
         @ParameterizedTest
         @ValueSource(chars = ['z', 'b', 'q'])
         fun `consonne sans variante - pas de menu`(letter: Char) {
@@ -119,6 +136,18 @@ class KeyPopupsTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `touche des symboles sans menu (mot de passe) - pas d'indice`() {
+            assertThat(KeyPopups.hint(Key(KeyKind.SYMBOLS, "?123", 1.5f), SymbolsMenu.NONE)).isNull()
+        }
+
+        @Test
+        fun `chaque symbole voisin a un indice égal à son premier voisin`() {
+            for ((symbol, neighbours) in KeyPopups.SYMBOLS) {
+                assertThat(KeyPopups.hint(Key.character(symbol[0]))).isEqualTo(neighbours.first())
+            }
+        }
+
         @Test
         fun `une seule langue - pas de menu sur l'espace`() {
             assertThat(KeyPopups.forKey(Key(KeyKind.SPACE, "", 1.6f), false, listOf("fr"))).isEmpty()

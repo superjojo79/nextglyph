@@ -122,6 +122,26 @@ object KeyPopups {
         else -> emptyList()
     }
 
+    /** Indice du menu de `?123` (ponctuation rapide, disposition classique). */
+    const val MENU_HINT: String = "…"
+
+    /**
+     * Indice affiché dans le coin d'une touche qui a un menu d'appui long (§5.1, issue #21), ou `null` :
+     *
+     * - symbole de la couche `?123` : son premier symbole voisin (`_` sur `-`, `=` sur `+`...) ;
+     * - `ABC` : `⇪` (majuscule verrouillée) ;
+     * - `?123` : [MENU_HINT] si son menu n'est pas vide.
+     *
+     * Les lettres n'ont pas d'indice : leurs variantes accentuées sont attendues, et dix indices par rangée
+     * chargeraient le clavier.
+     */
+    fun hint(key: Key, symbolsMenu: SymbolsMenu = SymbolsMenu.QUICK_PUNCTUATION): String? = when (key.kind) {
+        KeyKind.CHARACTER -> SYMBOLS[key.label]?.first()
+        KeyKind.LETTERS -> CAPS_LOCK_LABEL
+        KeyKind.SYMBOLS -> if (symbolsMenu == SymbolsMenu.NONE) null else MENU_HINT
+        else -> null
+    }
+
     private fun symbolsMenu(menu: SymbolsMenu): List<PopupItem> = when (menu) {
         SymbolsMenu.QUICK_PUNCTUATION -> quickPunctuation()
         SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC -> quickPunctuation() + PopupItem(CLASSIC_LABEL, PopupAction.ClassicLayout(true))

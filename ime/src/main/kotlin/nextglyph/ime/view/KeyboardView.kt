@@ -196,6 +196,10 @@ class KeyboardView(context: Context) : View(context) {
     private var upperLabels: Array<Array<String>> = emptyArray()
     private var symbolLabels: Array<Array<String>> = emptyArray()
 
+    /** Indices des menus d'appui long (§5.1, issue #21), par rangée et touche ; `null` : pas d'indice. */
+    private var mainHints: Array<Array<String?>> = emptyArray()
+    private var symbolHints: Array<Array<String?>> = emptyArray()
+
     // État affiché, issu de la session.
     private var shift = ShiftState.OFF
     private var spaceLabel: String? = null
@@ -269,7 +273,16 @@ class KeyboardView(context: Context) : View(context) {
         lowerLabels = labels(lettersLayout, upper = false)
         upperLabels = labels(lettersLayout, upper = true)
         symbolLabels = symbolsLayout?.let { labels(it, upper = false) } ?: emptyArray()
+        // Mêmes règles que popupFor : pas de menu sur les pavés, pas de menu de `?123` sur la couche.
+        val hasMenus = fieldKeyboard.symbols != null
+        mainHints = hints(lettersLayout, fieldKeyboard.symbolsMenu, hasMenus)
+        symbolHints = symbolsLayout?.let { hints(it, SymbolsMenu.NONE, hasMenus) } ?: emptyArray()
     }
+
+    private fun hints(layout: KeyboardLayout, menu: SymbolsMenu, hasMenus: Boolean): Array<Array<String?>> =
+        layout.rows.map { row ->
+            Array(row.keys.size) { k -> if (hasMenus) KeyPopups.hint(row.keys[k], menu) else null }
+        }.toTypedArray()
 
     private fun labels(layout: KeyboardLayout, upper: Boolean): Array<Array<String>> = layout.rows.map { row ->
         row.keys.map { key ->
@@ -642,7 +655,12 @@ class KeyboardView(context: Context) : View(context) {
         if (shift == ShiftState.LOCKED && (key.kind == KeyKind.SYMBOLS || key.kind == KeyKind.LETTERS)) {
             smallPaint.alpha = Color.alpha(labelColor)
             canvas.drawText(CAPS_LOCK, keyRect.right - SMALL_MARGIN_DP * 2 * density, keyRect.top + smallPaint.textSize, smallPaint)
+            return
         }
+        // Indice du menu d'appui long, dans le coin (contraste ≥ 3:1, comme l'indicateur de langue).
+        val hint = (if (symbolsShown) symbolHints else mainHints).getOrNull(row)?.getOrNull(index) ?: return
+        smallPaint.alpha = KeyStyle.LANGUAGE_ALPHA
+        canvas.drawText(hint, keyRect.right - SMALL_MARGIN_DP * 2 * density, keyRect.top + smallPaint.textSize, smallPaint)
     }
 
     private fun drawSpace(canvas: Canvas) {

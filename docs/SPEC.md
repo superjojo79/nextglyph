@@ -139,6 +139,8 @@ Rangée 3 : ABC | , . ! ? ' : | espace | ↵ | ⌫                          1 + 
 
 `ABC` ramène aux lettres. Les caractères moins courants (`* " ; = [ ]`, etc.) ne sont pas sur cette couche en V1 : ils sont sur la disposition classique (§7.1), accessible par l'échappatoire du §4, et dans les menus d'appui long de la couche (symboles voisins : `-` → `_ – —`, `+` → `= * × ÷`, `(` → `[ { <`, `)` → `] } >`, `/` → `\ |`, `€` → `$ £ ¥`, `%` → `‰ ^ ~`, `&` → `§ °`, `'` → `" « » ’`, `,` et `:` → `;`, `.` → `… ·`, `?` → `¿`, `!` → `¡`). Appui long sur `ABC` : majuscule verrouillée `⇪` (§5.7).
 
+**Indices.** Une touche qui a un menu d'appui long affiche dans son coin un petit indice (contraste ≥ 3:1, §13) : sur la couche `?123`, le premier symbole voisin (`_` sur `-`, `=` sur `+`…) ; `⇪` sur `ABC` ; `…` sur `?123` quand son menu n'est pas vide. Les lettres n'en ont pas (variantes accentuées attendues). Les réglages ont une section « Gestes » qui résume les gestes du §5.9 (issue #21).
+
 La touche `↵` est contextuelle d'après `imeOptions` : envoyer, rechercher, aller, suivant, terminé, ou saut de ligne si le champ est multiligne et n'a pas d'action. Libellés : `➤` envoyer, `⌕` rechercher, `➔` aller, `⇥` suivant, `⇤` précédent, `✓` terminé, `↵` saut de ligne, touche Entrée ou action inconnue (`EnterKeyLabel`). Même règle sur toutes les dispositions (mot de passe, pavés).
 
 ### 5.2 Adaptation visuelle

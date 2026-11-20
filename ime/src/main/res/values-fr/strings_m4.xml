@@ -89,4 +89,6 @@
     <string name="a11y_shift_locked">verrouillée</string>
     <string name="a11y_suggestion">Suggestion %1$s</string>
     <string name="a11y_inserted">Inséré : %1$s</string>
+    <string name="pref_section_gestures">Gestes</string>
+    <string name="pref_gestures_help">• Majuscule : glisser vers le haut sur une lettre.\n• Majuscules verrouillées : ?123, puis appui long sur ABC (⇪).\n• Accents : appui long sur une voyelle ou sur c.\n• Symboles voisins : sur la couche ?123, appui long sur un symbole ; le petit signe en coin indique le premier (_ sur -, = sur +…).\n• Ponctuation rapide et disposition classique (avec ⇧) : appui long sur ?123.\n• Langue : appui long sur l\'espace.\n• Retirer un mot appris : appui long sur la suggestion.</string>
 </resources>

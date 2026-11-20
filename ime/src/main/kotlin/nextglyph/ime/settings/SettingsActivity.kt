@@ -158,6 +158,9 @@ class SettingsActivity : Activity() {
         button(root, R.string.pref_export) { startExport() }
         button(root, R.string.pref_import) { startImport() }
         button(root, R.string.pref_clear) { confirmClear() }
+
+        section(root, R.string.pref_section_gestures)
+        text(root, getString(R.string.pref_gestures_help))
     }
 
     /** Active les contacts : explication, puis demande de la permission si elle manque (§6.1). */
