@@ -147,6 +147,8 @@ class KeyboardView(context: Context) : View(context) {
             if (field == value) return
             field = value
             applyBottomPadding()
+            // Nouveaux encarts demandés : la fenêtre du clavier est remesurée avec la nouvelle marge (#42).
+            requestApplyInsets()
         }
 
     /** Encarts système du bas reçus en dernier, en pixels (§13). */
@@ -719,6 +721,9 @@ class KeyboardView(context: Context) : View(context) {
         touchExploration = manager?.isTouchExplorationEnabled == true
         animatorScale = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         applyRestOnly()
+        // Marge réglée avant l'attachement (création de la vue) : réappliquée et encarts redemandés (#42).
+        applyBottomPadding()
+        requestApplyInsets()
     }
 
     override fun onDetachedFromWindow() {
