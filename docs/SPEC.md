@@ -677,10 +677,11 @@ Ensuite (V2) : bigrammes et prédiction du mot suivant, saisie par glissement, d
 | Saisie par glissement | Après la V1 |
 | Hébergement | GitHub |
 | Distribution | F-Droid et Google Play (§18) |
+| Identifiant d'application | `io.github.superjojo79.nextglyph` (2026-11-20), définitif dès la première publication |
 
 ### 17.2 Questions ouvertes
 
-1. **Identifiant d'application** (`applicationId`, ex. `org.nextglyph.keyboard` ou `io.github.<compte>.nextglyph`) : il dépend du nom de domaine ou du compte GitHub qui hébergera le projet, et ne pourra plus changer une fois publié.
+Aucune pour l'instant (l'identifiant d'application est tranché au §17.1).
 
 ---
 

@@ -138,5 +138,4 @@ Points à confirmer avec les relecteurs de F-Droid :
 Points ouverts repris de [PROGRESS.md](PROGRESS.md) :
 
 - Relecture des attributions des lexiques (licences françaises, mention COCA dans le README de SCOWL).
-- Identifiant d'application (§17.2) : `io.github.superjojo79.nextglyph`, définitif une fois publié.
 - Captures d'écran, icône 512 px et bannière Play.
