@@ -59,12 +59,13 @@ class KeyPopupsTest {
         }
 
         @Test
-        fun `profil texte - la ponctuation rapide puis l'échappatoire Classique en dernière case`() {
+        fun `profil texte - la ponctuation rapide, le panneau PC puis l'échappatoire Classique en dernière case`() {
             val items = KeyPopups.forKey(Key(KeyKind.SYMBOLS, "?123", 1f), false, bilingual, SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC)
 
-            assertThat(items).hasSize(8)
+            assertThat(items).hasSize(9)
             assertThat(items.last()).isEqualTo(PopupItem("Classique", PopupAction.ClassicLayout(true)))
-            assertThat(items.dropLast(1).map { it.label }).containsExactly("-", "(", ")", "\"", ";", "@", "#")
+            assertThat(items[7]).isEqualTo(PopupItem("PC", PopupAction.PcKeys))
+            assertThat(items.dropLast(2).map { it.label }).containsExactly("-", "(", ")", "\"", ";", "@", "#")
         }
 
         @Test

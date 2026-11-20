@@ -6,6 +6,7 @@ import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
@@ -14,6 +15,10 @@ import android.widget.Toast
 import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.contacts.ContactName
 import nextglyph.engine.input.EnterBehavior
+import nextglyph.engine.input.PcKey
+import nextglyph.engine.input.PcKeyEvent
+import nextglyph.engine.input.PcModifier
+import nextglyph.engine.input.PcModifiers
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyboardLayouts
@@ -89,6 +94,9 @@ class NextglyphInputMethodService : InputMethodService() {
     private var fieldKey = FieldKey("", 0)
     private var fieldInputType = 0
 
+    /** Modificateurs collants du panneau PC (§5.10). */
+    private val pcModifiers = PcModifiers()
+
     private val save = Runnable { services.learned.saveIfChanged() }
 
     private val preferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> applySettings() }
@@ -157,6 +165,8 @@ class NextglyphInputMethodService : InputMethodService() {
                 PopupAction.OpenSettings -> openSettings()
                 is PopupAction.SetAdaptation -> savePreference(KeyboardSettings.KEY_ADAPTATION, KeyboardSettings.storedName(action.mode))
                 is PopupAction.SetLayout -> savePreference(KeyboardSettings.KEY_LAYOUT, KeyboardSettings.storedName(action.kind))
+                // Le panneau PC est une couche de la vue, ouverte par la vue elle-même.
+                PopupAction.PcKeys -> Unit
             }
 
             override fun onBarItem(index: Int) = session.onBarItem(index)
@@ -181,6 +191,8 @@ class NextglyphInputMethodService : InputMethodService() {
         val enter = EnterBehaviorResolver.resolve(info.imeOptions, info.inputType)
         fieldKeyboard = FieldKeyboard.of(profile, layoutKind, decimalPolicy.separatorFor(key), settings.rowHeightDp.toFloat())
             .withClassic(keepClassic)
+        pcModifiers.reset()
+        showModifiers()
         startField(enter, info.initialSelStart, info.initialSelEnd)
     }
 
@@ -238,8 +250,38 @@ class NextglyphInputMethodService : InputMethodService() {
             KeyKind.SHIFT -> session.onShiftKey(SystemClock.uptimeMillis(), ViewConfiguration.getDoubleTapTimeout().toLong())
             KeyKind.DECIMAL -> onDecimalKey()
             KeyKind.SPACE -> if (upper) session.onSpaceSwipeUp() else session.onKey(key, upper, offset)
-            else -> session.onKey(key, upper, offset)
+            KeyKind.PC -> onPcKey(key)
+            else -> if (!sendModified(key)) session.onKey(key, upper, offset)
         }
+    }
+
+    /** Touche du panneau PC (§5.10) : événement clavier, ou bascule de `Ctrl` / `Alt`. */
+    private fun onPcKey(key: Key) {
+        val pc = PcKey.of(key.label) ?: return
+        pcModifiers.press(pc, SystemClock.uptimeMillis(), ViewConfiguration.getDoubleTapTimeout().toLong())?.let(::sendKeyEvent)
+        showModifiers()
+    }
+
+    /** Lettre ou chiffre tapé pendant qu'un modificateur PC est actif : `Ctrl+C`... (§5.10). Vrai si envoyé. */
+    private fun sendModified(key: Key): Boolean {
+        if (key.kind != KeyKind.LETTER && key.kind != KeyKind.CHARACTER) return false
+        val event = key.label.singleOrNull()?.let(pcModifiers::character) ?: return false
+        sendKeyEvent(event)
+        showModifiers()
+        return true
+    }
+
+    private fun sendKeyEvent(event: PcKeyEvent) {
+        val connection = currentInputConnection ?: return
+        // Le mot en cours est validé tel quel : l'événement agit sur le texte réel du champ.
+        connection.finishComposingText()
+        val now = SystemClock.uptimeMillis()
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, event.keyCode, 0, event.meta))
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, event.keyCode, 0, event.meta))
+    }
+
+    private fun showModifiers() {
+        keyboardView?.activeModifiers = PcModifier.entries.filter { pcModifiers.state(it) != PcModifiers.State.OFF }.toSet()
     }
 
     private fun onDecimalKey() {

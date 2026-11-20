@@ -28,6 +28,9 @@ sealed interface PopupAction {
 
     /** Choisit la disposition [kind] (§5.1, §14). */
     data class SetLayout(val kind: LayoutKind) : PopupAction
+
+    /** Affiche le panneau des touches PC à la place de la couche `?123` (§5.10). */
+    data object PcKeys : PopupAction
 }
 
 /** Menu de l'appui long sur `?123`, selon la disposition affichée (§4, §5.6, §7.1). */
@@ -35,7 +38,7 @@ enum class SymbolsMenu {
     /** Ponctuation rapide seule. */
     QUICK_PUNCTUATION,
 
-    /** Profil texte : ponctuation rapide, puis « Classique » (échappatoire du §4). */
+    /** Profil texte : ponctuation rapide, panneau « PC » (§5.10), puis « Classique » (échappatoire du §4). */
     QUICK_PUNCTUATION_AND_CLASSIC,
 
     /** Disposition classique choisie par l'échappatoire : retour à la disposition du champ. */
@@ -97,6 +100,9 @@ object KeyPopups {
 
     /** Libellé de la case qui passe sur la disposition classique (§4). */
     const val CLASSIC_LABEL: String = "Classique"
+
+    /** Libellé de la case qui ouvre le panneau des touches PC (§5.10). */
+    const val PC_LABEL: String = "PC"
 
     /** Libellé de la case qui revient de la disposition classique à la disposition du champ (§4). */
     const val ADAPTIVE_LABEL: String = "Adaptative"
@@ -190,7 +196,8 @@ object KeyPopups {
 
     private fun symbolsMenu(menu: SymbolsMenu): List<PopupItem> = when (menu) {
         SymbolsMenu.QUICK_PUNCTUATION -> quickPunctuation()
-        SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC -> quickPunctuation() + PopupItem(CLASSIC_LABEL, PopupAction.ClassicLayout(true))
+        SymbolsMenu.QUICK_PUNCTUATION_AND_CLASSIC ->
+            quickPunctuation() + PopupItem(PC_LABEL, PopupAction.PcKeys) + PopupItem(CLASSIC_LABEL, PopupAction.ClassicLayout(true))
         SymbolsMenu.BACK_FROM_CLASSIC -> listOf(PopupItem(ADAPTIVE_LABEL, PopupAction.ClassicLayout(false)))
         SymbolsMenu.NONE -> emptyList()
     }

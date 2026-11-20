@@ -45,6 +45,9 @@ enum class LayoutRole {
 
     /** Pavé date / heure (§8.3). */
     DATE_TIME,
+
+    /** Panneau des touches PC (§5.10). */
+    PC_KEYS,
 }
 
 /**

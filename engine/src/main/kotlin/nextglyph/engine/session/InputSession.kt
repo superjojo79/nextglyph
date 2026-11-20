@@ -206,8 +206,8 @@ class InputSession(
             KeyKind.BACKSPACE -> onBackspace()
             KeyKind.ENTER -> onEnter()
             // Couches, majuscule du pavé mot de passe, séparateur décimal, emplacements vides :
-            // gérés par l'IME (dispositions du profil, M3).
-            KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY -> Unit
+            // gérés par l'IME (dispositions du profil, M3). Touches PC : événements clavier envoyés par l'IME (§5.10).
+            KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC -> Unit
         }
     }
 

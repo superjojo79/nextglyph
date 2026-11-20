@@ -288,8 +288,23 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 | Glisser vers le haut sur l'espace | Insère la suggestion centrale, même si elle ne domine pas (comme un tap sur elle), puis une espace ; sans suggestion, une espace |
 | Glisser vers la gauche depuis ⌫ | Efface le mot précédent (répété en continuant) |
 | Glisser horizontalement sur l'espace | Déplace le curseur |
-| Appui long sur `?123` | Menu ponctuation rapide / « Disposition classique » |
+| Appui long sur `?123` | Menu ponctuation rapide / panneau « PC » (§5.10) / « Disposition classique » |
 | Appui long sur une lettre | Variantes accentuées |
+
+### 5.10 Panneau des touches PC
+
+Pour les usages techniques (SSH, RDP, TeamViewer ; issue #28). Ouvert depuis le menu d'appui long de `?123` (case « PC », profils à disposition compacte), il remplace la couche `?123` ; `ABC` ramène aux lettres.
+
+```
+Rangée 1 : Échap Tab Ctrl Alt Début Fin PgPr PgSv Inser Suppr        10 × 1 u
+Rangée 2 : F1 … F10                                                  10 × 1 u
+Rangée 3 : ABC | F11 F12 ← ↑ ↓ → | C+A+Sup | ⌫                       1,5 + 6 + 1,5 + 1 = 10 u
+```
+
+- Chaque touche envoie un vrai événement clavier (`InputConnection.sendKeyEvent`, appui puis relâchement), après validation du mot en cours tel quel.
+- `Ctrl` et `Alt` sont **collants** : un tap les active pour la prochaine touche, deux taps rapides les verrouillent, un tap les relâche ; actifs, ils sont affichés enfoncés. Pendant qu'un modificateur est actif, une lettre ou un chiffre tapé sur les lettres ou la couche `?123` part en événement clavier avec le modificateur (`Ctrl+C`, `Ctrl+V`, `Alt+F4`…). Les modificateurs sont relâchés à chaque changement de champ.
+- `C+A+Sup` envoie `Ctrl+Alt+Suppr` en une touche ; les clients RDP l'interceptent souvent et ont alors leur propre bouton.
+- Ni adaptation, ni suggestions, ni apprentissage sur le panneau.
 
 ---
 

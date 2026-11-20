@@ -25,6 +25,9 @@ import nextglyph.engine.adapt.TapSpatialModel
 import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.adapt.TapDecoding
 import nextglyph.engine.edit.ShiftState
+import nextglyph.engine.input.PcKey
+import nextglyph.engine.input.PcLayout
+import nextglyph.engine.input.PcModifier
 import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyboardGeometry
@@ -375,10 +378,36 @@ class KeyboardView(context: Context) : View(context) {
         if (symbolsShown == shown || (shown && symbolsLayout == null)) return
         keyboard.cancelPointers(now())
         symbolsShown = shown
+        // Retour aux lettres depuis le panneau PC : la couche `?123` du champ reprend sa place.
+        if (!shown && symbolsLayout !== fieldKeyboard.symbols) setSymbolsLayer(fieldKeyboard.symbols)
         rebuildGeometry()
         accessibility.invalidateNodes()
         invalidate()
     }
+
+    /** Panneau des touches PC (§5.10, issue #28), affiché à la place de la couche `?123`. */
+    private fun showPcKeys() {
+        if (fieldKeyboard.symbols == null) return
+        keyboard.cancelPointers(now())
+        symbolsShown = false
+        setSymbolsLayer(PcLayout.LAYOUT)
+        showSymbols(true)
+    }
+
+    private fun setSymbolsLayer(layout: KeyboardLayout?) {
+        symbols?.cancelPointers(now())
+        symbolsLayout = layout
+        symbols = createSymbols()
+        prepareLabels()
+    }
+
+    /** Modificateurs PC actifs (`Ctrl`, `Alt`), affichés enfoncés sur le panneau (§5.10). */
+    var activeModifiers: Set<PcModifier> = emptySet()
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
 
     /** Annonce [word], inséré par la validation par espace, si TalkBack est actif (§13). */
     fun announceInserted(word: String) {
@@ -672,6 +701,7 @@ class KeyboardView(context: Context) : View(context) {
             isHeld(row, index) -> pressedColor
             // Majuscule active ou verrouillée : `⇧` toujours visible (§7.1).
             key.kind == KeyKind.SHIFT && shift != ShiftState.OFF -> pressedColor
+            key.kind == KeyKind.PC && PcKey.of(key.label)?.modifier?.let { it in activeModifiers } == true -> pressedColor
             isLetterLike -> keyColor
             else -> functionKeyColor
         }
@@ -960,7 +990,7 @@ class KeyboardView(context: Context) : View(context) {
         closePopup()
         invalidate()
         val action = selected?.action ?: return
-        listener?.onPopup(action)
+        if (action == PopupAction.PcKeys) showPcKeys() else listener?.onPopup(action)
     }
 
     private fun closePopup() {
