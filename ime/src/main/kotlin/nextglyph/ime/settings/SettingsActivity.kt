@@ -31,6 +31,7 @@ import nextglyph.ime.contacts.ContactsSource
 import nextglyph.ime.settings.KeyboardSettings.Companion.AUTO
 import nextglyph.ime.settings.KeyboardSettings.Companion.BOTH
 import nextglyph.ime.settings.KeyboardSettings.Companion.storedName
+import java.text.NumberFormat
 
 /**
  * Réglages (spec §14) : activation du clavier, puis tous les réglages de l'utilisateur, écrits dans les
@@ -47,6 +48,7 @@ class SettingsActivity : Activity() {
     private lateinit var services: AppServices
     private lateinit var status: TextView
     private lateinit var learnedSummary: TextView
+    private lateinit var statsSummary: TextView
     private lateinit var contactsSwitch: Switch
     private val preferences: SharedPreferences get() = services.preferences
 
@@ -90,6 +92,26 @@ class SettingsActivity : Activity() {
         contactsSwitch.isChecked = preferences.getBoolean(KeyboardSettings.KEY_CONTACTS, false)
         services.syncContacts()
         updateLearnedSummary()
+        updateStatsSummary()
+    }
+
+    /** Mesures locales de saisie (issue #36) : vitesse et taux, « — » tant qu'il n'y a rien à mesurer. */
+    private fun updateStatsSummary() {
+        if (!::statsSummary.isInitialized) return
+        val c = services.stats.counters
+        if (c.keys == 0L) {
+            statsSummary.setText(R.string.pref_stats_empty)
+            return
+        }
+        val percent = NumberFormat.getPercentInstance().apply { maximumFractionDigits = 1 }
+        fun rate(value: Double?) = value?.let(percent::format) ?: DASH
+        statsSummary.text = listOf(
+            getString(R.string.pref_stats_speed, c.wordsPerMinute?.let { NumberFormat.getIntegerInstance().format(it) } ?: DASH),
+            getString(R.string.pref_stats_corrections, rate(c.correctionRate)),
+            getString(R.string.pref_stats_acceptance, rate(c.acceptanceRate)),
+            getString(R.string.pref_stats_undo, rate(c.undoRate)),
+            getString(R.string.pref_stats_privacy),
+        ).joinToString("\n")
     }
 
     private fun buildPreferences(root: LinearLayout) {
@@ -159,6 +181,14 @@ class SettingsActivity : Activity() {
         button(root, R.string.pref_export) { startExport() }
         button(root, R.string.pref_import) { startImport() }
         button(root, R.string.pref_clear) { confirmClear() }
+
+        section(root, R.string.pref_section_stats)
+        statsSummary = text(root, "")
+        button(root, R.string.pref_stats_reset) {
+            services.stats.reset()
+            services.saveStats()
+            updateStatsSummary()
+        }
 
         section(root, R.string.pref_section_gestures)
         text(root, getString(R.string.pref_gestures_help))
@@ -379,6 +409,7 @@ class SettingsActivity : Activity() {
     }
 
     private companion object {
+        const val DASH = "—"
         const val REQUEST_CONTACTS = 1
         const val REQUEST_EXPORT = 2
         const val REQUEST_IMPORT = 3

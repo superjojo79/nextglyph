@@ -5,7 +5,9 @@ import android.content.SharedPreferences
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.ContactsContract
+import nextglyph.engine.stats.TypingStats
 import nextglyph.ime.contacts.ContactsRepository
 import nextglyph.ime.contacts.ContactsSource
 import nextglyph.ime.learn.LearnedStore
@@ -45,6 +47,21 @@ class AppServices private constructor(context: Context) {
     private var observing = false
 
     /** Réglages courants. */
+    /**
+     * Mesures locales de saisie (issue #36) : partagées par le clavier (qui les alimente) et les réglages
+     * (qui les affichent et les remettent à zéro). Fichier de préférences à part, pour que leur
+     * enregistrement ne réveille pas l'écouteur des réglages.
+     */
+    private val statsPreferences: SharedPreferences = app.getSharedPreferences(STATS_PREFERENCES, Context.MODE_PRIVATE)
+    val stats = TypingStats({ SystemClock.uptimeMillis() }, TypingStats.Counters.parse(statsPreferences.getString(KEY_STATS, null)))
+
+    /** Enregistre les mesures si elles ont changé. */
+    fun saveStats() {
+        if (!stats.changed) return
+        statsPreferences.edit().putString(KEY_STATS, stats.counters.serialize()).apply()
+        stats.markSaved()
+    }
+
     val settings: KeyboardSettings get() = KeyboardSettings.read { preferences.all[it] }
 
     /**
@@ -66,6 +83,8 @@ class AppServices private constructor(context: Context) {
     companion object {
         const val PREFERENCES = "nextglyph_settings"
         const val LEARNED_FILE = "learned.ngls"
+        const val STATS_PREFERENCES = "nextglyph_stats"
+        private const val KEY_STATS = "typing_stats"
         private const val CONTACTS_DEBOUNCE_MS = 2000L
 
         @Volatile

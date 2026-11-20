@@ -48,6 +48,9 @@ enum class LayoutRole {
 
     /** Panneau des touches PC (§5.10). */
     PC_KEYS,
+
+    /** Panneau Navigation : flèches, sélection, copier-coller (issue #37). */
+    NAV_KEYS,
 }
 
 /**
