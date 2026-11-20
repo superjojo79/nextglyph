@@ -394,6 +394,17 @@ class InputSession(
         }
     }
 
+    /**
+     * Glisser vers le haut sur l'espace (§5.9) : insère la suggestion centrale de la barre de mots, même si
+     * elle ne domine pas, comme un tap sur elle (§5.4). Sans suggestion centrale (pas de mot en cours, barre
+     * de ponctuation ou de raccourcis), le geste vaut un appui sur l'espace.
+     */
+    fun onSpaceSwipeUp() {
+        val bar = state.bar
+        val center = bar.items.getOrNull(CENTER_ITEM)
+        if (bar.mode == BarMode.WORDS && center != null) pickSuggestion(center) else onSpace()
+    }
+
     /** Menu de l'espace : verrouille [code], ou revient au mode automatique si `null` (§10.6). */
     fun lockLanguage(code: String?) {
         val current = language ?: return
@@ -676,6 +687,9 @@ class InputSession(
     private fun Suggestion.toItem() = BarItem(text, highlighted, isTyped)
 
     companion object {
+        /** Case centrale de la barre de mots : le mot que l'espace insérera (§5.4). */
+        const val CENTER_ITEM: Int = 1
+
         /** Caractères demandés avant le curseur. */
         const val LOOKBACK: Int = WordPrefix.LOOKBACK
 

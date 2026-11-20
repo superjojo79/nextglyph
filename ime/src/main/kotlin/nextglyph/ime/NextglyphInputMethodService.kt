@@ -222,6 +222,7 @@ class NextglyphInputMethodService : InputMethodService() {
         when (key.kind) {
             KeyKind.SHIFT -> session.onShiftKey(SystemClock.uptimeMillis(), ViewConfiguration.getDoubleTapTimeout().toLong())
             KeyKind.DECIMAL -> onDecimalKey()
+            KeyKind.SPACE -> if (upper) session.onSpaceSwipeUp() else session.onKey(key, upper, offset)
             else -> session.onKey(key, upper, offset)
         }
     }

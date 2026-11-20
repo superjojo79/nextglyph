@@ -197,7 +197,7 @@ La barre a trois états :
 | Juste après une validation | Ponctuation (§5.6). |
 | Champ vide / début de texte | Mots probables en début de phrase (prédiction du mot suivant, V2), sinon vide. |
 
-Un tap sur une suggestion valide ce mot et ajoute une espace automatique.
+Un tap sur une suggestion valide ce mot et ajoute une espace automatique. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
 
 ### 5.5 Validation par espace
 
@@ -281,6 +281,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 | Geste | Effet |
 |---|---|
 | Glisser vers le haut sur une lettre | Majuscule |
+| Glisser vers le haut sur l'espace | Insère la suggestion centrale, même si elle ne domine pas (comme un tap sur elle), puis une espace ; sans suggestion, une espace |
 | Glisser vers la gauche depuis ⌫ | Efface le mot précédent (répété en continuant) |
 | Glisser horizontalement sur l'espace | Déplace le curseur |
 | Appui long sur `?123` | Menu ponctuation rapide / « Disposition classique » |

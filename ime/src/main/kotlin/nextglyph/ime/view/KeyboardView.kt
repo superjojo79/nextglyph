@@ -67,7 +67,7 @@ class KeyboardView(context: Context) : View(context) {
     /** Événements de la vue, transmis à la session de saisie par le service. */
     interface Listener {
         /**
-         * Appui validé sur [key] ; [upper] : glissé vers le haut sur une lettre ; [offset] : position de la
+         * Appui validé sur [key] ; [upper] : glissé vers le haut sur une lettre ou sur l'espace ; [offset] : position de la
          * frappe par rapport à la touche au repos (lettres tapées seulement, modèle spatial §5.3).
          */
         fun onKey(key: Key, upper: Boolean, offset: TapOffset?)
@@ -778,7 +778,8 @@ class KeyboardView(context: Context) : View(context) {
                     null
                 }
                 val key = decoded?.key ?: if (id < MAX_POINTERS) lastPressedKey(id) else null
-                val swipeUp = id < MAX_POINTERS && downKey[id]?.kind == KeyKind.LETTER &&
+                // Glisser vers le haut : majuscule sur une lettre (§5.7), suggestion centrale sur l'espace (§5.9).
+                val swipeUp = id < MAX_POINTERS && downKey[id]?.kind?.let { it in SWIPE_UP_KINDS } == true &&
                     downY[id] - y > rowHeightPx * SWIPE_UP_ROWS
                 val target = if (swipeUp) downKey[id] else key
                 if (id < MAX_POINTERS) {
@@ -936,6 +937,9 @@ class KeyboardView(context: Context) : View(context) {
         private const val POPUP_ITEM_DP = 40f
         private const val POPUP_WIDE_DP = 64f
         private const val SWIPE_UP_ROWS = 0.6f
+
+        /** Touches qui réagissent au glissement vers le haut. */
+        private val SWIPE_UP_KINDS = setOf(KeyKind.LETTER, KeyKind.SPACE)
         private const val FOCUS_STROKE_DP = 3f
     }
 }
