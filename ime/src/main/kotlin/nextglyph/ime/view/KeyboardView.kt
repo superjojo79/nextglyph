@@ -27,6 +27,8 @@ import nextglyph.engine.adapt.TapDecoding
 import nextglyph.engine.edit.ShiftState
 import nextglyph.engine.emoji.EmojiCatalog
 import nextglyph.engine.input.DragSteps
+import nextglyph.engine.input.NavKey
+import nextglyph.engine.input.NavLayout
 import nextglyph.engine.input.PcKey
 import nextglyph.engine.input.PcLayout
 import nextglyph.engine.input.PcModifier
@@ -413,6 +415,29 @@ class KeyboardView(context: Context) : View(context) {
         showSymbols(true)
     }
 
+    /** Panneau Navigation (issue #37), ouvert par `✥` à droite de la barre ; un deuxième appui ramène aux lettres. */
+    private fun toggleNavKeys() {
+        if (fieldKeyboard.symbols == null) return
+        if (navShown) {
+            showSymbols(false)
+            return
+        }
+        keyboard.cancelPointers(now())
+        symbolsShown = false
+        setSymbolsLayer(NavLayout.LAYOUT)
+        showSymbols(true)
+    }
+
+    private val navShown: Boolean get() = symbolsShown && symbolsLayout === NavLayout.LAYOUT
+
+    /** Mode Sélection du panneau Navigation, affiché enfoncé sur `Sélect.` (issue #37). */
+    var navSelecting: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     private fun setSymbolsLayer(layout: KeyboardLayout?) {
         symbols?.cancelPointers(now())
         symbolsLayout = layout
@@ -528,9 +553,12 @@ class KeyboardView(context: Context) : View(context) {
 
         // Le bouton `⚙` (issue #27) est le dernier nœud quand la barre est affichée.
         override val count: Int get() = emoji?.let { it.tabLabels.size + it.pageItems().size }
-            ?: (keyCount + if (fieldKeyboard.showsBar) barTexts.size + 1 else 0)
+            ?: (keyCount + if (fieldKeyboard.showsBar) barTexts.size + 2 else 0)
 
         private val gearId: Int get() = keyCount + barTexts.size
+
+        // Le bouton `✥` (issue #37) suit `⚙`.
+        private val navId: Int get() = gearId + 1
 
         private fun keyRow(id: Int): Int {
             var rest = id
@@ -558,6 +586,10 @@ class KeyboardView(context: Context) : View(context) {
                 out.set(0, 0, gearPx.toInt(), barPx.toInt())
                 return true
             }
+            if (id == navId) {
+                out.set((width - gearPx).toInt(), 0, width, barPx.toInt())
+                return true
+            }
             if (id >= keyCount) {
                 val slot = barSlotPx()
                 val i = id - keyCount
@@ -574,6 +606,7 @@ class KeyboardView(context: Context) : View(context) {
         override fun description(id: Int): String? {
             emoji?.let { return emojiDescription(it, id) }
             if (id == gearId) return context.getString(R.string.a11y_settings)
+            if (id == navId) return context.getString(R.string.a11y_navigation)
             if (id >= keyCount) return barItems.getOrNull(id - keyCount)?.let { descriptions.suggestion(it.text) }
             val r = keyRow(id)
             if (r == NONE) return null
@@ -601,6 +634,7 @@ class KeyboardView(context: Context) : View(context) {
             if (y < barPx) {
                 if (!fieldKeyboard.showsBar) return View.NO_ID
                 if (x < gearPx) return gearId
+                if (x >= width - gearPx) return navId
                 val i = barIndexAt(x)
                 return if (i == NONE || barItems[i] == null) View.NO_ID else keyCount + i
             }
@@ -616,6 +650,10 @@ class KeyboardView(context: Context) : View(context) {
             if (id < 0 || id >= count) return false
             if (id == gearId) {
                 listener?.onPopup(PopupAction.OpenSettings)
+                return true
+            }
+            if (id == navId) {
+                toggleNavKeys()
                 return true
             }
             if (id >= keyCount) {
@@ -776,17 +814,26 @@ class KeyboardView(context: Context) : View(context) {
         functionPaint.textSize = functionTextPx
         functionPaint.alpha = Color.alpha(labelColor)
         canvas.drawText(KeyPopups.SETTINGS_LABEL, gearPx / 2f, barPx / 2f + baselineOffset(functionPaint), functionPaint)
+        // `✥` à droite (issue #37), surligné pendant que le panneau Navigation est affiché.
+        if (navShown) {
+            val pad = BAR_PADDING_DP * density
+            keyRect.set(width - gearPx + pad, pad, width - pad, barPx - pad)
+            fillPaint.color = pressedColor
+            fillPaint.alpha = Color.alpha(pressedColor)
+            canvas.drawRoundRect(keyRect, cornerPx, cornerPx, fillPaint)
+        }
+        canvas.drawText(NAV_LABEL, width - gearPx / 2f, barPx / 2f + baselineOffset(functionPaint), functionPaint)
     }
 
     /** Largeur du bouton `⚙`, nulle sans barre. */
     private val gearPx: Float get() = if (fieldKeyboard.showsBar) GEAR_DP * density else 0f
 
-    /** Largeur d'une case de la barre, à droite du bouton `⚙`. */
-    private fun barSlotPx(): Float = if (barTexts.isEmpty()) 0f else (width - gearPx) / barTexts.size
+    /** Largeur d'une case de la barre, entre les boutons `⚙` et `✥` (de même largeur). */
+    private fun barSlotPx(): Float = if (barTexts.isEmpty()) 0f else (width - 2 * gearPx) / barTexts.size
 
     /** Case de la barre à l'abscisse [x], ou [NONE] (bouton `⚙`, barre vide). */
     private fun barIndexAt(x: Float): Int {
-        if (barTexts.isEmpty() || x < gearPx) return NONE
+        if (barTexts.isEmpty() || x < gearPx || x >= width - gearPx) return NONE
         return ((x - gearPx) / barSlotPx()).toInt().coerceIn(0, barTexts.size - 1)
     }
 
@@ -827,6 +874,7 @@ class KeyboardView(context: Context) : View(context) {
             // Majuscule active ou verrouillée : `⇧` toujours visible (§7.1).
             key.kind == KeyKind.SHIFT && shift != ShiftState.OFF -> pressedColor
             key.kind == KeyKind.PC && PcKey.of(key.label)?.modifier?.let { it in activeModifiers } == true -> pressedColor
+            key.kind == KeyKind.NAV && navSelecting && NavKey.of(key.label) == NavKey.SELECT -> pressedColor
             isLetterLike -> keyColor
             else -> functionKeyColor
         }
@@ -948,6 +996,11 @@ class KeyboardView(context: Context) : View(context) {
                     if (x < gearPx) {
                         keyboard.pointerDown(now)
                         openSettingsMenu(id, x)
+                        return true
+                    }
+                    if (x >= width - gearPx) {
+                        hapticTap()
+                        toggleNavKeys()
                         return true
                     }
                     if (id < MAX_POINTERS && barTexts.isNotEmpty()) {
@@ -1228,6 +1281,9 @@ class KeyboardView(context: Context) : View(context) {
         /** Largeur du bouton `⚙` de la barre (issue #27). */
         private const val GEAR_DP = 40f
         private const val SWIPE_UP_ROWS = 0.6f
+
+        /** Bouton du panneau Navigation, à droite de la barre (issue #37). */
+        const val NAV_LABEL: String = "✥"
 
         /** Gestes d'édition (§5.9) : touches concernées, seuil d'activation et longueur d'un pas, en unités. */
         private val DRAG_KINDS = setOf(KeyKind.SPACE, KeyKind.BACKSPACE)

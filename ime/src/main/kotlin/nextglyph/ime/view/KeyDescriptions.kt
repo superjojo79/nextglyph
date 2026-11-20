@@ -19,7 +19,7 @@ class KeyDescriptions(private val text: (id: Int, arg: String?) -> String) {
     fun describe(key: Key, label: String, shift: ShiftState, spaceLabel: String?, enterLabel: String): String? = when (key.kind) {
         KeyKind.EMPTY -> null
         KeyKind.LETTER -> if (shift != ShiftState.OFF) label.uppercase(Locale.ROOT) else label
-        KeyKind.CHARACTER, KeyKind.DECIMAL, KeyKind.PC -> label
+        KeyKind.CHARACTER, KeyKind.DECIMAL, KeyKind.PC, KeyKind.NAV -> label
         KeyKind.SPACE -> spaceLabel?.let { text(R.string.a11y_space_inserts, it.removePrefix(SPACE_PREFIX)) } ?: text(R.string.a11y_space, null)
         KeyKind.BACKSPACE -> text(R.string.a11y_backspace, null)
         KeyKind.ENTER -> text(enterName(enterLabel), null)

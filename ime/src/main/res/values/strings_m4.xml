@@ -91,6 +91,7 @@
     <string name="a11y_inserted">Inserted: %1$s</string>
     <string name="pref_section_gestures">Gestures</string>
     <string name="pref_gestures_help">• Capital letter: swipe up on a letter.\n• Caps lock: ?123, then long press on ABC (⇪).\n• Accents: long press on a vowel or on c.\n• Related symbols: on the ?123 layer, long press on a symbol; the small sign in the corner shows the first one (_ on -, = on +…).\n• Accept the middle suggestion: swipe up on the space bar.\n• Quick punctuation, PC keys (Ctrl, Alt, F1…F12) and classic layout (with ⇧): long press on ?123.\n• Emojis: long press on ↵ (☺).\n• Settings, mode and layout: ⚙ at the left of the suggestion bar.\n• Language: long press on the space bar.\n• Forget a learned word: long press on the suggestion.</string>
+    <string name="a11y_navigation">Navigation: arrows, selection, copy and paste</string>
     <string name="a11y_settings">Quick settings</string>
     <string name="a11y_emoji_recents">Recent emojis</string>
 </resources>

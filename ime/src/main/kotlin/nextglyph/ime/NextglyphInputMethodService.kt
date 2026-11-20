@@ -16,6 +16,10 @@ import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.contacts.ContactName
 import nextglyph.engine.emoji.EmojiRecents
 import nextglyph.engine.input.EnterBehavior
+import nextglyph.engine.input.ContextAction
+import nextglyph.engine.input.NavCommand
+import nextglyph.engine.input.NavKey
+import nextglyph.engine.input.NavSelection
 import nextglyph.engine.input.PcKey
 import nextglyph.engine.input.PcKeyEvent
 import nextglyph.engine.input.PcModifier
@@ -97,6 +101,9 @@ class NextglyphInputMethodService : InputMethodService() {
 
     /** Modificateurs collants du panneau PC (§5.10). */
     private val pcModifiers = PcModifiers()
+
+    /** Mode Sélection du panneau Navigation (issue #37). */
+    private val navSelection = NavSelection()
 
     /** Émojis récents (§5.11), enregistrés dans les préférences ; jamais alimentés sans apprentissage. */
     private var emojiRecents = EmojiRecents()
@@ -216,6 +223,8 @@ class NextglyphInputMethodService : InputMethodService() {
             .withClassic(keepClassic)
         pcModifiers.reset()
         showModifiers()
+        navSelection.reset()
+        keyboardView?.navSelecting = false
         startField(enter, info.initialSelStart, info.initialSelEnd)
     }
 
@@ -274,6 +283,7 @@ class NextglyphInputMethodService : InputMethodService() {
             KeyKind.DECIMAL -> onDecimalKey()
             KeyKind.SPACE -> if (upper) session.onSpaceSwipeUp() else session.onKey(key, upper, offset)
             KeyKind.PC -> onPcKey(key)
+            KeyKind.NAV -> onNavKey(key)
             else -> if (!sendModified(key)) session.onKey(key, upper, offset)
         }
     }
@@ -301,6 +311,27 @@ class NextglyphInputMethodService : InputMethodService() {
         val now = SystemClock.uptimeMillis()
         connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, event.keyCode, 0, event.meta))
         connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, event.keyCode, 0, event.meta))
+    }
+
+    /** Touche du panneau Navigation (issue #37) : événement clavier, ou action d'édition de l'éditeur. */
+    private fun onNavKey(key: Key) {
+        val nav = NavKey.of(key.label) ?: return
+        when (val command = navSelection.press(nav)) {
+            is NavCommand.Event -> sendKeyEvent(command.event)
+            is NavCommand.Context -> currentInputConnection?.let { connection ->
+                connection.finishComposingText()
+                connection.performContextMenuAction(
+                    when (command.action) {
+                        ContextAction.SELECT_ALL -> android.R.id.selectAll
+                        ContextAction.COPY -> android.R.id.copy
+                        ContextAction.CUT -> android.R.id.cut
+                        ContextAction.PASTE -> android.R.id.paste
+                    },
+                )
+            }
+            null -> Unit
+        }
+        keyboardView?.navSelecting = navSelection.selecting
     }
 
     /** Glisser sur l'espace (§5.9) : flèches gauche ou droite, une par pas, comme sur un clavier physique. */

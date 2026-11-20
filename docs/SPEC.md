@@ -203,7 +203,7 @@ La barre a trois états :
 
 Un tap sur une suggestion valide ce mot et ajoute une espace automatique. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
 
-**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. Les trois cases de suggestions se partagent le reste de la largeur.
+**Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. À droite, un bouton `✥` de même largeur ouvre le panneau Navigation (§5.12) ; les trois cases de suggestions se partagent la largeur restante.
 
 ### 5.5 Validation par espace
 
@@ -318,6 +318,20 @@ Issue #26. Ouvert par un appui long sur `↵` (un indice `☺` dans le coin de l
 - **Récents** : 32 au plus, le plus récent d'abord, enregistrés dans les préférences ; jamais alimentés en incognito ni dans un champ sans apprentissage (§9.2). Le panneau s'ouvre sur les récents s'il y en a, sinon sur le premier groupe.
 - **Données** : l'asset `emoji.txt` (groupe, émoji, version), généré par `./gradlew :tools:buildEmoji` depuis le paquet `unicode-emoji-json` (`docs/DATA.md`). Au chargement, seuls les émojis que la police du système sait dessiner (`Paint.hasGlyph`) sont proposés.
 - Pas de recherche par mot-clé ni de choix de couleur de peau en V1. Accessibilité : chaque onglet et chaque émoji est un nœud virtuel.
+
+### 5.12 Panneau Navigation
+
+Issue #37. Le bouton `✥` à droite de la barre (§5.4) remplace les lettres par le panneau Navigation ; un deuxième appui sur `✥`, ou `ABC`, ramène aux lettres.
+
+```
+Mot ←  ↑  Mot →  | Tout  Copier  Couper
+←      ↓  →      | Sélect.  Coller
+ABC  Début  Fin  | Suppr  ⌫
+```
+
+- Les flèches, `Début`, `Fin` et `Suppr` envoient de vrais événements clavier (comme le panneau PC, §5.10) ; `Mot ←` et `Mot →` sont `Ctrl` + flèche.
+- `Sélect.` bascule le mode Sélection (touche affichée enfoncée) : les déplacements portent alors `Maj` et étendent la sélection. `Tout`, `Copier`, `Couper` et `Coller` sont les actions d'édition de l'éditeur (`performContextMenuAction`) ; elles, et `Suppr`, quittent le mode Sélection, qui est aussi remis à zéro à chaque champ.
+- Le mot en cours est validé tel quel avant chaque action. Ni adaptation ni suggestions sur le panneau.
 
 ---
 

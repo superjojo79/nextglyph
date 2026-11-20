@@ -42,7 +42,7 @@ class KeyDispatcher(private val editor: EditorGateway) {
             }
             // Bascules de couche, majuscule, séparateur décimal (décidé par DecimalSeparatorPolicy) et
             // emplacements vides : gérés par l'appelant, sans effet direct sur l'éditeur.
-            KeyKind.SYMBOLS, KeyKind.SHIFT, KeyKind.LETTERS, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC -> Unit
+            KeyKind.SYMBOLS, KeyKind.SHIFT, KeyKind.LETTERS, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC, KeyKind.NAV -> Unit
         }
     }
 }
