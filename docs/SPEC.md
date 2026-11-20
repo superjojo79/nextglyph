@@ -640,6 +640,12 @@ Liste d'applications et de pages web couvrant : champs numériques décimaux, t�
 
 **Panel intégré.** La variante debug de l'IME contient une activité « Champs de test » (`nextglyph.ime.debug.FieldTestsActivity`, absente de la release, vérifié par `ManifestTest`) : un `EditText` par profil, drapeau et action de `↵`, chacun suivi d'un écho du texte exact (points de code hors ASCII en clair) et de la dernière action d'éditeur reçue. Cas, résultats attendus et observés : `docs/FIELD-TESTS.md`.
 
+### 15.4 Mesures locales
+
+Issue #36. Le clavier tient des compteurs (`TypingStats`), **jamais de texte** : caractères tapés, frappes, ⌫, temps de frappe actif (somme des intervalles de 5 s au plus entre deux frappes), mots terminés (espace ou choix dans la barre), validations par espace qui ont inséré un autre mot, validations annulées, mots choisis dans la barre. Rien n'est compté en incognito ni dans les champs sans apprentissage (mot de passe, pavés, e-mail, URL, §9.2).
+
+Les réglages (section « Mesures de saisie ») affichent : vitesse en mots par minute (5 caractères par mot), part des frappes qui sont des ⌫, part des mots complétés ou corrigés par le clavier, part des validations automatiques annulées (objectif < 3 %, §15.2), avec un bouton de remise à zéro. Les compteurs sont enregistrés localement (préférences à part, à la sortie de chaque champ). Ils servent à calibrer l'étude utilisateur de M5 et à décider des suites de #30 et #32.
+
 ---
 
 ## 16. Jalons

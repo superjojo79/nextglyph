@@ -88,6 +88,27 @@ class InputSessionTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `mesures - frappes, mot validé, annulation et choix dans la barre`() {
+            val s = setup()
+            val stats = nextglyph.engine.stats.TypingStats({ 0L })
+            s.session.stats = stats
+
+            s.type("bonj ")
+            s.backspace()
+            s.type(" comm")
+            s.bar("comment")
+
+            val c = stats.counters
+            assertThat(s.editor.toString()).isEqualTo("Bonjour comment ")
+            assertThat(c.autocommits).isEqualTo(2)
+            assertThat(c.chars).isEqualTo(10)
+            assertThat(c.backspaces).isEqualTo(1)
+            assertThat(c.words).isEqualTo(3)
+            assertThat(c.undone).isEqualTo(1)
+            assertThat(c.picks).isEqualTo(1)
+        }
+
+        @Test
         fun `texte du presse-papiers - le mot en cours est validé, puis le texte inséré`() {
             val s = setup()
 
@@ -413,6 +434,20 @@ class InputSessionTest {
 
     @Nested
     inner class ErrorCases {
+        @Test
+        fun `mesures - rien en mot de passe ni en incognito`() {
+            for (f in listOf(field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD), field(imeOptions = C.IME_FLAG_NO_PERSONALIZED_LEARNING))) {
+                val s = setup(field = f)
+                val stats = nextglyph.engine.stats.TypingStats({ 0L })
+                s.session.stats = stats
+
+                s.type("abc ")
+                s.backspace()
+
+                assertThat(stats.counters).isEqualTo(nextglyph.engine.stats.TypingStats.Counters())
+            }
+        }
+
         @Test
         fun `texte du presse-papiers vide refusé`() {
             assertThatThrownBy { setup().session.onClipText("") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("vide")

@@ -135,6 +135,7 @@ class NextglyphInputMethodService : InputMethodService() {
             onLearningEvent()
         }
         session.onWordReplaced = { word -> keyboardView?.announceInserted(word) }
+        session.stats = services.stats
         val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nextglyph-lexicon").apply { isDaemon = true } }
         worker = executor
         val assets = AssetLexicons(assets)
@@ -156,6 +157,7 @@ class NextglyphInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         clipboard?.removePrimaryClipChangedListener(clipListener)
+        services.saveStats()
         clipHistory.clear()
         services.preferences.unregisterOnSharedPreferenceChangeListener(preferencesListener)
         services.learned.removeListener(learnedListener)
@@ -256,6 +258,7 @@ class NextglyphInputMethodService : InputMethodService() {
     }
 
     override fun onFinishInput() {
+        services.saveStats()
         session.onFinishInput()
         handler.removeCallbacks(save)
         if (::services.isInitialized) services.learned.saveIfChanged()
