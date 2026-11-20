@@ -15,6 +15,7 @@ Clavier Android adaptatif et open source. Il garde une disposition AZERTY ou QWE
 - [Convention de tests](docs/TESTING.md)
 - [Contribuer](CONTRIBUTING.md)
 - [Signaler une faille de sécurité](SECURITY.md)
+- [Publication](docs/PUBLISHING.md) et [politique de confidentialité](docs/PRIVACY.md)
 
 ## Développement
 

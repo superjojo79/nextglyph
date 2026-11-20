@@ -103,6 +103,29 @@ class ManifestParserTest {
             assertThat(sources.map { it.language }).contains("fr", "en")
             assertThat(sources.flatMap { it.needs }).containsAll(Need.entries)
         }
+
+        @Test
+        fun `lit les miroirs dans l'ordre et les essaie avant l'url officielle`() {
+            val json = manifestWith("mirrors", "[\"https://miroir.example/un/lexique.zip\",\"https://autre.example/lexique.zip\"]")
+
+            val source = ManifestParser.parse(json).single()
+
+            assertThat(source.mirrors).containsExactly("https://miroir.example/un/lexique.zip", "https://autre.example/lexique.zip")
+            assertThat(source.urls).containsExactly(
+                "https://miroir.example/un/lexique.zip",
+                "https://autre.example/lexique.zip",
+                "https://example.org/data/lexique.zip",
+            )
+            assertThat(source.fileName).isEqualTo("lexique.zip")
+        }
+
+        @Test
+        fun `sans miroir, seule l'url officielle est essayée`() {
+            val source = ManifestParser.parse(manifest(obj(fields()))).single()
+
+            assertThat(source.mirrors).isEmpty()
+            assertThat(source.urls).containsExactly("https://example.org/data/lexique.zip")
+        }
     }
 
     @Nested
@@ -264,6 +287,33 @@ class ManifestParserTest {
             assertRejected(manifest(obj(fields()), obj(second)), "source « autre »")
             assertRejected(manifest(obj(fields()), "5"), "source n°2")
         }
+
+        @Test
+        fun `rejette un champ mirrors qui n'est pas un tableau`() {
+            assertRejected(manifestWith("mirrors", "\"https://miroir.example/lexique.zip\""), "lexique", "mirrors", "tableau")
+        }
+
+        @Test
+        fun `rejette un miroir qui n'est pas une chaîne`() {
+            assertRejected(manifestWith("mirrors", "[\"https://miroir.example/lexique.zip\", 3]"), "lexique", "miroir n°2", "chaîne")
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["http://miroir.example/lexique.zip", "https://miroir.example/", "ftp://miroir.example/lexique.zip"])
+        fun `rejette un miroir qui n'est pas une url https vers un fichier`(mirror: String) {
+            assertRejected(manifestWith("mirrors", "[\"$mirror\"]"), "lexique", "miroir n°1", "url")
+        }
+
+        @Test
+        fun `rejette un miroir identique à l'url officielle`() {
+            assertRejected(manifestWith("mirrors", "[\"https://example.org/data/lexique.zip\"]"), "lexique", "url officielle")
+        }
+
+        @Test
+        fun `rejette deux miroirs identiques`() {
+            val mirror = "\"https://miroir.example/lexique.zip\""
+            assertRejected(manifestWith("mirrors", "[$mirror,$mirror]"), "Doublon", "miroir", "lexique")
+        }
     }
 
     @Nested
@@ -331,6 +381,22 @@ class ManifestParserTest {
         fun `le code d'un besoin inconnu n'est pas résolu`() {
             assertThat(Need.fromCode("z")).isNull()
             assertThat(Need.fromCode("")).isNull()
+        }
+
+        @Test
+        fun `un tableau de miroirs vide équivaut à son absence`() {
+            val source = ManifestParser.parse(manifestWith("mirrors", "[]")).single()
+
+            assertThat(source.mirrors).isEmpty()
+            assertThat(source.urls).containsExactly(source.url)
+        }
+
+        @Test
+        fun `un miroir peut porter un autre nom de fichier que l'url officielle`() {
+            val source = ManifestParser.parse(manifestWith("mirrors", "[\"https://miroir.example/copie.zip\"]")).single()
+
+            assertThat(source.fileName).isEqualTo("lexique.zip")
+            assertThat(source.mirrors).containsExactly("https://miroir.example/copie.zip")
         }
     }
 }

@@ -12,7 +12,7 @@ Suivi tenu par l'orchestrateur. Jalons définis au §16 de la [spécification](S
 | M2 — saisie complète (validation, ponctuation, bilinguisme) | Terminé (2026-11-19) |
 | M3 — profils de saisie (mot de passe, pavés, e-mail, URL, disposition classique) | Terminé côté moteur et IME (2026-11-19) ; panel d'applications tierces à faire |
 | M4 — apprentissage, contacts, réglages, accessibilité | Fait (2026-11-19), vérifié sur émulateur sauf TalkBack (absent de l'image) |
-| M5 | Hors périmètre autonome : validation de l'utilisateur requise |
+| M5 | En cours (mené par l'utilisateur) ; publication préparée (§18, [PUBLISHING.md](PUBLISHING.md)) : signature, build reproductible, release sur tag, métadonnées fastlane, politique de confidentialité |
 
 ## M0 — bilan
 
@@ -73,7 +73,7 @@ Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr
 ## Problèmes ouverts
 
 - **Licences des lexiques français** : levé en M2, un fichier par source (`docs/DATA.md`) ; une relecture juridique de l'ensemble des attributions reste prévue avant M5.
-- **Instantané des données Tatoeba** : les exports changent chaque semaine ; il faut un instantané figé pour une recette F-Droid reproductible (avant M5).
+- **Instantané des données** : miroirs figés dans `sources.json` et workflow « Instantané des données » en place ; il reste à lancer ce workflow après la fusion, tant que le cache de la CI contient les fichiers (voir [PUBLISHING.md](PUBLISHING.md)).
 - **Fréquences anglaises** : tirées de Tatoeba (biais « Tom », « Mary ») ; chercher une meilleure source à licence compatible.
 - **Prototype** : n'implémente pas encore la correction des préfixes connus du §5.5 révisé ; ses valeurs par défaut sont alignées sur la spec.
 - **SCOWL** : mention de données COCA dans son README, à relire avant publication.

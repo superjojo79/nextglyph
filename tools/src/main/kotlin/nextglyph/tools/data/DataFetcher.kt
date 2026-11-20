@@ -49,32 +49,42 @@ class DataFetcher(private val downloader: Downloader, private val log: (String) 
             log("${source.id} : déjà présent et valide")
             return FetchOutcome.AlreadyPresent(source)
         }
-        log("${source.id} : téléchargement de ${source.url}")
+        val failures = mutableListOf<String>()
+        for (url in source.urls) {
+            val failure = tryDownload(source, url, outputDir, target) ?: return FetchOutcome.Downloaded(source)
+            failures += failure
+        }
+        throw DataFetchException(failures.joinToString(separator = " ; "))
+    }
+
+    /** Télécharge [url] dans [target] après vérification ; renvoie la raison de l'échec, ou `null`. */
+    private fun tryDownload(source: DataSource, url: String, outputDir: Path, target: Path): String? {
+        log("${source.id} : téléchargement de $url")
         val partial = outputDir.resolve(source.fileName + PARTIAL_SUFFIX)
         try {
             Files.deleteIfExists(partial)
             try {
-                downloader.download(source.url, partial)
+                downloader.download(url, partial)
             } catch (e: IOException) {
-                throw DataFetchException("${source.id} : téléchargement impossible (${e.message}) depuis ${source.url}")
+                return "${source.id} : téléchargement impossible (${e.message}) depuis $url"
             }
             val check = FileVerifier.verify(partial, source)
-            if (check.needsDownload) throw DataFetchException(describeMismatch(source, check))
+            if (check.needsDownload) return describeMismatch(source, check, url)
             Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING)
         } finally {
             Files.deleteIfExists(partial)
         }
-        return FetchOutcome.Downloaded(source)
+        return null
     }
 
-    private fun describeMismatch(source: DataSource, check: FileVerification): String {
+    private fun describeMismatch(source: DataSource, check: FileVerification, url: String): String {
         val detail = when (check.state) {
             FileState.ABSENT -> "aucun fichier reçu"
             FileState.EMPTY -> "fichier reçu vide"
             FileState.WRONG_SIZE -> "taille différente de celle attendue (${source.sizeBytes} octets)"
             else -> "SHA-256 attendu ${source.sha256}, obtenu ${check.actualSha256}"
         }
-        return "${source.id} : contenu téléchargé refusé, $detail. " +
+        return "${source.id} : contenu téléchargé depuis $url refusé, $detail. " +
             "La source a peut-être changé : vérifier sa licence puis mettre à jour tools/data/sources.json."
     }
 

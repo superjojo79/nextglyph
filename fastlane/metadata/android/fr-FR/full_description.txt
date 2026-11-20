@@ -1,0 +1,31 @@
+Nextglyph est un clavier Android adaptatif, libre et open source. Il garde une disposition AZERTY ou QWERTY que vous reconnaissez tout de suite, et, à chaque lettre tapée, met en avant les lettres qui peuvent encore former un mot. Les lettres improbables s'atténuent et cèdent un peu de place aux autres, sans jamais changer de rangée.
+
+<b>Plus rapide, plus compact</b>
+<ul>
+<li>Le clavier tient sur trois rangées, barre de suggestions comprise : il laisse plus de place à l'écran.</li>
+<li>Le décodage des appuis tient compte des lettres probables : moins de fautes de frappe.</li>
+<li>La touche espace affiche le mot qu'elle va insérer ; un appui sur Effacer annule toute correction.</li>
+</ul>
+
+<b>Français et anglais en même temps</b>
+<ul>
+<li>Les deux langues sont actives ensemble, sans changer de clavier.</li>
+<li>Typographie française (espaces avant ; : ! ?), élisions, accents, majuscules automatiques.</li>
+</ul>
+
+<b>Adapté à chaque champ</b>
+<ul>
+<li>Pavés dédiés pour les nombres, le téléphone, les dates et les codes PIN.</li>
+<li>Champs mot de passe : rien n'est lu, rien n'est appris.</li>
+<li>Dispositions pour les adresses e-mail et web, panneau d'émojis et touches PC.</li>
+</ul>
+
+<b>Votre vie privée</b>
+<ul>
+<li>Aucune permission réseau : rien ne quitte votre téléphone.</li>
+<li>Le clavier apprend vos mots et votre façon de taper, sur l'appareil seulement ; tout s'efface en un geste.</li>
+<li>Les noms de vos contacts peuvent être proposés si vous l'autorisez (permission facultative).</li>
+<li>Ni publicité, ni statistiques, ni bibliothèque propriétaire.</li>
+</ul>
+
+Code source sous licence Apache 2.0. Les dictionnaires gardent leur propre licence (Lexique, Grammalecte, SCOWL, Tatoeba) : voir le fichier NOTICE du dépôt.

@@ -27,12 +27,41 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Signature de release (§18.1) : la clé reste hors du dépôt et n'est lue que dans l'environnement
+    // (workflow de release, ou poste du mainteneur). Sans NEXTGLYPH_KEYSTORE, l'APK de release n'est
+    // pas signé : c'est le cas du contrôle de reproductibilité et de la recette F-Droid.
+    val releaseKeystore = providers.environmentVariable("NEXTGLYPH_KEYSTORE").orNull
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = providers.environmentVariable("NEXTGLYPH_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("NEXTGLYPH_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("NEXTGLYPH_KEY_PASSWORD").get()
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
+            // Build reproductible (§18.1) : pas d'empreinte du commit dans l'APK, qui différerait
+            // entre une copie de travail et une archive des sources.
+            vcsInfo.include = false
         }
+    }
+
+    // Bloc chiffré des dépendances, lisible par Google seulement : F-Droid le signale et il empêche
+    // de comparer l'APK publié à un build indépendant (§18.1, §18.3).
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     lint {

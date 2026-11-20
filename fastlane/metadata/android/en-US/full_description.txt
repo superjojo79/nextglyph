@@ -1,0 +1,31 @@
+Nextglyph is an adaptive, free and open source Android keyboard. It keeps an AZERTY or QWERTY layout you recognize at a glance and, with each letter you type, highlights the letters that can still form a word. Unlikely letters fade and give some of their room to the others, without ever leaving their row.
+
+<b>Faster and more compact</b>
+<ul>
+<li>The keyboard fits in three rows, suggestion bar included, leaving more room on screen.</li>
+<li>Taps are decoded with the likely letters in mind, so you make fewer typos.</li>
+<li>The space bar shows the word it will insert; a tap on Delete undoes any correction.</li>
+</ul>
+
+<b>French and English at the same time</b>
+<ul>
+<li>Both languages are active together, with no keyboard switching.</li>
+<li>French typography (spaces before ; : ! ?), elisions, accents and automatic capitals.</li>
+</ul>
+
+<b>Made for each field</b>
+<ul>
+<li>Dedicated pads for numbers, phone numbers, dates and PIN codes.</li>
+<li>Password fields: nothing is read and nothing is learned.</li>
+<li>Layouts for email and web addresses, an emoji panel and PC keys.</li>
+</ul>
+
+<b>Your privacy</b>
+<ul>
+<li>No network permission: nothing leaves your phone.</li>
+<li>The keyboard learns your words and the way you type, on the device only; everything can be erased in one tap.</li>
+<li>Your contacts' names can be suggested if you allow it (optional permission).</li>
+<li>No ads, no analytics, no proprietary library.</li>
+</ul>
+
+Source code under the Apache 2.0 license. The dictionaries keep their own license (Lexique, Grammalecte, SCOWL, Tatoeba): see the NOTICE file in the repository.

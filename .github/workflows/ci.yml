@@ -34,13 +34,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       # Données linguistiques (~100 Mo, :tools:fetchData) : le cache évite de les retélécharger à chaque
-      # exécution ; la clé change dès que sources.json change. Les lexiques (assets de l'APK) sont
-      # reconstruits à partir de ces données par :tools:buildLexicons, dont dépend l'application.
-      - name: Restaurer les données linguistiques
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: tools/build/data
-          key: lexicon-data-${{ hashFiles('tools/data/sources.json') }}
+      # exécution. La clé ne dépend que des empreintes de sources.json (ajouter un miroir ne l'invalide
+      # pas) ; à défaut, le cache le plus récent est restauré et fetchData ne remplace que les fichiers
+      # dont l'empreinte diffère. Les lexiques (assets de l'APK) sont reconstruits à partir de ces
+      # données par :tools:buildLexicons, dont dépend l'application.
+      - uses: ./.github/actions/lexicon-data
 
       # `build` compile aussi le module ime : il lui faut le SDK Android et les lexiques (assets).
       - uses: ./.github/actions/android-sdk
@@ -103,11 +101,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       # Mêmes données linguistiques que le job « Build et tests » (cache partagé par la clé).
-      - name: Restaurer les données linguistiques
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: tools/build/data
-          key: lexicon-data-${{ hashFiles('tools/data/sources.json') }}
+      - uses: ./.github/actions/lexicon-data
 
       # Le runner fournit un SDK Android ; on ne télécharge que ce qui manque.
       - uses: ./.github/actions/android-sdk
@@ -130,6 +124,41 @@ jobs:
           name: rapports-android
           path: |
             ime/build/reports/
+          retention-days: 14
+
+  reproducible:
+    name: Build reproductible
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-read-only: true
+
+      - uses: ./.github/actions/lexicon-data
+
+      - uses: ./.github/actions/android-sdk
+
+      # §18.1 : deux builds de l'APK de release (non signé) depuis deux dossiers différents, sans
+      # cache de build, doivent être identiques à l'octet près (lexiques compris).
+      - name: Construire deux fois l'APK de release et comparer
+        run: scripts/check-reproducible.sh
+
+      - name: Publier les deux APK en cas d'écart
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk-non-reproductibles
+          path: ${{ runner.temp }}/reproductible/
           retention-days: 14
 
   dependency-review:

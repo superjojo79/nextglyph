@@ -1,0 +1,6 @@
+Première version publique.
+• Clavier adaptatif AZERTY et QWERTY, français et anglais actifs ensemble.
+• Suggestions, validation par espace, typographie française, majuscules automatiques.
+• Pavés numérique, téléphone, date et PIN ; champs mot de passe protégés.
+• Apprentissage sur l'appareil, noms des contacts (facultatif), émojis, touches PC.
+• Aucune permission réseau.

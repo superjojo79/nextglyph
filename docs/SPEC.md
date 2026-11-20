@@ -662,15 +662,16 @@ Ensuite (V2) : bigrammes et prédiction du mot suivant, saisie par glissement, d
 
 - **Un seul build pour les deux stores.** Aucune dépendance propriétaire : ni Google Play Services, ni Firebase, ni SDK d'analyse ou de publicité. C'est une condition d'entrée sur F-Droid, et c'est cohérent avec le §12.
 - **Builds reproductibles.** Le même code source doit produire un APK identique à l'octet près (versions de Gradle et du JDK figées, pas d'horodatage ni de chemin absolu dans l'APK). F-Droid peut alors publier l'APK signé par le projet au lieu de le re-signer avec sa propre clé. Résultat : une même signature sur F-Droid, Google Play et GitHub, et des utilisateurs qui peuvent passer d'une source à l'autre sans désinstaller.
-- **Clé de signature** : générée une seule fois, conservée hors du dépôt, avec une sauvegarde hors ligne. Sur Google Play, l'inscription à Play App Signing doit utiliser cette même clé comme clé d'application (et non une clé générée par Google), sinon les signatures divergent.
+- **Clé de signature** : générée une seule fois, conservée hors du dépôt, avec une sauvegarde hors ligne. Le build la lit dans l'environnement (`NEXTGLYPH_KEYSTORE` et trois variables associées) ; sans elle, l'APK de release n'est pas signé. Sur Google Play, l'inscription à Play App Signing doit utiliser cette même clé comme clé d'application (et non une clé générée par Google), sinon les signatures divergent.
 - **Versionnage** : `versionName` sémantique (`1.2.0`) et `versionCode` strictement croissant, identiques dans les trois canaux.
 
 ### 18.2 GitHub
 
 - Dépôt public ; fichiers `LICENSE` (Apache-2.0), `NOTICE` (attributions des données, cf. §10.2), `README`, `CONTRIBUTING`, `SECURITY`.
-- **Intégration continue** (GitHub Actions) : tests du module `engine`, lint, build de l'APK, vérification de la reproductibilité (deux builds successifs comparés).
+- **Intégration continue** (GitHub Actions) : tests du module `engine`, lint, build de l'APK, vérification de la reproductibilité (deux builds de l'APK de release non signé, depuis deux dossiers et sans cache, comparés à l'octet : `scripts/check-reproducible.sh`).
 - **Publication** : chaque tag `vX.Y.Z` produit une release GitHub avec l'APK signé et son empreinte SHA-256.
-- Les lexiques binaires sont générés par `tools/` pendant le build, pas versionnés. Seules les sources de données (ou un script de téléchargement avec sommes de contrôle) sont dans le dépôt.
+- Les lexiques binaires sont générés par `tools/` pendant le build, pas versionnés. Seules les sources de données (ou un script de téléchargement avec sommes de contrôle) sont dans le dépôt. Chaque source a un miroir figé dans une release du dépôt (`mirrors` dans `tools/data/sources.json`), essayé avant l'URL officielle : un fichier écrasé en place par son auteur ne casse pas le build.
+- Procédure complète (clé, secrets, tags, F-Droid, Play) : [PUBLISHING.md](PUBLISHING.md).
 
 ### 18.3 F-Droid
 
@@ -682,8 +683,9 @@ Ensuite (V2) : bigrammes et prédiction du mot suivant, saisie par glissement, d
 
 - **Cible SDK** : Google Play impose de cibler une version récente d'Android (`targetSdk`), relevée chaque année. La règle exacte est à vérifier à chaque publication.
 - **Section « Sécurité des données »** : déclarer qu'aucune donnée n'est collectée ni partagée. Les données traitées uniquement sur l'appareil (texte saisi, contacts, dictionnaire personnel) ne sont en principe pas considérées comme collectées. À confirmer avec la politique en vigueur au moment de la publication.
-- **Contacts** : la permission `READ_CONTACTS` impose une explication claire avant la demande (écran de réglages, §6.1) et une politique de confidentialité publiée (page GitHub Pages du dépôt).
-- **Politique de confidentialité** : requise par Google Play ; une page courte qui reprend le §12.
+- **Contacts** : la permission `READ_CONTACTS` impose une explication claire avant la demande (écran de réglages, §6.1) et une politique de confidentialité publiée.
+- **Politique de confidentialité** : requise par Google Play ; une page courte qui reprend le §12, en français et en anglais : [PRIVACY.md](PRIVACY.md), publiée par le dépôt (ou GitHub Pages).
+- **Format** : Google Play exige un app bundle (`.aab`) pour une nouvelle application ; le workflow de release le produit, signé avec la même clé que l'APK. Play App Signing doit être configuré avec cette clé (« fournir votre propre clé »).
 - Fiche du store en français et en anglais, générée à partir des mêmes textes que les métadonnées fastlane.
 
 ---
