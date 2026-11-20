@@ -25,6 +25,7 @@ import nextglyph.engine.adapt.TapSpatialModel
 import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.adapt.TapDecoding
 import nextglyph.engine.edit.ShiftState
+import nextglyph.engine.emoji.EmojiCatalog
 import nextglyph.engine.input.PcKey
 import nextglyph.engine.input.PcLayout
 import nextglyph.engine.input.PcModifier
@@ -83,6 +84,9 @@ class KeyboardView(context: Context) : View(context) {
 
         /** Appui long sur la case [index] de la barre (§10.5 : supprimer un mot appris). */
         fun onBarItemLongPress(index: Int)
+
+        /** Émoji choisi dans le panneau (§5.11). */
+        fun onEmoji(emoji: String)
     }
 
     var listener: Listener? = null
@@ -284,7 +288,7 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun hints(layout: KeyboardLayout, menu: SymbolsMenu, hasMenus: Boolean): Array<Array<String?>> =
         layout.rows.map { row ->
-            Array(row.keys.size) { k -> if (hasMenus) KeyPopups.hint(row.keys[k], menu) else null }
+            Array(row.keys.size) { k -> if (hasMenus) KeyPopups.hint(row.keys[k], menu, emoji = fieldKeyboard.showsBar) else null }
         }.toTypedArray()
 
     private fun labels(layout: KeyboardLayout, upper: Boolean): Array<Array<String>> = layout.rows.map { row ->
@@ -306,6 +310,11 @@ class KeyboardView(context: Context) : View(context) {
         val labelChanged = enterLabel != this.enterLabel
         fieldKeyboard = keyboard
         this.enterLabel = enterLabel
+        // Nouveau champ : le panneau des émojis se referme.
+        if (emojiShown) {
+            emojiShown = false
+            accessibility.invalidateNodes()
+        }
         if (layoutsChanged) {
             closePopup()
             cancelPendingPopup()
@@ -401,6 +410,56 @@ class KeyboardView(context: Context) : View(context) {
         prepareLabels()
     }
 
+    /** Panneau des émojis (§5.11) : créé à la première ouverture (lecture de l'asset, filtrage des glyphes). */
+    private var emojiPanel: EmojiPanel? = null
+    private var emojiShown = false
+    private val emojiPaint = labelPaint(textPx(EMOJI_TEXT_SP))
+
+    /** Émojis récents, du plus récent au plus ancien (§5.11). */
+    var recentEmojis: List<String> = emptyList()
+        set(value) {
+            field = value
+            emojiPanel?.recents = value
+            if (emojiShown) invalidate()
+        }
+
+    /** Affiche le panneau des émojis, ou revient aux lettres. */
+    private fun showEmoji(shown: Boolean) {
+        if (shown == emojiShown) return
+        if (shown) {
+            closePopup()
+            cancelPendingPopup()
+            keyboard.cancelPointers(now())
+            val panel = emojiPanel ?: EmojiPanel(loadEmoji()).also { emojiPanel = it }
+            panel.recents = recentEmojis
+            panel.open()
+            layoutEmoji()
+        }
+        emojiShown = shown
+        accessibility.invalidateNodes()
+        invalidate()
+    }
+
+    /** Catalogue de l'asset, limité aux émojis que la police du système sait dessiner. */
+    private fun loadEmoji(): EmojiCatalog {
+        val catalog = context.assets.open(EMOJI_ASSET).bufferedReader().useLines { EmojiCatalog.parse(it) }
+        return catalog.filter { emojiPaint.hasGlyph(it.text) }
+    }
+
+    private fun layoutEmoji() {
+        emojiPanel?.layout(width.toFloat(), barPx, keysHeightPx(lettersLayout.rows.size))
+    }
+
+    private fun onEmojiAction(action: EmojiPanel.Action?) {
+        when (action) {
+            EmojiPanel.Action.Letters -> showEmoji(false)
+            EmojiPanel.Action.Backspace -> listener?.onKey(Key(KeyKind.BACKSPACE, "⌫", 1f), false, null)
+            is EmojiPanel.Action.Insert -> listener?.onEmoji(action.emoji)
+            null -> Unit
+        }
+        invalidate()
+    }
+
     /** Modificateurs PC actifs (`Ctrl`, `Alt`), affichés enfoncés sur le panneau (§5.10). */
     var activeModifiers: Set<PcModifier> = emptySet()
         set(value) {
@@ -422,9 +481,44 @@ class KeyboardView(context: Context) : View(context) {
     /** Nœuds d'accessibilité : les touches de la couche affichée, puis les cases de la barre. */
     private inner class AccessibilityHost : KeyboardAccessibility.Host {
         private val keyCount: Int get() = keyboardLayout.rows.sumOf { it.keys.size }
+        private val emojiRect = RectF()
+
+        /** Panneau des émojis affiché : ses onglets puis les cases de la page sont les nœuds. */
+        private val emoji: EmojiPanel? get() = if (emojiShown) emojiPanel else null
+
+        private fun emojiBounds(panel: EmojiPanel, id: Int, out: android.graphics.Rect): Boolean {
+            val tabs = panel.tabLabels.size
+            if (id < 0 || id >= tabs + panel.pageItems().size) return false
+            if (id < tabs) panel.tabRect(id, emojiRect) else panel.cellRect(id - tabs, emojiRect)
+            out.set(emojiRect.left.toInt(), emojiRect.top.toInt(), emojiRect.right.toInt(), emojiRect.bottom.toInt())
+            return true
+        }
+
+        private fun emojiDescription(panel: EmojiPanel, id: Int): String? {
+            val tabs = panel.tabLabels.size
+            return when {
+                id == 0 -> context.getString(R.string.a11y_letters)
+                id == tabs - 1 -> context.getString(R.string.a11y_backspace)
+                id == 1 -> context.getString(R.string.a11y_emoji_recents)
+                id < tabs -> panel.tabLabels[id]
+                else -> panel.pageItems().getOrNull(id - tabs)
+            }
+        }
+
+        private fun emojiClick(panel: EmojiPanel, id: Int): Boolean {
+            val tabs = panel.tabLabels.size
+            when {
+                id in 0 until tabs -> onEmojiAction(panel.selectTab(id))
+                id - tabs in panel.pageItems().indices -> onEmojiAction(EmojiPanel.Action.Insert(panel.pageItems()[id - tabs]))
+                else -> return false
+            }
+            accessibility.invalidateNodes()
+            return true
+        }
 
         // Le bouton `⚙` (issue #27) est le dernier nœud quand la barre est affichée.
-        override val count: Int get() = keyCount + if (fieldKeyboard.showsBar) barTexts.size + 1 else 0
+        override val count: Int get() = emoji?.let { it.tabLabels.size + it.pageItems().size }
+            ?: (keyCount + if (fieldKeyboard.showsBar) barTexts.size + 1 else 0)
 
         private val gearId: Int get() = keyCount + barTexts.size
 
@@ -447,6 +541,7 @@ class KeyboardView(context: Context) : View(context) {
         }
 
         override fun bounds(id: Int, out: android.graphics.Rect): Boolean {
+            emoji?.let { return emojiBounds(it, id, out) }
             val rest = restGeometry ?: return false
             if (id < 0 || id >= count) return false
             if (id == gearId) {
@@ -467,6 +562,7 @@ class KeyboardView(context: Context) : View(context) {
         }
 
         override fun description(id: Int): String? {
+            emoji?.let { return emojiDescription(it, id) }
             if (id == gearId) return context.getString(R.string.a11y_settings)
             if (id >= keyCount) return barItems.getOrNull(id - keyCount)?.let { descriptions.suggestion(it.text) }
             val r = keyRow(id)
@@ -478,12 +574,19 @@ class KeyboardView(context: Context) : View(context) {
         }
 
         override fun state(id: Int): String? {
+            if (emoji != null) return null
             val r = keyRow(id)
             if (r == NONE) return null
             return if (keyboardLayout.rows[r].keys[keyIndex(id)].kind == KeyKind.SHIFT) descriptions.shiftState(shift) else null
         }
 
         override fun nodeAt(x: Float, y: Float): Int {
+            emoji?.let { panel ->
+                val tab = panel.tabAt(x, y)
+                if (tab >= 0) return tab
+                val cell = panel.cellAt(x, y)
+                return if (cell >= 0) panel.tabLabels.size + cell else View.NO_ID
+            }
             val rest = restGeometry ?: return View.NO_ID
             if (y < barPx) {
                 if (!fieldKeyboard.showsBar) return View.NO_ID
@@ -499,6 +602,7 @@ class KeyboardView(context: Context) : View(context) {
         }
 
         override fun click(id: Int): Boolean {
+            emoji?.let { return emojiClick(it, id) }
             if (id < 0 || id >= count) return false
             if (id == gearId) {
                 listener?.onPopup(PopupAction.OpenSettings)
@@ -575,6 +679,7 @@ class KeyboardView(context: Context) : View(context) {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         rebuildGeometry()
         measureBar()
+        layoutEmoji()
     }
 
     private fun keysHeightPx(rows: Int): Float = rows * rowHeightPx + (rows - 1) * rowGapPx
@@ -592,6 +697,16 @@ class KeyboardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(backgroundColor)
         if (width <= 0) return
+        val panel = emojiPanel
+        if (emojiShown && panel != null) {
+            fillPaint.color = pressedColor
+            fillPaint.alpha = Color.alpha(pressedColor)
+            functionPaint.textSize = functionTextPx
+            functionPaint.alpha = Color.alpha(labelColor)
+            panel.draw(canvas, keyRect, emojiPaint, functionPaint, fillPaint, cornerPx)
+            drawAccessibilityFocus(canvas)
+            return
+        }
         drawBar(canvas)
         val now = now()
         val keyboard = keyboard
@@ -799,6 +914,18 @@ class KeyboardView(context: Context) : View(context) {
     // Avec TalkBack, les touches sont des nœuds virtuels activés par ACTION_CLICK (KeyboardAccessibility, §13).
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        val panel = emojiPanel
+        if (emojiShown && panel != null) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    panel.down(event.x, event.y)
+                    hapticTap()
+                }
+                MotionEvent.ACTION_UP -> onEmojiAction(panel.up(event.x, event.y))
+                else -> Unit
+            }
+            return true
+        }
         val rest = restGeometry ?: return false
         val now = now()
         when (event.actionMasked) {
@@ -960,7 +1087,8 @@ class KeyboardView(context: Context) : View(context) {
         // Pas de menu d'appui long sur les pavés (aucune couche) ; menu des langues seulement avec la barre.
         if (fieldKeyboard.symbols == null) return emptyList()
         val menu = if (symbolsShown) SymbolsMenu.NONE else fieldKeyboard.symbolsMenu
-        return KeyPopups.forKey(key, shift != ShiftState.OFF, if (fieldKeyboard.showsBar) languages else emptyList(), menu)
+        val bar = fieldKeyboard.showsBar
+        return KeyPopups.forKey(key, shift != ShiftState.OFF, if (bar) languages else emptyList(), menu, emoji = bar)
     }
 
     private fun openPopup() {
@@ -990,7 +1118,11 @@ class KeyboardView(context: Context) : View(context) {
         closePopup()
         invalidate()
         val action = selected?.action ?: return
-        if (action == PopupAction.PcKeys) showPcKeys() else listener?.onPopup(action)
+        when (action) {
+            PopupAction.PcKeys -> showPcKeys()
+            PopupAction.EmojiPanel -> showEmoji(true)
+            else -> listener?.onPopup(action)
+        }
     }
 
     private fun closePopup() {
@@ -1039,6 +1171,12 @@ class KeyboardView(context: Context) : View(context) {
         private const val MIN_BAR_SCALE = 0.6f
         private const val POPUP_ITEM_DP = 40f
         private const val POPUP_WIDE_DP = 64f
+
+        /** Asset des émojis (`:tools:buildEmoji`, §5.11). */
+        private const val EMOJI_ASSET = "emoji.txt"
+
+        /** Taille des émojis du panneau. */
+        private const val EMOJI_TEXT_SP = 24f
 
         /** Largeur du bouton `⚙` de la barre (issue #27). */
         private const val GEAR_DP = 40f

@@ -17,6 +17,14 @@ class KeyPopupsTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `appui long sur entrée - panneau des émojis, avec son indice`() {
+            val enter = Key(KeyKind.ENTER, "↵", 1f)
+
+            assertThat(KeyPopups.forKey(enter, false, bilingual, emoji = true)).containsExactly(PopupItem("☺", PopupAction.EmojiPanel))
+            assertThat(KeyPopups.hint(enter, emoji = true)).isEqualTo("☺")
+        }
+
+        @Test
         fun `indices - premier symbole voisin, majuscule verrouillée sur ABC, menu des symboles`() {
             assertThat(KeyPopups.hint(Key.character('-'))).isEqualTo("_")
             assertThat(KeyPopups.hint(Key.character('+'))).isEqualTo("=")
@@ -118,6 +126,14 @@ class KeyPopupsTest {
 
     @Nested
     inner class ErrorCases {
+        @Test
+        fun `entrée sans panneau des émojis - ni menu ni indice`() {
+            val enter = Key(KeyKind.ENTER, "↵", 1f)
+
+            assertThat(KeyPopups.forKey(enter, false, bilingual)).isEmpty()
+            assertThat(KeyPopups.hint(enter)).isNull()
+        }
+
         @Test
         fun `pas d'indice - lettres, symbole sans voisin, touches de fonction`() {
             assertThat(KeyPopups.hint(Key.letter('e'))).isNull()

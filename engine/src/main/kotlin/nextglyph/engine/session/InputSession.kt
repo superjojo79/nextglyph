@@ -254,6 +254,15 @@ class InputSession(
         }
     }
 
+    /**
+     * Émoji choisi dans le panneau (§5.11) : le mot en cours est d'abord validé comme devant un signe
+     * (§5.5, sans espace), puis l'émoji est inséré tel quel, quelle que soit sa longueur.
+     */
+    fun onEmoji(text: String) {
+        require(text.isNotEmpty()) { "Un émoji ne peut pas être vide." }
+        plain(text, validate = field.readsText)
+    }
+
     /** Raccourci de la barre (e-mail, URL) : inséré tel quel. */
     fun onShortcut(text: String) = plain(text, validate = false)
 

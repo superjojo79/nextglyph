@@ -88,6 +88,17 @@ class InputSessionTest {
     @Nested
     inner class HappyPath {
         @Test
+        fun `émoji - le mot en cours est validé sans espace, puis l'émoji inséré`() {
+            val s = setup()
+
+            s.type("bonj")
+            s.session.onEmoji("👋🏽")
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("Bonjour👋🏽")
+        }
+
+        @Test
         fun `glisser vers le haut sur l'espace - insère la suggestion centrale même si elle ne domine pas`() {
             val s = setup()
 
@@ -368,6 +379,11 @@ class InputSessionTest {
     @Nested
     inner class ErrorCases {
         @Test
+        fun `émoji vide refusé`() {
+            assertThatThrownBy { setup().session.onEmoji("") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("vide")
+        }
+
+        @Test
         fun `glisser vers le haut sur l'espace sans mot en cours - vaut un appui sur l'espace`() {
             val s = setup()
 
@@ -456,6 +472,16 @@ class InputSessionTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `émoji dans un champ qui ne lit pas le texte - inséré tel quel`() {
+            val s = setup(field = field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD))
+
+            s.session.onEmoji("😀")
+            s.editor.deliver(s.session)
+
+            assertThat(s.editor.toString()).isEqualTo("😀")
+        }
+
         @Test
         fun `glisser vers le haut sur l'espace dans un champ sans suggestions - une espace`() {
             val s = setup(field = field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_FLAG_NO_SUGGESTIONS))

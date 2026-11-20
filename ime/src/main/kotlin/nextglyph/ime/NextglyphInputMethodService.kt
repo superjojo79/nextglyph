@@ -14,6 +14,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import nextglyph.engine.adapt.DistributionSource
 import nextglyph.engine.contacts.ContactName
+import nextglyph.engine.emoji.EmojiRecents
 import nextglyph.engine.input.EnterBehavior
 import nextglyph.engine.input.PcKey
 import nextglyph.engine.input.PcKeyEvent
@@ -97,6 +98,9 @@ class NextglyphInputMethodService : InputMethodService() {
     /** Modificateurs collants du panneau PC (§5.10). */
     private val pcModifiers = PcModifiers()
 
+    /** Émojis récents (§5.11), enregistrés dans les préférences ; jamais alimentés sans apprentissage. */
+    private var emojiRecents = EmojiRecents()
+
     private val save = Runnable { services.learned.saveIfChanged() }
 
     private val preferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> applySettings() }
@@ -132,6 +136,7 @@ class NextglyphInputMethodService : InputMethodService() {
         services.contacts.addListener(contactsListener)
         services.learned.load()
         services.syncContacts()
+        emojiRecents = EmojiRecents.parse(services.preferences.getString(KEY_EMOJI_RECENTS, null))
     }
 
     override fun onDestroy() {
@@ -154,6 +159,7 @@ class NextglyphInputMethodService : InputMethodService() {
         bottomMarginDp = settings.bottomMarginDp
         services.learned.data?.let { spatialModel = it.spatial }
         languages = session.predictor?.languages.orEmpty()
+        recentEmojis = emojiRecents.list
         listener = object : KeyboardView.Listener {
             override fun onKey(key: Key, upper: Boolean, offset: TapOffset?) = onKeyPressed(key, upper, offset)
 
@@ -167,7 +173,11 @@ class NextglyphInputMethodService : InputMethodService() {
                 is PopupAction.SetLayout -> savePreference(KeyboardSettings.KEY_LAYOUT, KeyboardSettings.storedName(action.kind))
                 // Le panneau PC est une couche de la vue, ouverte par la vue elle-même.
                 PopupAction.PcKeys -> Unit
+                // Le panneau des émojis aussi.
+                PopupAction.EmojiPanel -> Unit
             }
+
+            override fun onEmoji(emoji: String) = onEmojiChosen(emoji)
 
             override fun onBarItem(index: Int) = session.onBarItem(index)
 
@@ -176,6 +186,15 @@ class NextglyphInputMethodService : InputMethodService() {
         setSource(if (session.predictor != null) source else null)
         setState(session.state)
         keyboardView = this
+    }
+
+    /** Insère [emoji] et, hors incognito et champs sans apprentissage, le place en tête des récents. */
+    private fun onEmojiChosen(emoji: String) {
+        session.onEmoji(emoji)
+        if (!field.profile.learning || field.profile.incognito) return
+        emojiRecents.add(emoji)
+        services.preferences.edit().putString(KEY_EMOJI_RECENTS, emojiRecents.serialize()).apply()
+        keyboardView?.recentEmojis = emojiRecents.list
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
@@ -403,5 +422,6 @@ class NextglyphInputMethodService : InputMethodService() {
     private companion object {
         const val LANGUAGE_SEPARATOR = "+"
         const val SAVE_DELAY_MS = 3000L
+        const val KEY_EMOJI_RECENTS = "emoji_recents"
     }
 }

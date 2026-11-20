@@ -31,6 +31,9 @@ sealed interface PopupAction {
 
     /** Affiche le panneau des touches PC à la place de la couche `?123` (§5.10). */
     data object PcKeys : PopupAction
+
+    /** Affiche le panneau des émojis (§5.11). */
+    data object EmojiPanel : PopupAction
 }
 
 /** Menu de l'appui long sur `?123`, selon la disposition affichée (§4, §5.6, §7.1). */
@@ -116,12 +119,14 @@ object KeyPopups {
      * @param upper la prochaine lettre sera une majuscule (variantes en majuscules).
      * @param languages langues actives (menu de l'espace seulement s'il y en a plusieurs).
      * @param symbolsMenu contenu du menu de `?123`.
+     * @param emoji le panneau des émojis est proposé (appui long sur `↵`, profils texte, §5.11).
      */
     fun forKey(
         key: Key,
         upper: Boolean,
         languages: List<String>,
         symbolsMenu: SymbolsMenu = SymbolsMenu.QUICK_PUNCTUATION,
+        emoji: Boolean = false,
     ): List<PopupItem> = when (key.kind) {
         KeyKind.LETTER -> ACCENTS[key.label[0]].orEmpty().map { variant ->
             val text = if (upper) variant.uppercase(Locale.ROOT) else variant
@@ -136,6 +141,7 @@ object KeyPopups {
         }
         KeyKind.CHARACTER -> SYMBOLS[key.label].orEmpty().map { PopupItem(it, PopupAction.Text(it)) }
         KeyKind.LETTERS -> listOf(PopupItem(CAPS_LOCK_LABEL, PopupAction.CapsLock))
+        KeyKind.ENTER -> if (emoji) listOf(PopupItem(EMOJI_LABEL, PopupAction.EmojiPanel)) else emptyList()
         else -> emptyList()
     }
 
@@ -147,17 +153,22 @@ object KeyPopups {
      *
      * - symbole de la couche `?123` : son premier symbole voisin (`_` sur `-`, `=` sur `+`...) ;
      * - `ABC` : `⇪` (majuscule verrouillée) ;
-     * - `?123` : [MENU_HINT] si son menu n'est pas vide.
+     * - `?123` : [MENU_HINT] si son menu n'est pas vide ;
+     * - `↵` : [EMOJI_LABEL] si [emoji] (panneau des émojis, §5.11).
      *
      * Les lettres n'ont pas d'indice : leurs variantes accentuées sont attendues, et dix indices par rangée
      * chargeraient le clavier.
      */
-    fun hint(key: Key, symbolsMenu: SymbolsMenu = SymbolsMenu.QUICK_PUNCTUATION): String? = when (key.kind) {
+    fun hint(key: Key, symbolsMenu: SymbolsMenu = SymbolsMenu.QUICK_PUNCTUATION, emoji: Boolean = false): String? = when (key.kind) {
         KeyKind.CHARACTER -> SYMBOLS[key.label]?.first()
+        KeyKind.ENTER -> if (emoji) EMOJI_LABEL else null
         KeyKind.LETTERS -> CAPS_LOCK_LABEL
         KeyKind.SYMBOLS -> if (symbolsMenu == SymbolsMenu.NONE) null else MENU_HINT
         else -> null
     }
+
+    /** Libellé de la case qui ouvre le panneau des émojis (§5.11). */
+    const val EMOJI_LABEL: String = "☺"
 
     /** Libellé de la case qui ouvre les réglages. */
     const val SETTINGS_LABEL: String = "⚙"

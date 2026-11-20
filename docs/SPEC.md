@@ -31,7 +31,7 @@ Un clavier mobile **compact** qui garde une disposition AZERTY ou QWERTY immédi
 - iOS (le moteur est toutefois écrit pour rester portable, cf. §11).
 - Toute fonctionnalité nécessitant le réseau.
 - Langues autres que le français et l'anglais (l'architecture doit cependant les permettre, cf. §10).
-- Emojis, GIF, presse-papiers avancé.
+- GIF, presse-papiers avancé (les émojis, d'abord exclus, sont couverts par le §5.11).
 
 ---
 
@@ -290,6 +290,7 @@ Exemple : `bonjour␣` puis `,` → `bonjour, `. Coût : 2 taps, comme la séque
 | Glisser horizontalement sur l'espace | Déplace le curseur |
 | Appui long sur `?123` | Menu ponctuation rapide / panneau « PC » (§5.10) / « Disposition classique » |
 | Appui long sur une lettre | Variantes accentuées |
+| Appui long sur `↵` | Panneau des émojis (§5.11), dans les profils qui affichent la barre de suggestions |
 
 ### 5.10 Panneau des touches PC
 
@@ -305,6 +306,16 @@ Rangée 3 : ABC | F11 F12 ← ↑ ↓ → | C+A+Sup | ⌫                       
 - `Ctrl` et `Alt` sont **collants** : un tap les active pour la prochaine touche, deux taps rapides les verrouillent, un tap les relâche ; actifs, ils sont affichés enfoncés. Pendant qu'un modificateur est actif, une lettre ou un chiffre tapé sur les lettres ou la couche `?123` part en événement clavier avec le modificateur (`Ctrl+C`, `Ctrl+V`, `Alt+F4`…). Les modificateurs sont relâchés à chaque changement de champ.
 - `C+A+Sup` envoie `Ctrl+Alt+Suppr` en une touche ; les clients RDP l'interceptent souvent et ont alors leur propre bouton.
 - Ni adaptation, ni suggestions, ni apprentissage sur le panneau.
+
+### 5.11 Panneau des émojis
+
+Issue #26. Ouvert par un appui long sur `↵` (un indice `☺` dans le coin de la touche le signale), seulement dans les profils qui affichent la barre de suggestions (texte : jamais en mot de passe, pavés ni URL). Il remplace la barre et les touches, à hauteur égale :
+
+- **Onglets** (hauteur de la barre) : `ABC` (retour aux lettres), `🕘` (récents), un onglet par groupe Unicode (son premier émoji ; le groupe « composants » est exclu), `⌫` (efface comme la touche).
+- **Grille** de 8 × 3 émojis ; glisser horizontalement change de page (numéro `n/N` en bas à droite). Un tap insère l'émoji au curseur, après validation du mot en cours tel quel.
+- **Récents** : 32 au plus, le plus récent d'abord, enregistrés dans les préférences ; jamais alimentés en incognito ni dans un champ sans apprentissage (§9.2). Le panneau s'ouvre sur les récents s'il y en a, sinon sur le premier groupe.
+- **Données** : l'asset `emoji.txt` (groupe, émoji, version), généré par `./gradlew :tools:buildEmoji` depuis le paquet `unicode-emoji-json` (`docs/DATA.md`). Au chargement, seuls les émojis que la police du système sait dessiner (`Paint.hasGlyph`) sont proposés.
+- Pas de recherche par mot-clé ni de choix de couleur de peau en V1. Accessibilité : chaque onglet et chaque émoji est un nœud virtuel.
 
 ---
 
