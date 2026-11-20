@@ -293,9 +293,10 @@ class ManifestParserTest {
             assertRejected(manifestWith("mirrors", "\"https://miroir.example/lexique.zip\""), "lexique", "mirrors", "tableau")
         }
 
-        @Test
-        fun `rejette un miroir qui n'est pas une chaîne`() {
-            assertRejected(manifestWith("mirrors", "[\"https://miroir.example/lexique.zip\", 3]"), "lexique", "miroir n°2", "chaîne")
+        @ParameterizedTest
+        @ValueSource(strings = ["3", "true", "null", "{}", "[]"])
+        fun `rejette un miroir qui n'est pas une chaîne`(element: String) {
+            assertRejected(manifestWith("mirrors", "[\"https://miroir.example/lexique.zip\", $element]"), "lexique", "miroir n°2", "chaîne")
         }
 
         @ParameterizedTest
