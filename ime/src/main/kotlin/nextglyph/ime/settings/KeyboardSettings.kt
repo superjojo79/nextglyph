@@ -25,6 +25,8 @@ enum class HapticLevel {
  * @property languages langues actives, dans l'ordre (le français d'abord quand les deux sont actives).
  * @property rowHeightDp hauteur des rangées, de [MIN_ROW_HEIGHT_DP] à [MAX_ROW_HEIGHT_DP] (§13).
  * @property contacts réglage « Noms des contacts » : effectif seulement avec la permission (§6.1).
+ * @property bottomMarginDp marge ajoutée sous la dernière rangée, en plus des encarts système, de 0 à
+ *   [MAX_BOTTOM_MARGIN_DP] dp (§13, §14) : remonte le clavier au-dessus des boutons système.
  */
 data class KeyboardSettings(
     val layout: LayoutKind? = null,
@@ -38,9 +40,11 @@ data class KeyboardSettings(
     val doubleSpacePeriod: Boolean = true,
     val contacts: Boolean = false,
     val haptics: HapticLevel = HapticLevel.MEDIUM,
+    val bottomMarginDp: Int = 0,
 ) {
     init {
         require(rowHeightDp in MIN_ROW_HEIGHT_DP..MAX_ROW_HEIGHT_DP) { "Hauteur de rangée hors de $MIN_ROW_HEIGHT_DP..$MAX_ROW_HEIGHT_DP : $rowHeightDp." }
+        require(bottomMarginDp in 0..MAX_BOTTOM_MARGIN_DP) { "Marge basse hors de 0..$MAX_BOTTOM_MARGIN_DP : $bottomMarginDp." }
         require(languages.isNotEmpty() && languages.all { it in LexiconLanguage.SUPPORTED }) { "Langues invalides : $languages." }
         require(preferredLanguage == null || preferredLanguage in LexiconLanguage.SUPPORTED) { "Langue préférée invalide : $preferredLanguage." }
     }
@@ -64,12 +68,14 @@ data class KeyboardSettings(
         const val MIN_ROW_HEIGHT_DP: Int = 34
         const val MAX_ROW_HEIGHT_DP: Int = 46
         const val DEFAULT_ROW_HEIGHT_DP: Int = 38
+        const val MAX_BOTTOM_MARGIN_DP: Int = 48
 
         const val KEY_LAYOUT = "layout"
         const val KEY_LANGUAGES = "languages"
         const val KEY_PREFERRED_LANGUAGE = "preferred_language"
         const val KEY_ADAPTATION = "adaptation_mode"
         const val KEY_ROW_HEIGHT = "row_height_dp"
+        const val KEY_BOTTOM_MARGIN = "bottom_margin_dp"
         const val KEY_AUTOCOMMIT = "autocommit"
         const val KEY_PRUDENCE = "prudence"
         const val KEY_FRENCH_TYPOGRAPHY = "french_typography"
@@ -85,7 +91,7 @@ data class KeyboardSettings(
 
         /** Tous les réglages, dans l'ordre de l'écran. */
         val KEYS: List<String> = listOf(
-            KEY_LAYOUT, KEY_LANGUAGES, KEY_PREFERRED_LANGUAGE, KEY_ADAPTATION, KEY_ROW_HEIGHT, KEY_AUTOCOMMIT,
+            KEY_LAYOUT, KEY_LANGUAGES, KEY_PREFERRED_LANGUAGE, KEY_ADAPTATION, KEY_ROW_HEIGHT, KEY_BOTTOM_MARGIN, KEY_AUTOCOMMIT,
             KEY_PRUDENCE, KEY_FRENCH_TYPOGRAPHY, KEY_DOUBLE_SPACE, KEY_CONTACTS, KEY_HAPTICS,
         )
 
@@ -114,6 +120,7 @@ data class KeyboardSettings(
                 doubleSpacePeriod = boolean(KEY_DOUBLE_SPACE, defaults.doubleSpacePeriod),
                 contacts = boolean(KEY_CONTACTS, defaults.contacts),
                 haptics = enumOrNull<HapticLevel>(string(KEY_HAPTICS)) ?: defaults.haptics,
+                bottomMarginDp = (values(KEY_BOTTOM_MARGIN) as? Int)?.takeIf { it in 0..MAX_BOTTOM_MARGIN_DP } ?: defaults.bottomMarginDp,
             )
         }
 

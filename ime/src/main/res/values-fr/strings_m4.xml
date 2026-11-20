@@ -13,6 +13,7 @@
     <string name="pref_adaptation_elastic">Élastique</string>
     <string name="pref_row_height">Hauteur des rangées</string>
     <string name="pref_row_height_value">%1$d dp</string>
+    <string name="pref_bottom_margin">Marge basse (au-dessus des boutons système)</string>
     <string name="pref_haptics">Retour haptique</string>
     <string name="pref_haptics_off">Désactivé</string>
     <string name="pref_haptics_light">Léger</string>

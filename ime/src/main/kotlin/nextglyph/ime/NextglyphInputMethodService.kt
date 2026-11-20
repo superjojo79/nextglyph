@@ -141,6 +141,7 @@ class NextglyphInputMethodService : InputMethodService() {
         adaptationAllowed = field.adaptation
         adaptationMode = settings.adaptationMode
         haptics = settings.haptics
+        bottomMarginDp = settings.bottomMarginDp
         services.learned.data?.let { spatialModel = it.spatial }
         languages = session.predictor?.languages.orEmpty()
         listener = object : KeyboardView.Listener {
@@ -319,6 +320,7 @@ class NextglyphInputMethodService : InputMethodService() {
         keyboardView?.let { view ->
             view.adaptationMode = settings.adaptationMode
             view.haptics = settings.haptics
+            view.bottomMarginDp = settings.bottomMarginDp
         }
         val kindChanged = kind != layoutKind
         if (kindChanged || settings.rowHeightDp != previous.rowHeightDp ||
