@@ -466,3 +466,26 @@ Sur Galaxy S25 Ultra (navigation par gestes, boutons « changer de clavier » et
 - **`mandatorySystemGestures()`** : réserverait la zone de gestes même quand le système ne dessine rien dessus ; la marge réglable couvre ce besoin.
 - **Hauteur de la barre de navigation lue dans les ressources du système** (`navigation_bar_height`) : identifiant interne, non garanti, signalé par lint.
 
+---
+
+## 2026-11-20 — Préparation de la publication (§18)
+
+### Contexte
+
+M5 démarre : publication sur GitHub, F-Droid et Google Play avec une seule signature (§18.1). Il manquait la signature de release, le contrôle de reproductibilité, la release sur tag, les métadonnées des stores et la politique de confidentialité. Les données téléchargées étaient fragiles : les exports Tatoeba sont écrasés chaque semaine, et l'empreinte de `sources.json` ne correspond plus qu'au cache de la CI.
+
+### Décision
+
+- **Miroirs figés** : champ facultatif `mirrors` dans `sources.json`, essayé avant `url` ; l'empreinte reste vérifiée quelle que soit l'adresse. Les copies sont des pièces jointes d'une release du dépôt (`donnees-AAAA-MM-JJ`), créée par un workflow manuel à partir du cache de la CI. Toutes les sources sont figées.
+- **Clé du cache des données** calculée sur les seules empreintes de `sources.json`, avec repli sur le cache le plus récent : ajouter un miroir n'oblige pas à retélécharger.
+- **Signature** lue dans l'environnement (`NEXTGLYPH_KEYSTORE`…), jamais dans le dépôt ; secrets dans un environnement GitHub `release` avec approbation. Schémas v2 et v3 seulement (`minSdk` 26).
+- **Reproductibilité** : `dependenciesInfo` désactivé (bloc chiffré pour Google, signalé par F-Droid), `vcsInfo` désactivé. Job de CI : deux builds de release non signés depuis deux dossiers, sans cache de build, comparés à l'octet ; en cas d'écart, les deux APK sont publiés en artefact.
+- **Release sur tag `vX.Y.Z`** : le tag doit égaler `versionName` et les notes de version `changelogs/<versionCode>.txt` doivent exister en `fr-FR` et `en-US` ; APK signé, `.sha256` et notes dans la release GitHub ; app bundle en artefact pour Play.
+- **Politique de confidentialité** dans `docs/PRIVACY.md`, servie par GitHub : aucun site à maintenir.
+
+### Alternatives écartées
+
+- **Versionner les données dans git** : interdit au-delà de 1 Mo (CLAUDE.md), et ~100 Mo.
+- **Git LFS** : quota de bande passante, et F-Droid ne le suit pas par défaut.
+- **`versionCode` dérivé de `versionName`** : plus d'automatisme mais moins lisible ; un entier incrémenté à la main suffit et la release vérifie le reste.
+- **Action tierce de création de release** : `gh`, présent sur les runners, évite une dépendance de plus à épingler.

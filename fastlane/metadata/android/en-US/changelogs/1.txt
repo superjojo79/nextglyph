@@ -1,0 +1,7 @@
+First public release.
+• Adaptive AZERTY and QWERTY keyboard, French and English active together.
+• Suggestions, space-bar commit, French typography, automatic capitals.
+• Number, phone, date and PIN pads; protected password fields.
+• On-device learning, contact names (optional), emojis, PC keys.
+• Editing gestures, navigation panel, clipboard history.
+• No network permission.

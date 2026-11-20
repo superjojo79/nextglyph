@@ -14,6 +14,9 @@ class DataFetcherTest {
     private val content = "contenu valide".toByteArray()
     private val source = sourceFor("lexique", content)
 
+    private val mirror = "https://miroir.example/copie/lexique.bin"
+    private val mirrored = source.copy(mirrors = listOf(mirror))
+
     private fun downloaderServing(vararg served: Pair<DataSource, ByteArray>) =
         FakeDownloader(served.associate { (src, bytes) -> src.url to bytes })
 
@@ -90,6 +93,33 @@ class DataFetcherTest {
             DataFetcher(downloaderServing(source to content)).fetch(listOf(source), nested)
 
             assertThat(nested.resolve("lexique.bin")).exists()
+        }
+
+        @Test
+        fun `télécharge depuis le miroir sans toucher l'url officielle`(@TempDir dir: Path) {
+            val downloader = FakeDownloader(mapOf(mirror to content, source.url to content))
+
+            val outcomes = DataFetcher(downloader).fetch(listOf(mirrored), dir)
+
+            assertThat(outcomes).containsExactly(FetchOutcome.Downloaded(mirrored))
+            assertThat(downloader.calls).containsExactly(mirror)
+            assertThat(Files.readAllBytes(dir.resolve("lexique.bin"))).isEqualTo(content)
+        }
+
+        @Test
+        fun `se replie sur l'url officielle si le miroir est injoignable`(@TempDir dir: Path) {
+            val downloader = FakeDownloader(mapOf(source.url to content))
+            val messages = mutableListOf<String>()
+
+            val outcomes = DataFetcher(downloader, messages::add).fetch(listOf(mirrored), dir)
+
+            assertThat(outcomes).containsExactly(FetchOutcome.Downloaded(mirrored))
+            assertThat(downloader.calls).containsExactly(mirror, source.url)
+            assertThat(messages).containsExactly(
+                "lexique : téléchargement de $mirror",
+                "lexique : téléchargement de ${source.url}",
+            )
+            assertThat(filesIn(dir)).containsExactly("lexique.bin")
         }
     }
 
@@ -181,6 +211,20 @@ class DataFetcherTest {
                 .isInstanceOf(IllegalStateException::class.java)
             assertThat(filesIn(dir)).isEmpty()
         }
+
+        @Test
+        fun `rapporte l'échec de chaque adresse si aucune ne convient`(@TempDir dir: Path) {
+            val downloader = FakeDownloader(mapOf(source.url to "écrasé".toByteArray()))
+
+            assertThatThrownBy { DataFetcher(downloader).fetch(listOf(mirrored), dir) }
+                .isInstanceOf(DataFetchException::class.java)
+                .hasMessageContainingAll(
+                    "téléchargement impossible (HTTP 404) depuis $mirror",
+                    " ; ",
+                    "contenu téléchargé depuis ${source.url} refusé",
+                )
+            assertThat(filesIn(dir)).isEmpty()
+        }
     }
 
     @Nested
@@ -230,6 +274,26 @@ class DataFetcherTest {
             assertThatThrownBy { DataFetcher(failing).fetch(listOf(source), dir) }
                 .isInstanceOf(DataFetchException::class.java)
                 .hasMessageContaining("téléchargement impossible")
+        }
+
+        @Test
+        fun `un miroir au contenu refusé ne laisse rien avant le repli`(@TempDir dir: Path) {
+            val downloader = FakeDownloader(mapOf(mirror to "faux".toByteArray(), source.url to content))
+
+            val outcomes = DataFetcher(downloader).fetch(listOf(mirrored), dir)
+
+            assertThat(outcomes).containsExactly(FetchOutcome.Downloaded(mirrored))
+            assertThat(downloader.calls).containsExactly(mirror, source.url)
+            assertThat(filesIn(dir)).containsExactly("lexique.bin")
+        }
+
+        @Test
+        fun `un fichier valide n'interroge ni le miroir ni l'url officielle`(@TempDir dir: Path) {
+            Files.write(dir.resolve("lexique.bin"), content)
+            val downloader = FakeDownloader(emptyMap())
+
+            assertThat(DataFetcher(downloader).fetch(listOf(mirrored), dir)).containsExactly(FetchOutcome.AlreadyPresent(mirrored))
+            assertThat(downloader.calls).isEmpty()
         }
     }
 }

@@ -1,0 +1,20 @@
+name: Données linguistiques
+description: Restaure (et enregistre) le cache de tools/build/data, indexé par les empreintes de tools/data/sources.json.
+
+runs:
+  using: composite
+  steps:
+    # Seules les empreintes comptent : ajouter ou changer un miroir ne doit pas invalider le cache.
+    - name: Calculer la clé du cache des données
+      id: key
+      shell: bash
+      run: echo "key=$(jq -r '.sources[].sha256' tools/data/sources.json | sha256sum | cut -c1-32)" >> "$GITHUB_OUTPUT"
+
+    - name: Restaurer les données linguistiques
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: tools/build/data
+        key: lexicon-data-${{ steps.key.outputs.key }}
+        # Repli sur le cache le plus récent : fetchData ne retélécharge que les fichiers dont
+        # l'empreinte a changé.
+        restore-keys: lexicon-data-

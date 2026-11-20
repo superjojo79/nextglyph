@@ -1,0 +1,65 @@
+name: Instantané des données
+
+# Publie les fichiers de tools/data/sources.json comme pièces jointes d'une release du dépôt, que
+# sources.json désigne ensuite comme miroirs (§18.3, docs/DATA.md) : les exports Tatoeba et le zip
+# Lexique sont écrasés en place par leurs auteurs, ce qui casserait la recette F-Droid. Les licences
+# (CC BY, CC BY-SA, MPL-2.0, SCOWL) autorisent cette redistribution avec attribution.
+# À lancer à la main, une fois par changement d'empreinte dans sources.json.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag de la release d'instantané (celui des miroirs de sources.json)"
+        required: true
+        default: donnees-2026-11-19
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    name: Publier l'instantané
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      # Le cache de la CI contient les fichiers aux empreintes attendues, même si la source a changé
+      # depuis ; fetchData les vérifie un par un et échoue si l'un d'eux est introuvable.
+      - uses: ./.github/actions/lexicon-data
+
+      - name: Vérifier les données (empreintes de sources.json)
+        run: ./gradlew :tools:fetchData --console=plain
+
+      - name: Créer la release d'instantané
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(jq -r '.sources[].url | sub(".*/"; "") | "tools/build/data/" + .' tools/data/sources.json)
+          {
+            echo "Copie figée des données linguistiques de \`tools/data/sources.json\`, pour des builds reproductibles."
+            echo "Ce n'est pas une version de l'application."
+            echo
+            echo "Sources, licences et attributions : [docs/DATA.md](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/DATA.md) et [NOTICE](https://github.com/$GITHUB_REPOSITORY/blob/main/NOTICE)."
+            echo
+            echo '| Fichier | SHA-256 |'
+            echo '|---|---|'
+            for f in "${files[@]}"; do echo "| $(basename "$f") | \`$(sha256sum "$f" | cut -d' ' -f1)\` |"; done
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" "${files[@]}" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+            --title "Données linguistiques ($TAG)" --notes-file "$RUNNER_TEMP/notes.md"

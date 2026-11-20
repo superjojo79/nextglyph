@@ -58,7 +58,23 @@ object ManifestParser {
         }
         val size = sizeOf(obj, label)
         val license = text(obj, "license", label)
-        return DataSource(id, language, needs, url, sha256, size, license, fileName)
+        val mirrors = mirrorsOf(obj, url, label)
+        return DataSource(id, language, needs, url, sha256, size, license, fileName, mirrors)
+    }
+
+    /** Champ facultatif « mirrors » : tableau d'URL https distinctes, autres que « url ». */
+    private fun mirrorsOf(obj: JsonObject, url: String, where: String): List<String> {
+        val value = obj.get("mirrors") ?: return emptyList()
+        if (!value.isJsonArray) throw ManifestException("$where : champ « mirrors » n'est pas un tableau")
+        val mirrors = value.asJsonArray.mapIndexed { index, element ->
+            if (!element.isJsonPrimitive || !element.asJsonPrimitive.isString) {
+                throw ManifestException("$where : miroir n°${index + 1} n'est pas une chaîne")
+            }
+            element.asString.also { fileNameOf(it, "$where, miroir n°${index + 1}") }
+        }
+        if (url in mirrors) throw ManifestException("$where : un miroir reprend l'url officielle")
+        requireUnique(mirrors, "miroir dans $where")
+        return mirrors
     }
 
     /** « a », « b », « c », ou une combinaison séparée par « + » (ex. « a+b »). */

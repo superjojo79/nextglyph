@@ -23,4 +23,12 @@ data class DataSource(
     val license: String,
     /** Nom du fichier local : dernier segment du chemin de l'URL. */
     val fileName: String,
-)
+    /**
+     * Copies figées du même fichier (même empreinte), essayées avant [url] : une source dont le
+     * fichier est écrasé en place (Tatoeba) reste ainsi téléchargeable et le build reproductible.
+     */
+    val mirrors: List<String> = emptyList(),
+) {
+    /** Adresses essayées dans l'ordre : miroirs d'abord, puis l'adresse officielle. */
+    val urls: List<String> get() = mirrors + url
+}
