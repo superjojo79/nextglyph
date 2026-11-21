@@ -721,7 +721,8 @@ class KeyboardView(context: Context) : View(context) {
         touchExploration = manager?.isTouchExplorationEnabled == true
         animatorScale = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         applyRestOnly()
-        // Marge réglée avant l'attachement (création de la vue) : réappliquée et encarts redemandés (#42).
+        // Vue recréée (thème, veille) : encarts lus tout de suite, marge réappliquée, encarts redemandés (#42).
+        rootWindowInsets?.let { readBottomInsets(it) }
         applyBottomPadding()
         requestApplyInsets()
     }
@@ -740,20 +741,27 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
-        systemBottomInsetsPx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Navigation par gestes avec les boutons du clavier : la barre est un encart captionBar() (#20).
-            listOf(
-                WindowInsets.Type.navigationBars(),
-                WindowInsets.Type.captionBar(),
-                WindowInsets.Type.tappableElement(),
-                WindowInsets.Type.displayCutout(),
-            ).map { insets.getInsets(it).bottom }
-        } else {
-            @Suppress("DEPRECATION")
-            listOf(insets.systemWindowInsetBottom)
-        }
+        readBottomInsets(insets)
         applyBottomPadding()
         return insets
+    }
+
+    /**
+     * Encarts du bas retenus (§13). Sur une vue recréée (thème jour/nuit, retour de veille, issue #42), le
+     * système ne redistribue pas toujours les encarts : ils sont aussi lus à l'attachement. Les barres
+     * momentanément masquées (sortie de veille) comptent quand même, via les encarts « hors visibilité ».
+     */
+    private fun readBottomInsets(insets: WindowInsets) {
+        systemBottomInsetsPx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Navigation par gestes avec les boutons du clavier : la barre est un encart captionBar() (#20).
+            val bars = listOf(WindowInsets.Type.navigationBars(), WindowInsets.Type.captionBar(), WindowInsets.Type.tappableElement())
+            bars.map { insets.getInsets(it).bottom } +
+                bars.map { insets.getInsetsIgnoringVisibility(it).bottom } +
+                insets.getInsets(WindowInsets.Type.displayCutout()).bottom
+        } else {
+            @Suppress("DEPRECATION")
+            listOf(insets.systemWindowInsetBottom, insets.stableInsetBottom)
+        }
     }
 
     /** Padding bas : encarts système et marge réglée (§13, §14). */
