@@ -698,7 +698,7 @@ Aucune pour l'instant (l'identifiant d'application est tranché au §17.1).
 
 - Dépôt public ; fichiers `LICENSE` (Apache-2.0), `NOTICE` (attributions des données, cf. §10.2), `README`, `CONTRIBUTING`, `SECURITY`.
 - **Intégration continue** (GitHub Actions) : tests du module `engine`, lint, build de l'APK, vérification de la reproductibilité (deux builds de l'APK de release non signé, depuis deux dossiers et sans cache, comparés à l'octet : `scripts/check-reproducible.sh`).
-- **Publication** : chaque tag `vX.Y.Z` produit une release GitHub avec l'APK signé et son empreinte SHA-256.
+- **Publication** : chaque tag `vX.Y.Z` produit une release GitHub avec l'APK signé, son empreinte SHA-256 et son attestation de provenance (SLSA, Sigstore).
 - Les lexiques binaires sont générés par `tools/` pendant le build, pas versionnés. Seules les sources de données (ou un script de téléchargement avec sommes de contrôle) sont dans le dépôt. Chaque source a un miroir figé dans une release du dépôt (`mirrors` dans `tools/data/sources.json`), essayé avant l'URL officielle : un fichier écrasé en place par son auteur ne casse pas le build.
 - Procédure complète (clé, secrets, tags, F-Droid, Play) : [PUBLISHING.md](PUBLISHING.md).
 

@@ -1,7 +1,7 @@
 name: Release
 
 # Publie une release GitHub à chaque tag vX.Y.Z (spec §18.2) : APK de release signé avec la clé du
-# projet, et son empreinte SHA-256. L'app bundle signé (Google Play) reste un artefact du workflow.
+# projet, son empreinte SHA-256 et son attestation de provenance (SLSA, signée via Sigstore). L'app bundle signé (Google Play) reste un artefact du workflow.
 # La clé n'est jamais dans le dépôt : elle vient des secrets de l'environnement « release »
 # (procédure dans docs/PUBLISHING.md).
 
@@ -24,6 +24,9 @@ jobs:
     environment: release
     permissions:
       contents: write
+      # Attestation de provenance : jeton OIDC pour Sigstore, écriture dans l'API des attestations.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -87,6 +90,19 @@ jobs:
           "$apksigner" verify --verbose --print-certs "dist/nextglyph-$VERSION.apk"
           (cd dist && sha256sum "nextglyph-$VERSION.apk" > "nextglyph-$VERSION.apk.sha256" && cat ./*.sha256)
 
+      # Prouve que l'APK sort de ce workflow, à ce commit. Vérification : docs/PUBLISHING.md §5.
+      - name: Attester la provenance de l'APK
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/nextglyph-${{ steps.version.outputs.name }}.apk
+
+      - name: Joindre l'attestation à la release
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          VERSION: ${{ steps.version.outputs.name }}
+        run: cp "$BUNDLE" "dist/nextglyph-$VERSION.apk.sigstore.json"
+
       - name: Conserver l'app bundle pour Google Play
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -115,5 +131,6 @@ jobs:
           } > "$RUNNER_TEMP/notes.md"
           gh release create "$GITHUB_REF_NAME" \
             "dist/nextglyph-$VERSION.apk" "dist/nextglyph-$VERSION.apk.sha256" \
+            "dist/nextglyph-$VERSION.apk.sigstore.json" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Nextglyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
