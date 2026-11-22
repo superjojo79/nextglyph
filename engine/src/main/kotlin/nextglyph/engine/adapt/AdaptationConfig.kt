@@ -56,6 +56,10 @@ data class ModeProfile(
  * @property coreFraction fraction centrale (en largeur et en hauteur) de la touche affichée dans
  *   laquelle un tap produit toujours cette touche, quel que soit le modèle de langue.
  *   **Valeur choisie : 0,5** (voir `docs/DECISIONS.md`). 0 désactive le noyau.
+ * @property maxBoundaryShift déplacement maximal, appris, d'une frontière entre une touche de fonction et
+ *   sa voisine (voir [TapDecoder]), en fraction de la plus petite des deux largeurs au repos (frontière
+ *   horizontale) ou de la hauteur de rangée (frontière verticale), dans [0, 0,5]. **Valeur choisie : 0,2.**
+ *   0 désactive les zones de frappe personnalisées des touches de fonction.
  */
 data class TapDecoderConfig(
     val alpha: Float = 0.5f,
@@ -63,6 +67,7 @@ data class TapDecoderConfig(
     val lambda: Float = 0.6f,
     val minPrior: Float = 0.05f,
     val coreFraction: Float = 0.5f,
+    val maxBoundaryShift: Float = 0.2f,
 ) {
     init {
         requireUnit(alpha, "alpha")
@@ -70,6 +75,7 @@ data class TapDecoderConfig(
         require(lambda >= 0f && lambda < Float.POSITIVE_INFINITY) { "lambda doit être positif ou nul : $lambda." }
         require(minPrior > 0f && minPrior <= 1f) { "minPrior doit être dans ]0, 1] : $minPrior." }
         requireUnit(coreFraction, "coreFraction")
+        require(maxBoundaryShift in 0f..0.5f) { "maxBoundaryShift doit être dans [0, 0,5] : $maxBoundaryShift." }
     }
 
     companion object {

@@ -3,6 +3,8 @@ package nextglyph.engine.session
 import nextglyph.engine.contacts.ContactName
 import nextglyph.engine.edit.EditConfig
 import nextglyph.engine.input.EnterBehavior
+import nextglyph.engine.layout.Key
+import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.learn.LearnedData
 import nextglyph.engine.lexicon.LexiconFixtures
@@ -62,6 +64,18 @@ class InputSessionLearningTest {
         }
     }
 
+    private val keyOffset = TapOffset(-0.1, 0.05)
+    private val spaceKey = Key(KeyKind.SPACE, "", 1.6f)
+    private val enterKey = Key(KeyKind.ENTER, "↵", 1f)
+    private val backspaceKey = Key(KeyKind.BACKSPACE, "⌫", 1f)
+    private val symbolsKey = Key(KeyKind.SYMBOLS, "?123", 1f)
+    private val lettersKey = Key(KeyKind.LETTERS, "ABC", 1f)
+
+    private fun Setup.tapKey(key: Key, offset: TapOffset? = keyOffset) {
+        session.onKey(key, offset = offset)
+        editor.deliver(session)
+    }
+
     private fun Setup.backspace() {
         session.onBackspace()
         editor.deliver(session)
@@ -71,6 +85,50 @@ class InputSessionLearningTest {
 
     @Nested
     inner class HappyPath {
+
+        @Test
+        fun `une frappe d'espace par onKey est apprise quand une lettre la suit`() {
+            val s = setup()
+            s.type("a")
+
+            s.tapKey(spaceKey)
+            assertThat(data.spatial.pendingKey).isEqualTo(KeyKind.SPACE)
+            s.type("b")
+
+            assertThat(data.spatial.sampleCount(KeyKind.SPACE)).isEqualTo(1)
+            assertThat(data.spatial.pendingKey).isNull()
+        }
+
+        @Test
+        fun `une frappe d'entrée par onKey est apprise quand une lettre la suit`() {
+            val s = setup()
+
+            s.tapKey(enterKey)
+            s.type("b")
+
+            assertThat(data.spatial.sampleCount(KeyKind.ENTER)).isEqualTo(1)
+        }
+
+        @Test
+        fun `une série de retours arrière par onKey apprend le premier`() {
+            val s = setup(initial = "abc")
+
+            s.tapKey(backspaceKey)
+            s.tapKey(backspaceKey)
+
+            assertThat(data.spatial.sampleCount(KeyKind.BACKSPACE)).isEqualTo(1)
+        }
+
+        @Test
+        fun `un changement de couche est signalé par onLayerKey`() {
+            val s = setup()
+
+            s.session.onLayerKey(symbolsKey, keyOffset)
+            assertThat(data.spatial.pendingKey).isEqualTo(KeyKind.SYMBOLS)
+            s.session.onKey(Key(KeyKind.CHARACTER, "1", 1f))
+
+            assertThat(data.spatial.sampleCount(KeyKind.SYMBOLS)).isEqualTo(1)
+        }
 
         @Test
         fun `un mot inconnu tapé deux fois est appris puis complété`() {
@@ -196,6 +254,67 @@ class InputSessionLearningTest {
     inner class ErrorCases {
 
         @Test
+        fun `un retour arrière après une frappe d'espace écarte l'espace`() {
+            val s = setup()
+            s.type("a")
+
+            s.tapKey(spaceKey)
+            s.tapKey(backspaceKey)
+            s.type("b")
+
+            assertThat(data.spatial.sampleCount(KeyKind.SPACE)).isZero()
+            assertThat(data.spatial.sampleCount(KeyKind.BACKSPACE)).isZero()
+        }
+
+        @Test
+        fun `un retour immédiat aux lettres écarte la frappe de symboles`() {
+            val s = setup()
+
+            s.session.onLayerKey(symbolsKey, keyOffset)
+            s.session.onLayerKey(lettersKey, keyOffset)
+
+            assertThat(data.spatial.sampleCount(KeyKind.SYMBOLS)).isZero()
+            assertThat(data.spatial.pendingKey).isNull()
+        }
+
+        @Test
+        fun `une frappe sans position, ou les appels directs, n'apprennent aucune touche`() {
+            val s = setup()
+            s.type("a")
+
+            s.tapKey(spaceKey, offset = null)
+            s.session.onSpace()
+            s.session.onBackspace()
+            s.session.onEnter()
+            s.type("b")
+
+            assertThat(data.spatial.pendingKey).isNull()
+            assertThat(KeyKind.entries.sumOf { data.spatial.sampleCount(it) }).isZero()
+        }
+
+        @Test
+        fun `un champ mot de passe n'apprend aucune touche de fonction`() {
+            val s = setup(field(C.TYPE_CLASS_TEXT or C.TYPE_TEXT_VARIATION_PASSWORD))
+
+            s.tapKey(spaceKey)
+            s.type("b")
+
+            assertThat(data.spatial.totalSamples).isEqualTo(0)
+            assertThat(data.spatial.pendingKey).isNull()
+        }
+
+        @Test
+        fun `un changement de couche sans apprentissage branché ne fait rien`() {
+            val editor = FakeEditor("")
+            val session = InputSession(editor)
+
+            session.onLayerKey(symbolsKey, keyOffset)
+            session.onKey(spaceKey, offset = keyOffset)
+
+            assertThat(data.spatial.isEmpty).isTrue()
+        }
+
+        @Test
         fun `incognito - rien n'est appris`() {
             val s = setup(field(imeOptions = C.IME_FLAG_NO_PERSONALIZED_LEARNING))
 
@@ -286,6 +405,27 @@ class InputSessionLearningTest {
 
     @Nested
     inner class BoundaryValues {
+
+        @Test
+        fun `une touche lettre par onKey ne passe pas par l'apprentissage des touches de fonction`() {
+            val s = setup()
+
+            s.session.onKey(Key.letter('a'), offset = keyOffset)
+
+            assertThat(data.spatial.pendingKey).isNull()
+            assertThat(data.spatial.stagedCount).isEqualTo(1)
+        }
+
+        @Test
+        fun `changer de champ écarte la frappe de touche en attente`() {
+            val s = setup()
+            s.tapKey(spaceKey)
+
+            s.session.onStartInput(field(), 0, 0)
+
+            assertThat(data.spatial.pendingKey).isNull()
+            assertThat(data.spatial.totalSamples).isEqualTo(0)
+        }
 
         @Test
         fun `une frappe sans position (menu, glissé) n'est pas apprise mais garde l'alignement`() {

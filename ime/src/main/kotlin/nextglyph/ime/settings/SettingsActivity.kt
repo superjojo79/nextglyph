@@ -327,7 +327,14 @@ class SettingsActivity : Activity() {
         learnedSummary.text = if (data == null) {
             getString(R.string.learned_loading)
         } else {
-            resources.getQuantityString(R.plurals.learned_summary, data.personal.size, data.personal.size)
+            val words = resources.getQuantityString(R.plurals.learned_summary, data.personal.size, data.personal.size)
+            val taps = data.spatial.totalSamples
+            val zones = if (taps == 0) {
+                getString(R.string.learned_zones_none)
+            } else {
+                resources.getQuantityString(R.plurals.learned_zones, taps, NumberFormat.getIntegerInstance().format(taps))
+            }
+            "$words\n$zones"
         }
     }
 

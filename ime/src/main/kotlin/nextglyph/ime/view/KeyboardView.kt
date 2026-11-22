@@ -79,6 +79,12 @@ class KeyboardView(context: Context) : View(context) {
          */
         fun onKey(key: Key, upper: Boolean, offset: TapOffset?)
 
+        /**
+         * Touche de couche `?123` tapée (les couches sont changées par la vue) : [offset] est calculé sur la disposition
+         * des lettres, avant le changement ; `null` pour `ABC`, simple événement.
+         */
+        fun onLayerKey(key: Key, offset: TapOffset?)
+
         /** Case choisie dans un menu d'appui long. */
         fun onPopup(action: PopupAction)
 
@@ -1128,8 +1134,9 @@ class KeyboardView(context: Context) : View(context) {
                 val x = event.getX(index)
                 val y = event.getY(index)
                 val decoded = if (id < MAX_POINTERS) decode(x, y, rest) else null
-                // Position de la frappe pour le modèle spatial : lettres tapées sur la disposition principale.
-                val offset = if (decoded?.key?.kind == KeyKind.LETTER && !symbolsShown) {
+                // Position de la frappe pour le modèle spatial : lettres et touches de fonction apprises, tapées sur la
+                // disposition principale (`TapOffset.of` rend null pour les autres touches).
+                val offset = if (decoded?.key != null && !symbolsShown) {
                     TapOffset.of(x, y - layerTopPx, rest.rows[decoded.rowIndex][decoded.keyIndex])
                 } else {
                     null
@@ -1188,8 +1195,14 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun dispatch(key: Key, upper: Boolean, offset: TapOffset?) {
         when (key.kind) {
-            KeyKind.SYMBOLS -> showSymbols(true)
-            KeyKind.LETTERS -> showSymbols(false)
+            KeyKind.SYMBOLS -> {
+                listener?.onLayerKey(key, offset)
+                showSymbols(true)
+            }
+            KeyKind.LETTERS -> {
+                listener?.onLayerKey(key, null)
+                showSymbols(false)
+            }
             else -> listener?.onKey(key, upper, offset)
         }
     }

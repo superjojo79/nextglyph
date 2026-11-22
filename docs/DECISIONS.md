@@ -489,3 +489,36 @@ M5 démarre : publication sur GitHub, F-Droid et Google Play avec une seule sign
 - **Git LFS** : quota de bande passante, et F-Droid ne le suit pas par défaut.
 - **`versionCode` dérivé de `versionName`** : plus d'automatisme mais moins lisible ; un entier incrémenté à la main suffit et la release vérifie le reste.
 - **Action tierce de création de release** : `gh`, présent sur les runners, évite une dépendance de plus à épingler.
+
+---
+
+## 2026-11-22 — Zones de frappe des touches de fonction (issue #30)
+
+### Contexte
+
+Le modèle spatial personnalisé (M4) n'apprenait que les 26 lettres, et la règle de frontière du décodeur (2026-11-19) fixait la nature de la touche à celle de la touche affichée sous le doigt. Or la frontière entre la rangée 3 et l'espace (`n`|espace, rangée 2 au-dessus de l'espace) et celle de `?123`, `↵` et `⌫` sont des sources fréquentes d'erreurs, que ni le score ni la correction ne rattrapent : un tap sur une touche de fonction n'est jamais redécodé. Après quelques jours d'usage, l'utilisateur constate une nette amélioration de la frappe sur les lettres ; on étend donc la même idée aux touches de fonction.
+
+### Décision
+
+**Apprentissage.** `SpatialModel` gagne quatre emplacements (`LEARNED_KEYS` : espace, `↵`, `⌫`, `?123`), avec le même estimateur, les mêmes bornes et le même retour vers le défaut que les lettres, relatifs à la touche au repos. Les frappes de touches de fonction ont une case d'attente unique (`stageKey`), distincte de la file des lettres, résolue par l'événement suivant (`SessionLearning.onKeyTap`) : espace et `↵` écartés si un `⌫` suit ; `?123` écarté si `ABC` ou `⌫` suit ; un `⌫` appris seulement s'il est suivi d'un autre `⌫` (un `⌫` isolé est peut-être un `n` ou un `m` manqué) ; tout abandon (champ quitté, curseur déplacé) écarte la frappe. Rien n'est appris dans la couche des symboles (géométrie différente), ni pour les glissés et gestes. `LearningPolicy` s'applique comme pour les lettres.
+
+**Décodage : frontières personnalisées, pas de redécodage probabiliste.** La frontière entre deux touches dont l'une au moins n'est pas une lettre est déplacée de la moyenne des décalages appris des deux touches, convertis en pixels, bornée par `TapDecoderConfig.maxBoundaryShift` = 0,2 de la plus petite des deux largeurs au repos (horizontal) ou de la hauteur de rangée (vertical). Les frontières lettre/lettre ne bougent pas : le score s'en charge déjà. Si une frontière horizontale et une verticale revendiquent le point, l'horizontale l'emporte. La règle de 2026-11-19 devient : la nature de la touche est celle de la touche sous le doigt **dans les zones personnalisées**. Ce qu'elle protégeait reste vrai : le modèle de langue ne convertit jamais une lettre en espace ni l'inverse ; le déplacement est déterministe pour un modèle donné, borné et lent (fenêtre de 300 frappes, retour vers le défaut `n / (n + 20)`). Le noyau des lettres (moitié centrale) n'est jamais atteint, puisque 0,2 < 0,25.
+
+**Stabilité.** Une frappe n'est apprise que dans le rectangle **au repos** de sa touche (`maxSampleOffset` = 0,5) : les taps captés au-delà par une frontière déplacée ne sont pas appris, donc pas d'emballement (l'estimation est censurée par une borne fixe).
+
+**Équivalence.** Avec un modèle vide (ou `maxBoundaryShift` = 0), la touche retenue est exactement celle de `keyAt` : test d'équivalence sur toutes les arêtes de touches, AZERTY et QWERTY, espacements de rangée 0, 12 et 20 px. Un décalage appris nul laisse `keyAt` décider seul (pas d'écart d'arrondi).
+
+**Persistance.** Section du modèle spatial en version 2 (26 lettres puis les 4 touches) ; la version 1 reste lue (touches vides). Version du fichier inchangée.
+
+**Visibilité.** Les réglages affichent « Zones de frappe : apprises sur N frappes » (`SpatialModel.totalSamples`, somme des fenêtres).
+
+### Mesure
+
+Simulation déterministe (`TapKeyZonesSimulationTest`, AZERTY 1 000 × 100 px) : un utilisateur qui vise l'espace avec un biais moyen de −60 px horizontalement et −30 px verticalement (écarts types 40 et 20 px). Après 600 frappes (dont 333 apprises, celles qui tombent dans le rectangle de l'espace), décalages appris −0,23 et −0,22 ; taux de frappes manquées sur l'espace : **41,8 % → 23,8 %**. Contrepartie : pour un tap centré sur `n` (même dispersion, sans biais), le taux d'erreur passe de 27,1 % à 38,8 %. L'espace étant environ deux à trois fois plus fréquent que `n`, le bilan est nettement positif pour ce profil ; un utilisateur centré ne perd rien (testé). Les constantes (0,2, règles de validation) sont à calibrer en M5 avec `TypingStats`.
+
+### Alternatives écartées
+
+- **Redécoder lettre ↔ espace avec le modèle de langue** : déjà écarté (2026-11-19), l'espace valide un mot.
+- **Apprendre tous les `⌫`** : un `⌫` isolé est souvent une lettre manquée, il tirerait la frontière vers la lettre et renforcerait l'erreur.
+- **Score gaussien pour toutes les touches** : la normalisation favorise les petites touches et l'espace (large) perdrait sans modèle ; il faudrait recalibrer tout le décodeur, sans garantie d'équivalence pour un modèle vide.
+- **Apprendre dans la couche des symboles** : autre géométrie, peu de frappes, gain marginal.

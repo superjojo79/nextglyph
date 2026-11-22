@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import nextglyph.engine.layout.KeyKind
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -26,6 +27,10 @@ class LearnedDataFileTest {
         repeat(30) { data.spatial.stage('e', 0.1, -0.05, settings) }
         repeat(30) { data.spatial.stage('t', -0.2, 0.1, settings) }
         data.spatial.confirm()
+        repeat(30) {
+            data.spatial.stageKey(KeyKind.SPACE, -0.15, 0.1, settings)
+            data.spatial.confirmKey()
+        }
         return data
     }
 
@@ -64,8 +69,8 @@ class LearnedDataFileTest {
 
     private fun payload(block: ByteWriter.() -> Unit): ByteArray = ByteWriter().apply(block).toByteArray()
 
-    private fun emptySpatial(): ByteArray = payload {
-        repeat(26) {
+    private fun emptySpatial(entries: Int = 26): ByteArray = payload {
+        repeat(entries) {
             varInt(0)
             repeat(4) { double(0.0) }
         }
@@ -127,7 +132,50 @@ class LearnedDataFileTest {
             // "NGLS", version 1, 3 sections ; la première (dictionnaire personnel vide) : tag 1, version 1, 2 octets.
             assertThat(bytes.copyOfRange(0, 7)).containsExactly('N'.code.toByte(), 'G'.code.toByte(), 'L'.code.toByte(), 'S'.code.toByte(), 0, 1, 3)
             assertThat(bytes.copyOfRange(7, 15)).containsExactly(1, 1, 0, 0, 0, 2, 0, 0)
-            assertThat(bytes).hasSize(7 + (6 + 2 + 4) + (6 + 1 + 4) + (6 + 26 * 33 + 4))
+            assertThat(bytes).hasSize(7 + (6 + 2 + 4) + (6 + 1 + 4) + (6 + 30 * 33 + 4))
+            // Section du modèle spatial : tag 3, version 2, longueur 990 (30 entrées de 33 octets).
+            val spatial = 7 + (6 + 2 + 4) + (6 + 1 + 4)
+            assertThat(bytes.copyOfRange(spatial, spatial + 6)).containsExactly(3, 2, 0, 0, 3, -34)
+            // Les sections personnelle et des refus restent en version 1.
+            assertThat(bytes[8]).isEqualTo(1.toByte())
+            assertThat(bytes[7 + (6 + 2 + 4) + 1]).isEqualTo(1.toByte())
+        }
+
+        @Test
+        fun `les touches de fonction apprises survivent à l'écriture puis la lecture`() {
+            val original = populated()
+
+            val result = LearnedDataFile.decode(bytesOf(original))
+
+            assertThat(result.isClean).isTrue()
+            assertThat(result.data.spatial.sampleCount(KeyKind.SPACE)).isEqualTo(30)
+            assertThat(result.data.spatial.keyOffsetX(KeyKind.SPACE)).isEqualTo(original.spatial.keyOffsetX(KeyKind.SPACE))
+            assertThat(result.data.spatial.keyOffsetX(KeyKind.SPACE)).isNegative()
+            assertThat(result.data.spatial.keyOffsetY(KeyKind.SPACE)).isPositive()
+            assertThat(result.data.spatial.totalSamples).isEqualTo(original.spatial.totalSamples)
+        }
+
+        @Test
+        fun `une section spatiale de version 1 (26 lettres) est encore lue, touches vides`() {
+            val letters = LearnedData()
+            repeat(20) { letters.spatial.stage('e', 0.1, 0.0, settings) }
+            letters.spatial.confirm()
+            val v1 = payload {
+                for (s in letters.spatial.snapshot().take(26)) {
+                    varInt(s.samples)
+                    double(s.meanX)
+                    double(s.meanY)
+                    double(s.varX)
+                    double(s.varY)
+                }
+            }
+
+            val result = LearnedDataFile.decode(file(Triple(3, 1, v1)))
+
+            assertThat(result.isClean).isTrue()
+            assertThat(result.data.spatial.sampleCount('e')).isEqualTo(20)
+            assertThat(result.data.spatial.sampleCount(KeyKind.SPACE)).isZero()
+            assertThat(result.data.spatial.totalSamples).isEqualTo(20)
         }
 
         @Test
@@ -315,6 +363,28 @@ class LearnedDataFileTest {
         }
 
         @Test
+        fun `une section spatiale de version 2 de 26 entrées est tronquée donc invalide`() {
+            val result = LearnedDataFile.decode(file(Triple(3, 2, emptySpatial(26))))
+
+            assertThat(result.issues.map { it.kind }).containsExactly(LoadIssueKind.INVALID_SECTION)
+            assertThat(result.data.spatial.isEmpty).isTrue()
+        }
+
+        @Test
+        fun `une section spatiale de version 1 de 30 entrées a des octets en trop`() {
+            val result = LearnedDataFile.decode(file(Triple(3, 1, emptySpatial(30))))
+
+            assertThat(result.issues.map { it.kind }).containsExactly(LoadIssueKind.INVALID_SECTION)
+        }
+
+        @Test
+        fun `une version de section spatiale inconnue est refusée`() {
+            val result = LearnedDataFile.decode(file(Triple(3, 3, emptySpatial(30))))
+
+            assertThat(result.issues.map { it.kind }).containsExactly(LoadIssueKind.INVALID_SECTION)
+        }
+
+        @Test
         fun `un modèle spatial aux valeurs absurdes est refusé`() {
             val bad = payload {
                 repeat(26) {
@@ -356,6 +426,14 @@ class LearnedDataFileTest {
 
     @Nested
     inner class BoundaryValues {
+
+        @Test
+        fun `une section spatiale de version 2 de 30 entrées vides est lue`() {
+            val result = LearnedDataFile.decode(file(Triple(3, 2, emptySpatial(30))))
+
+            assertThat(result.isClean).isTrue()
+            assertThat(result.data.spatial.isEmpty).isTrue()
+        }
 
         @Test
         fun `un fichier de exactement maxFileBytes est lu`() {

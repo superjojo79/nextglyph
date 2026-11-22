@@ -193,6 +193,8 @@ class NextglyphInputMethodService : InputMethodService() {
         listener = object : KeyboardView.Listener {
             override fun onKey(key: Key, upper: Boolean, offset: TapOffset?) = onKeyPressed(key, upper, offset)
 
+            override fun onLayerKey(key: Key, offset: TapOffset?) = session.onLayerKey(key, offset)
+
             override fun onPopup(action: PopupAction) = when (action) {
                 is PopupAction.Text -> onPopupText(action.text)
                 is PopupAction.LockLanguage -> session.lockLanguage(action.language)
