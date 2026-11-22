@@ -71,7 +71,13 @@ Pour signer en local : exporter `NEXTGLYPH_KEYSTORE` (chemin du `.jks`) et les t
 git tag -a v0.1.0 -m "Nextglyph 0.1.0" && git push origin v0.1.0
 ```
 
-Le workflow **Release** vérifie que le tag égale `versionName`, attend votre accord (environnement `release`), construit l'APK et l'app bundle signés, vérifie la signature (`apksigner`), puis crée la release avec `nextglyph-0.1.0.apk`, son `.sha256` et les notes de version dans les deux langues. L'app bundle est dans les artefacts du workflow (90 jours).
+Le workflow **Release** vérifie que le tag égale `versionName`, attend votre accord (environnement `release`), construit l'APK et l'app bundle signés, vérifie la signature (`apksigner`), atteste sa provenance (SLSA, signée via Sigstore), puis crée la release avec `nextglyph-0.1.0.apk`, son `.sha256`, son attestation `.sigstore.json` et les notes de version dans les deux langues. L'app bundle est dans les artefacts du workflow (90 jours).
+
+Vérifier qu'un APK sort bien de ce workflow, à partir du tag (CLI GitHub) :
+
+```sh
+gh attestation verify nextglyph-0.1.0.apk --repo superjojo79/nextglyph
+```
 
 ## 6. Publier sur F-Droid
 
