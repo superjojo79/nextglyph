@@ -239,6 +239,10 @@ class NextglyphInputMethodService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // Réglages relus à chaque ouverture (issue #42) : une modification manquée par l'écouteur des
+        // préférences (marge basse notamment) est appliquée ici plutôt qu'au prochain redémarrage du service.
+        if (services.settings != settings) applySettings()
+        keyboardView?.bottomMarginDp = settings.bottomMarginDp
         // La permission a pu être accordée ou retirée depuis les réglages du système.
         services.syncContacts()
         val key = FieldKey(info.packageName.orEmpty(), info.fieldId)
