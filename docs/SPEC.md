@@ -582,7 +582,7 @@ docs/        Cette spécification, décisions d'architecture.
 - **Contrastes** : une touche atténuée garde un contraste de libellé d'au moins 3:1 ; les touches au repos respectent 4,5:1, de même que les touches enfoncées, de fonction, `⇧` active, la suggestion surlignée et le texte tapé proposé dans la barre ; l'indicateur de langue et le contour du focus TalkBack gardent 3:1 (vérifié sur les deux thèmes par `KeyStyleTest`).
 - **Animations** : supprimées si les animations système sont désactivées.
 - **Tailles** : hauteur de rangée réglable de 34 à 46 dp ; zones de tap jamais inférieures à 32 × 32 dp après adaptation (sauf mode élastique explicitement choisi).
-- **Marge basse** : la dernière rangée reste au-dessus des éléments système du bas. Le padding bas est le plus grand des encarts `navigationBars()`, `captionBar()`, `tappableElement()` et `displayCutout()` (en navigation par gestes, la barre des boutons « changer de clavier » / « masquer le clavier » est déclarée comme `captionBar()` dans la fenêtre du clavier, issue #20), plus la marge basse réglée (§14).
+- **Marge basse** : la dernière rangée reste au-dessus des éléments système du bas. Le padding bas est le plus grand des encarts `navigationBars()`, `captionBar()`, `tappableElement()` et `displayCutout()` (en navigation par gestes, la barre des boutons « changer de clavier » / « masquer le clavier » est déclarée comme `captionBar()` dans la fenêtre du clavier, issue #20), plus la marge basse réglée (§14). Les barres comptent aussi lorsqu'elles sont momentanément masquées (encarts hors visibilité), et les encarts sont relus à chaque recréation de la vue (changement de thème jour/nuit, retour de veille, issue #42).
 
 ---
 
