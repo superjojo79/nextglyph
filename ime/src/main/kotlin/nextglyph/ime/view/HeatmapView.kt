@@ -91,6 +91,8 @@ internal class HeatmapView(context: Context) : View(context) {
 
         // La carte est en lecture seule : activer une touche ne fait rien.
         override fun click(id: Int): Boolean = false
+
+        override val clickable: Boolean get() = false
     }
     private val accessibility = KeyboardAccessibility(this, host)
 
