@@ -95,14 +95,17 @@ class ManifestTest {
 
         @Test
         fun `le panel des champs de test est dans la variante debug`() {
-            assertThat(activitiesOf(mergedManifest("debug"))).contains(fieldTests, "nextglyph.ime.settings.SettingsActivity")
+            assertThat(activitiesOf(mergedManifest("debug"))).contains(fieldTests, "nextglyph.ime.settings.SettingsActivity", "nextglyph.ime.settings.HeatmapActivity")
         }
 
         @Test
         fun `le panel des champs de test n'est jamais dans la release`() {
             val release = mergedManifest("release")
 
-            assertThat(activitiesOf(release)).containsExactly("nextglyph.ime.settings.SettingsActivity")
+            assertThat(activitiesOf(release)).containsExactlyInAnyOrder(
+                "nextglyph.ime.settings.SettingsActivity",
+                "nextglyph.ime.settings.HeatmapActivity",
+            )
             assertThat(activitiesOf(release)).noneMatch { it.contains(".debug.") }
         }
 

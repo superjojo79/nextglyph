@@ -8,4 +8,10 @@
     <color name="key_label">#F1F1F5</color>
     <!-- Contour du focus TalkBack : contraste >= 3:1 sur la touche et le fond (spec §13). -->
     <color name="key_focus_outline">#B4CFFB</color>
+    <!-- Carte de frappe (issue #46) : densité, rouge des erreurs, flèches des décalages et contour des touches ;
+         libellé lisible sur chacune (>= 4,5:1) et contour >= 3:1 sur le fond, vérifiés par HeatmapStyleTest. -->
+    <color name="heat_density">#3D6FD0</color>
+    <color name="heat_error">#B3261E</color>
+    <color name="heat_arrow">#B4CFFB</color>
+    <color name="heat_outline">#9AA0B0</color>
 </resources>

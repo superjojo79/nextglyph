@@ -31,6 +31,9 @@ import nextglyph.engine.predict.WordTaps
 import nextglyph.engine.profile.DecimalSeparatorPolicy
 import nextglyph.engine.profile.FieldKey
 import nextglyph.engine.profile.SeparatorEditor
+import nextglyph.engine.learn.LearningPolicy
+import nextglyph.engine.learn.SpatialModel
+import nextglyph.engine.stats.KeyHeatmap
 import nextglyph.engine.stats.TypingStats
 import nextglyph.engine.text.WordPrefix
 import java.util.Locale
@@ -75,6 +78,17 @@ class InputSession(
 
     /** Apprentissage (§5.3, §10.5), ou `null` : rien n'est appris (données pas encore chargées). */
     var learning: SessionLearning? = null
+
+    /**
+     * Carte de frappe (§15.5) : compteurs par touche, jamais de texte ; `null` pour ne rien compter. Alimentée
+     * seulement là où [LearningPolicy.allowsTaps] est vrai (pas en incognito, mot de passe, code PIN, pavés).
+     */
+    var heatmap: KeyHeatmap? = null
+
+    // Frappe de touche déjà comptée par `onKey`, qui appelle ensuite `onSpace` ou `onEnter` : évite un marqueur en double.
+    private var tapCounted = false
+
+    private val heat: KeyHeatmap? get() = heatmap?.takeIf { LearningPolicy.allowsTaps(this.field.prediction) }
 
     /**
      * Prévenu quand la validation par espace insère un autre mot que le texte tapé (§13 : annoncé par
@@ -154,6 +168,7 @@ class InputSession(
     /** Nouveau champ (ou même champ redémarré), sélection initiale [selStart]–[selEnd] (−1 : inconnue). */
     fun onStartInput(field: SessionField, selStart: Int, selEnd: Int) {
         learning?.onWordAbandoned()
+        heatmap?.forgetRecent()
         this.field = field
         composing = ""
         editState = EditState.INITIAL
@@ -169,6 +184,7 @@ class InputSession(
     /** Fin de la saisie dans le champ : le mot en cours est validé tel quel. */
     fun onFinishInput() {
         learning?.onWordAbandoned()
+        heatmap?.forgetRecent()
         if (composing.isNotEmpty()) target.finishComposingText()
         composing = ""
         undo = null
@@ -196,6 +212,7 @@ class InputSession(
         }
         pending.clear()
         learning?.onWordAbandoned()
+        heatmap?.forgetRecent()
         cursor = if (selStart >= 0 && selEnd >= 0) minOf(selStart, selEnd) else UNKNOWN
         selectionLength = if (cursor == UNKNOWN) 0 else abs(selEnd - selStart)
         if (composing.isNotEmpty()) {
@@ -218,6 +235,9 @@ class InputSession(
      */
     fun onKey(key: Key, upper: Boolean = false, offset: TapOffset? = null) {
         if (key.kind != KeyKind.LETTER) learning?.onKeyTap(key.kind, offset, field.prediction)
+        if (offset != null && key.kind in HEAT_KEYS && key.kind != KeyKind.SYMBOLS) {
+            tapCounted = heat?.onTap(key.kind, offset.dx, offset.dy, field.prediction) ?: false
+        }
         when (key.kind) {
             KeyKind.LETTER -> onLetter(key.label, upper, offset)
             KeyKind.CHARACTER -> onCharacter(key.label)
@@ -228,6 +248,7 @@ class InputSession(
             // gérés par l'IME (dispositions du profil, M3). Touches PC : événements clavier envoyés par l'IME (§5.10).
             KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC, KeyKind.NAV -> Unit
         }
+        tapCounted = false
     }
 
     /**
@@ -236,6 +257,8 @@ class InputSession(
      */
     fun onLayerKey(key: Key, offset: TapOffset? = null) {
         learning?.onKeyTap(key.kind, offset, field.prediction)
+        // ?123 : une frappe comptée, mais aucun caractère inséré (donc pas d'erreur possible).
+        if (offset != null) heat?.onTap(key.kind, offset.dx, offset.dy, field.prediction)
     }
 
     /**
@@ -253,6 +276,7 @@ class InputSession(
         learning?.onLetter(letter, offset, field.prediction)
         if (composing.isEmpty()) wordTaps.clear()
         addTap(letter, offset)
+        trackLetter(letter, offset)
         batch { typeIntoWord(text) }
         if (composing == text) {
             // Première lettre d'un mot : d'où vient sa majuscule.
@@ -271,6 +295,7 @@ class InputSession(
     fun onCharacter(text: String) {
         require(text.isNotEmpty()) { "Un caractère ne peut pas être vide." }
         measuring?.onKey()
+        heat?.onUntracked()
         val sign = text.singleOrNull()
         when {
             !field.readsText || sign == null || sign.isDigit() -> plain(text, validate = false)
@@ -292,20 +317,26 @@ class InputSession(
      */
     fun onEmoji(text: String) {
         require(text.isNotEmpty()) { "Un émoji ne peut pas être vide." }
+        heatmap?.forgetRecent()
         plain(text, validate = field.readsText)
     }
 
     /** Texte de l'historique du presse-papiers (issue #35) : inséré comme un collage, après validation du mot en cours. */
     fun onClipText(text: String) {
         require(text.isNotEmpty()) { "Texte vide." }
+        heatmap?.forgetRecent()
         plain(text, validate = field.readsText)
     }
 
     /** Raccourci de la barre (e-mail, URL) : inséré tel quel. */
-    fun onShortcut(text: String) = plain(text, validate = false)
+    fun onShortcut(text: String) {
+        heatmap?.forgetRecent()
+        plain(text, validate = false)
+    }
 
     /** Touche espace : validation par espace (§5.5), double espace (§5.6). */
     fun onSpace() {
+        noteInsert()
         undo = null
         measuring?.onKey()
         if (!field.readsText) {
@@ -358,6 +389,7 @@ class InputSession(
         undo = null
         editState = EditState.INITIAL
         if (!field.readsText) {
+            heatmap?.forgetRecent()
             target.sendBackspaceKey()
             cursor = UNKNOWN
             selectionLength = 0
@@ -370,6 +402,8 @@ class InputSession(
             if (edit != null) {
                 learning?.onUndo()
                 measuring?.onUndo()
+                // Annuler une validation automatique n'est pas une erreur de frappe.
+                heatmap?.forgetRecent()
                 batch {
                     apply(edit)
                     reopenComposing()
@@ -383,6 +417,7 @@ class InputSession(
         batch {
             when {
                 composing.isNotEmpty() -> {
+                    heat?.onErase()
                     val n = TextUnits.lastCodePointLength(composing)
                     wordTaps.removeLastOrNull()
                     composing = composing.dropLast(n)
@@ -391,15 +426,18 @@ class InputSession(
                     if (composing.isEmpty()) target.finishComposingText()
                 }
                 selectionLength > 0 -> {
+                    heatmap?.forgetRecent()
                     target.commitText("")
                     selectionLength = 0
                 }
                 else -> {
                     val n = TextUnits.lastCodePointLength(target.textBeforeCursor(2) ?: "")
                     if (n > 0) {
+                        heat?.onErase()
                         target.deleteBefore(n)
                         move(-n)
                     } else {
+                        heatmap?.forgetRecent()
                         target.sendBackspaceKey()
                         cursor = UNKNOWN
                     }
@@ -420,6 +458,7 @@ class InputSession(
         undo = null
         editState = EditState.INITIAL
         learning?.onWordAbandoned()
+        heatmap?.forgetRecent()
         if (!field.readsText) {
             target.sendBackspaceKey()
             cursor = UNKNOWN
@@ -448,6 +487,12 @@ class InputSession(
         undo = null
         editState = EditState.INITIAL
         learning?.onWordEnded()
+        if (field.enter == EnterBehavior.NewLine) {
+            noteInsert()
+        } else {
+            tapCounted = false
+            heatmap?.forgetRecent()
+        }
         when (val enter = field.enter) {
             EnterBehavior.NewLine -> {
                 batch { commit("\n") }
@@ -561,10 +606,24 @@ class InputSession(
         return predictor.distribution(prefix, language)
     }
 
+    /** Un caractère va être inséré par espace ou entrée : sa frappe est déjà comptée par `onKey`, sinon un marqueur. */
+    private fun noteInsert() {
+        if (tapCounted) tapCounted = false else heat?.onUntracked()
+    }
+
+    /** Compte la frappe sur [letter] ; hors `a`–`z`, sans position ou hors touche, un marqueur garde la pile alignée. */
+    private fun trackLetter(letter: String, offset: TapOffset?) {
+        val map = heat ?: return
+        val base = letter.lowercase(Locale.ROOT).singleOrNull()
+        val counted = offset != null && base != null && map.onTap(base, offset.dx, offset.dy, field.prediction)
+        if (!counted) map.onUntracked()
+    }
+
     private fun pickSuggestion(item: BarItem) {
         val predictor = predictor ?: return
         val language = language ?: return
         undo = null
+        heatmap?.forgetRecent()
         batch {
             val p = currentPrediction() ?: return@batch
             val commit = predictor.pickSuggestion(p, Suggestion(item.text, item.highlighted, item.typed), language, field.prediction)
@@ -799,6 +858,7 @@ class InputSession(
         const val SPACE_SYMBOL: String = "␣"
 
         private const val UNKNOWN = -1
+        private val HEAT_KEYS = SpatialModel.LEARNED_KEYS
 
         /** Délai maximal entre les deux appuis du verrouillage de `⇧` (§7.1), valeur par défaut d'Android. */
         const val DOUBLE_TAP_MS: Long = 300L
