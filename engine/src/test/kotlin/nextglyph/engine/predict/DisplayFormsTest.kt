@@ -22,6 +22,12 @@ class DisplayFormsTest {
     )
     private val en = LexiconSet(LexiconFixtures.lexicon(listOf("café" to 10L, "mere" to 10L, "I" to 100L, "i" to 1L, "McDonald" to 5L), "en"))
 
+    /** Français de masse 10 000 où [word] pèse 100 (donc 1 %). */
+    private fun bilingualFrench(word: String) = LexiconSet(LexiconFixtures.lexicon(listOf(word to 100L, "x" to 9900L), "fr"))
+
+    /** Anglais de masse 1 000 où [word] pèse 100 (donc 10 %). */
+    private fun bilingualEnglish(word: String) = LexiconSet(LexiconFixtures.lexicon(listOf(word to 100L, "y" to 900L), "en"))
+
     @Nested
     inner class HappyPath {
         @ParameterizedTest(name = "« {0} » → « {1} »")
@@ -59,6 +65,25 @@ class DisplayFormsTest {
             assertThat(display.forCandidate("pechet", "pecher", listOf(fr), fr)).isEqualTo("pêcher")
             assertThat(display.forCandidate("Ecol", "ecole", listOf(fr), fr)).isEqualTo("École")
         }
+
+
+        @Test
+        fun `sigles et casses implausibles ignorés - ça`() {
+            val french = LexiconSet(LexiconFixtures.lexicon(listOf("ça" to 870L, "CA" to 100L, "cA" to 30L), "fr"))
+
+            assertThat(display.forTypedWord("ca", "ca", listOf(french), french)).isEqualTo("ça")
+            assertThat(display.forCandidate("ca", "ca", listOf(french), french)).isEqualTo("ça")
+        }
+
+        @Test
+        fun `bilingue pondéré - anglais de faible poids, le français est restitué`() {
+            val fr2 = bilingualFrench("rôle")
+            val en2 = bilingualEnglish("role")
+
+            val inserted = display.forTypedWord("role", "role", listOf(fr2, en2), fr2, listOf(0.999, 0.001))
+
+            assertThat(inserted).isEqualTo("rôle")
+        }
     }
 
     @Nested
@@ -83,6 +108,23 @@ class DisplayFormsTest {
             assertThat(DisplayForms.isPlausibleCase("monday")).isTrue()
             assertThat(DisplayForms.isPlausibleCase("")).isTrue()
             assertThat(display.forCandidate("da", "dav", listOf(fr), fr)).isEqualTo("dav")
+        }
+
+
+        @Test
+        fun `bilingue pondéré - anglais de fort poids, le texte tapé est gardé`() {
+            val fr2 = bilingualFrench("rôle")
+            val en2 = bilingualEnglish("role")
+
+            assertThat(display.forTypedWord("role", "role", listOf(fr2, en2), fr2, listOf(0.5, 0.5))).isEqualTo("role")
+        }
+
+        @Test
+        fun `bilingue - un lexique sans orthographe dominante rend la restitution ambiguë`() {
+            val fr2 = LexiconSet(LexiconFixtures.lexicon(listOf("ou" to 50L, "où" to 50L, "x" to 900L), "fr"))
+            val en2 = LexiconSet(LexiconFixtures.lexicon(listOf("où" to 100L, "y" to 900L), "en"))
+
+            assertThat(display.forTypedWord("ou", "ou", listOf(fr2, en2), fr2, listOf(0.999, 0.001))).isEqualTo("ou")
         }
     }
 
@@ -116,6 +158,27 @@ class DisplayFormsTest {
         @Test
         fun `langue de la phrase sans la clé - formes de tous les lexiques`() {
             assertThat(display.forTypedWord("i", "i", listOf(en), fr)).isEqualTo("I")
+        }
+
+
+        @Test
+        fun `clé qui n'a que des sigles - calcul inchangé`() {
+            val sigles = LexiconSet(LexiconFixtures.lexicon(listOf("USA" to 100L, "UsA" to 1L), "en"))
+
+            assertThat(display.forTypedWord("usa", "usa", listOf(sigles), sigles)).isEqualTo("USA")
+        }
+
+        @Test
+        fun `poids nul d'un lexique - sa masse ne compte pas`() {
+            val fr2 = bilingualFrench("rôle")
+            val en2 = bilingualEnglish("role")
+
+            assertThat(display.forTypedWord("role", "role", listOf(fr2, en2), fr2, listOf(1.0, 0.0))).isEqualTo("rôle")
+        }
+
+        @Test
+        fun `un seul lexique - la pondération ne change rien`() {
+            assertThat(display.forTypedWord("ecole", "ecole", listOf(fr), fr, listOf(0.01))).isEqualTo("école")
         }
     }
 }

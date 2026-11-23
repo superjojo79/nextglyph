@@ -50,7 +50,8 @@ class Predictor(
 
     private val sets: List<LexiconSet> = languages.map { lexicons.getValue(it) }
     private val adjacency = KeyAdjacency(layout, config.neighborDistance)
-    private val sources: List<CandidateSource> = sets.map { CandidateSource(it, adjacency, config) }
+    private val substitution = SpatialSubstitution(layout, config)
+    private val sources: List<CandidateSource> = sets.map { CandidateSource(it, adjacency, config, substitution) }
     private val display = DisplayForms(config.accentDominance)
     private val frenchIndex = languages.indexOfFirst { it in config.elisions.keys }
     private val caches: List<LruCache>? =
@@ -72,25 +73,31 @@ class Predictor(
      * Décision de l'espace et barre de suggestions pour le texte [textBeforeCursor] (au moins
      * `WordPrefix.LOOKBACK` caractères ; `null` si indisponible).
      *
+     * [taps] : frappes du mot en cours, qui pondèrent les substitutions d'après la position réelle des
+     * doigts (issue #53) ; `null` si inconnues.
+     *
      * @throws IllegalArgumentException si [language] ne porte pas sur les langues de ce prédicteur.
      */
-    fun predict(textBeforeCursor: CharSequence?, language: LanguageState, settings: PredictionSettings): Prediction {
+    fun predict(textBeforeCursor: CharSequence?, language: LanguageState, settings: PredictionSettings, taps: WordTaps? = null): Prediction {
         requireLanguages(language)
         val sentence = language.sentenceLanguage
         if (!settings.suggestionsEnabled) return Prediction("", "", SpaceCase.DISABLED, "", emptyList(), SuggestionBar.EMPTY, sentence)
         val raw = WordPrefix.currentWord(textBeforeCursor, 0, elisionLanguage(language)).orEmpty()
         if (raw.isEmpty()) return Prediction("", "", SpaceCase.NO_WORD, "", emptyList(), SuggestionBar.EMPTY, sentence)
         val key = keyOf(raw) ?: return Prediction(raw, "", SpaceCase.LITERAL, raw, emptyList(), SuggestionBar.EMPTY, sentence)
-        return decide(raw, key, language, settings)
+        return decide(raw, key, language, settings, taps)
     }
 
     /**
      * Décision pour le mot [raw] de clé [key] déjà extraits (simulations, mesures) ; voir [predict].
+     * Les candidats ne passent pas par le cache quand [taps] s'aligne sur [key].
      */
-    fun decide(raw: String, key: String, language: LanguageState, settings: PredictionSettings): Prediction {
+    fun decide(raw: String, key: String, language: LanguageState, settings: PredictionSettings, taps: WordTaps? = null): Prediction {
         requireLanguages(language)
         val weights = languageWeights(language)
         val active = sets.filterIndexed { i, _ -> weights[i] > 0.0 }
+        val activeWeights = weights.filter { it > 0.0 }
+        val spatialTaps = if (taps?.alignedTo(key) != null) taps else null
         val sentenceSet = sets[languages.indexOf(language.sentenceLanguage)]
         var isWord = false
         var total = 0.0
@@ -98,7 +105,11 @@ class Predictor(
         for (i in sets.indices) {
             val pi = weights[i]
             if (pi <= 0.0) continue
-            val found = caches?.get(i)?.getOrPut(key) { sources[i].lookup(key) } ?: sources[i].lookup(key)
+            val found = if (spatialTaps != null) {
+                sources[i].lookup(key, spatialTaps)
+            } else {
+                caches?.get(i)?.getOrPut(key) { sources[i].lookup(key) } ?: sources[i].lookup(key)
+            }
             isWord = isWord || found.isWord
             total += pi * found.total
             for (c in found.top) {
@@ -108,7 +119,7 @@ class Predictor(
         }
         // Les candidats des langues sont fusionnés puis ramenés aux formsPerPrefix meilleurs.
         val ranked = if (total <= 0.0) emptyList() else scores.values.sortedWith(CandidateSource.SCORE_ORDER).take(config.formsPerPrefix).map {
-            Candidate(it.key, display(raw, it, active, sentenceSet), it.score / total)
+            Candidate(it.key, display(raw, it, active, activeWeights, sentenceSet), it.score / total)
         }
         val p1 = ranked.getOrNull(0)?.probability ?: 0.0
         val p2 = ranked.getOrNull(1)?.probability ?: 0.0
@@ -117,11 +128,11 @@ class Predictor(
         when {
             isWord -> {
                 case = SpaceCase.WORD
-                val restored = if (settings.autocommitEnabled) display.forTypedWord(raw, key, active, sentenceSet) else raw
+                val restored = if (settings.autocommitEnabled) display.forTypedWord(raw, key, active, sentenceSet, activeWeights) else raw
                 inserted = if (restored != raw && isRejected(raw, restored)) raw else restored
             }
             settings.autocommitEnabled && ranked.isNotEmpty() && p1 >= settings.prudence.minProb &&
-                p1 >= config.minRatio * p2 && !isRejected(raw, ranked[0].text) && !blockedAutocommit(ranked[0].key) -> {
+                p1 >= settings.prudence.minRatio * p2 && !isRejected(raw, ranked[0].text) && !blockedAutocommit(ranked[0].key) -> {
                 case = SpaceCase.DOMINANT
                 inserted = ranked[0].text
             }
@@ -130,7 +141,7 @@ class Predictor(
                 inserted = raw
             }
         }
-        val bar = bar(raw, key, case, inserted, ranked, active)
+        val bar = bar(raw, key, case, inserted, ranked, active, activeWeights)
         return Prediction(raw, key, case, inserted, ranked, bar, language.sentenceLanguage)
     }
 
@@ -254,18 +265,18 @@ class Predictor(
         return key.takeIf(LexiconAlphabet::isValidKey)
     }
 
-    private fun display(raw: String, candidate: ScoredKey, active: List<LexiconSet>, sentenceSet: LexiconSet): String {
-        if (candidate.restStart == 0) return display.forCandidate(raw, candidate.key, active, sentenceSet)
+    private fun display(raw: String, candidate: ScoredKey, active: List<LexiconSet>, activeWeights: List<Double>, sentenceSet: LexiconSet): String {
+        if (candidate.restStart == 0) return display.forCandidate(raw, candidate.key, active, sentenceSet, activeWeights)
         // Élision reconstituée : l'élision garde la casse tapée, le mot élidé est restitué.
         val elisionLength = candidate.restStart - 1
         val head = raw.take(elisionLength)
-        val rest = display.forCandidate(raw.drop(elisionLength).lowercase(Locale.ROOT), candidate.key.substring(candidate.restStart), active, sentenceSet)
+        val rest = display.forCandidate(raw.drop(elisionLength).lowercase(Locale.ROOT), candidate.key.substring(candidate.restStart), active, sentenceSet, activeWeights)
         return "$head'$rest"
     }
 
     private fun isRejected(raw: String, inserted: String): Boolean = rejections.rejections(raw, inserted) >= config.rejectLimit
 
-    private fun bar(raw: String, key: String, case: SpaceCase, inserted: String, ranked: List<Candidate>, active: List<LexiconSet>): SuggestionBar {
+    private fun bar(raw: String, key: String, case: SpaceCase, inserted: String, ranked: List<Candidate>, active: List<LexiconSet>, activeWeights: List<Double>): SuggestionBar {
         val list = ArrayList<Suggestion>(BAR_SIZE + 2)
         val seen = HashSet<String>()
         fun add(suggestion: Suggestion) {
@@ -276,7 +287,7 @@ class Predictor(
             SpaceCase.WORD -> {
                 add(Suggestion(inserted, highlighted = replaces))
                 if (replaces) add(Suggestion(raw, isTyped = true))
-                for (variant in variants(raw, key, active)) add(Suggestion(variant))
+                for (variant in variants(raw, key, active, activeWeights)) add(Suggestion(variant))
             }
             SpaceCase.DOMINANT -> {
                 add(Suggestion(inserted, highlighted = true))
@@ -294,7 +305,7 @@ class Predictor(
      * `j'aime`) et les mots obtenus en insérant une apostrophe ou un trait d'union (`its` → `it's`,
      * `well` → `we'll`).
      */
-    private fun variants(raw: String, key: String, active: List<LexiconSet>): List<String> {
+    private fun variants(raw: String, key: String, active: List<LexiconSet>, activeWeights: List<Double>): List<String> {
         val result = ArrayList<String>()
         for (set in active) {
             for (entry in set.displayForms(key)) {
@@ -306,7 +317,7 @@ class Predictor(
                 val rest = key.removePrefix(elision)
                 if (rest.length == key.length || rest.isEmpty() || rest[0] !in config.elisionInitials) continue
                 if (sets[frenchIndex].containsKey(rest) && sets[frenchIndex].containsKey("$elision'")) {
-                    result += raw.take(elision.length) + "'" + display.forCandidate(raw.drop(elision.length).lowercase(Locale.ROOT), rest, active, sets[frenchIndex])
+                    result += raw.take(elision.length) + "'" + display.forCandidate(raw.drop(elision.length).lowercase(Locale.ROOT), rest, active, sets[frenchIndex], activeWeights)
                 }
             }
         }

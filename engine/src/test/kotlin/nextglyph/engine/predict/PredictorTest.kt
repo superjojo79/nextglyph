@@ -20,6 +20,10 @@ class PredictorTest {
     private val en = PredictFixtures.englishPredictor()
     private val enState = en.initialLanguageState("en")
 
+    /** Deux mots qui ne diffèrent que par la première lettre, QWERTY : `e` est voisine de `r` (1 u) et de `d`. */
+    private fun roses() =
+        Predictor(mapOf("fr" to LexiconSet(LexiconFixtures.lexicon(listOf("rose" to 100L, "dose" to 100L)))), KeyboardLayouts.QWERTY)
+
     private fun Predictor.at(text: String, state: LanguageState, s: PredictionSettings = settings) = predict(text, state, s)
 
     @Nested
@@ -337,6 +341,35 @@ class PredictorTest {
             assertThat(picked.edit.endsWithAutoSpace).isTrue()
             assertThat(picked.undo).isNull()
         }
+
+
+        @Test
+        fun `frappes - la frappe à la frontière désigne la voisine, sans frappes égalité alphabétique`() {
+            val roses = roses()
+            val state = roses.initialLanguageState("fr")
+
+            val without = roses.predict("eose", state, settings)
+            val boundary = roses.predict("eose", state, settings, WordTaps(listOf(TypedTap('e', 0.5, 0.0), null, null, null)))
+
+            assertThat(without.candidates.map { it.key }).startsWith("dose", "rose")
+            assertThat(boundary.candidates.map { it.key }).startsWith("rose", "dose")
+        }
+
+        @Test
+        fun `frappes - la décision et le cache restent cohérents`() {
+            val cached = Predictor(mapOf("fr" to LexiconSet(LexiconFixtures.lexicon(listOf("rose" to 100L, "dose" to 100L)))), KeyboardLayouts.QWERTY, cacheSize = 4)
+            val state = cached.initialLanguageState("fr")
+            val taps = WordTaps(listOf(TypedTap('e', 0.5, 0.0), null, null, null))
+
+            val first = cached.predict("eose", state, settings)
+            val spatial = cached.predict("eose", state, settings, taps)
+            val again = cached.predict("eose", state, settings)
+
+            assertThat(first.candidates[0].key).isEqualTo("dose")
+            assertThat(spatial.candidates[0].key).isEqualTo("rose")
+            assertThat(again.candidates[0].key).isEqualTo("dose")
+            assertThat(cached.cachedTexts()).containsExactly(1)
+        }
     }
 
     @Nested
@@ -438,6 +471,17 @@ class PredictorTest {
 
             assertThat(state).isSameAs(frState)
         }
+
+
+        @Test
+        fun `frappes qui ne s'alignent pas sur le mot - ignorées`() {
+            val roses = roses()
+            val state = roses.initialLanguageState("fr")
+
+            val misaligned = roses.predict("eose", state, settings, WordTaps(listOf(TypedTap('x', 0.5, 0.0), null, null, null)))
+
+            assertThat(misaligned.candidates.map { it.key }).startsWith("dose", "rose")
+        }
     }
 
     @Nested
@@ -461,16 +505,6 @@ class PredictorTest {
 
             assertThat(prediction.word).isEqualTo("ecole")
             assertThat(fr.commitSpace(prediction, frState, settings).edit.applyTo("l'ecole")).isEqualTo("l'école ")
-        }
-
-        @Test
-        fun `minRatio - candidat probable mais pas assez dominant`() {
-            val cats = PredictFixtures.catPredictor(chat = 62L, chien = 38L)
-
-            val prediction = cats.at("ch", cats.initialLanguageState("fr"), PredictionSettings(prudence = Prudence.BOLD))
-
-            assertThat(prediction.candidates[0].probability).isGreaterThan(0.6)
-            assertThat(prediction.case).isEqualTo(SpaceCase.LITERAL)
         }
 
         @Test
@@ -517,6 +551,18 @@ class PredictorTest {
             val prediction = plain.at("jai", plain.initialLanguageState("fr"))
 
             assertThat(prediction.candidates.map { it.key }).doesNotContain("j'ai")
+        }
+
+
+        @Test
+        fun `frappes pour un mot de passe ou sans suggestions - aucune prédiction`() {
+            val roses = roses()
+            val state = roses.initialLanguageState("fr")
+            val taps = WordTaps(listOf(TypedTap('e', 0.5, 0.0), null, null, null))
+
+            val p = roses.predict("eose", state, PredictionSettings(noSuggestions = true), taps)
+
+            assertThat(p.case).isEqualTo(SpaceCase.DISABLED)
         }
     }
 }

@@ -8,6 +8,7 @@ import nextglyph.engine.predict.PredictionSettings
 import nextglyph.engine.predict.Predictor
 import nextglyph.engine.predict.Prudence
 import nextglyph.engine.predict.SpaceCase
+import nextglyph.engine.predict.WordTaps
 import nextglyph.tools.analysis.CorpusAnalysis.Companion.f
 import nextglyph.tools.analysis.CorpusAnalysis.Companion.pct
 import nextglyph.tools.analysis.CorpusAnalysis.Companion.percent
@@ -24,6 +25,10 @@ import kotlin.random.Random
  *   même hachage que l'analyse M0).
  * @property mixedSamplePercent part des phrases du corpus mixte analysées.
  * @property cacheSize taille du cache de candidats du moteur, par langue.
+ * @property spatialSigmas écarts-types σu (fraction de touche) du modèle de frappe gaussien de la section
+ *   « Score spatial » ; liste vide : section omise.
+ * @property spatialSamplePercent part des phrases de test analysées pour cette section (le cache du
+ *   moteur est contourné avec les frappes : elle est plus lente), par défaut [samplePercent].
  */
 data class EngineAnalysisConfig(
     val prudences: List<Prudence> = Prudence.entries,
@@ -33,9 +38,14 @@ data class EngineAnalysisConfig(
     val mixedSamplePercent: Int = 5,
     val cacheSize: Int = 400_000,
     val seed: Long = 20261119L,
+    val spatialSigmas: List<Double> = listOf(0.20, 0.25),
+    val spatialSamplePercent: Int = samplePercent,
 ) {
     init {
         require(prudences.isNotEmpty() && errorRates.isNotEmpty()) { "Les prudences et taux de fautes ne doivent pas être vides." }
+        require(spatialSamplePercent in 1..100 && spatialSigmas.all { it.isFinite() && it >= 0.0 }) {
+            "L'échantillon spatial doit être compris entre 1 et 100 % et les écarts-types positifs ou nuls."
+        }
         require(samplePercent in 1..100 && mixedSamplePercent in 1..100) { "Les échantillons doivent être compris entre 1 et 100 %." }
     }
 }
@@ -84,6 +94,10 @@ class EngineAnalysis(private val config: EngineAnalysisConfig = EngineAnalysisCo
             val words = CorpusWords.count(sample.asSequence(), Tokenizer(input.language))
             out.append(space(input, sets.getValue(input.language), words))
             out.append(separators(input, sets.getValue(input.language), sample))
+            if (config.spatialSigmas.isNotEmpty()) {
+                val spatialSample = input.test.filterIndexed { i, _ -> keep(i, config.spatialSamplePercent) }
+                out.append(spatial(input, sets.getValue(input.language), CorpusWords.count(spatialSample.asSequence(), Tokenizer(input.language))))
+            }
         }
         out.append(accents(fr, sets, fr.test.filterIndexed { i, _ -> keep(i, config.samplePercent) }))
         // Corpus mixte : début du corpus (blocs de phrases contigus), une liste de mots par phrase.
@@ -113,13 +127,64 @@ class EngineAnalysis(private val config: EngineAnalysisConfig = EngineAnalysisCo
                     words.counts,
                     { t: String -> CandidateMixer.combine(listOf(1.0 to m0.lookup(t))) },
                     typos,
-                    Thresholds(prudence.minProb, 2.0),
+                    Thresholds(prudence.minProb, prudence.minRatio),
                 )
                 appendLine(row(rate, "M0, minProb ${f(prudence.minProb, 2)}", reference))
             }
             m0.clearCache()
         }
         appendLine()
+    }
+
+    /**
+     * Score spatial (issue #53) : l'utilisateur attentif tape chaque occurrence avec le modèle gaussien
+     * [GaussianTapModel] ; le moteur décide (a) sans les frappes (poids binaires) et (b) avec les `k`
+     * premières frappes pour le préfixe de longueur `k`. Mêmes tirages pour tous les réglages. Chaque
+     * occurrence est tirée (les frappes changent les poids même sans lettre fausse).
+     */
+    private fun spatial(input: LanguageInput, set: LexiconSet, words: WordCounts): String = buildString {
+        val layout = KeyboardLayouts.of(layoutKind(input.layout))
+        val predictor = Predictor(mapOf(input.language.code to set), layout, cacheSize = config.cacheSize)
+        val state = predictor.initialLanguageState(input.language.code)
+        appendLine("## Score spatial (frappes simulées) — ${input.language.code} (${input.layout}), ${words.analyzed} mots").appendLine()
+        appendLine("| σu | Lettres fausses | Prudence | Moteur | Complétées/corrigées (% mots) | dont corrections | Fausses (% auto) | Fautes non corrigées (% mots) |")
+        appendLine("|---|---|---|---|---|---|---|---|")
+        for (sigma in config.spatialSigmas) {
+            val started = System.nanoTime()
+            val model = GaussianTapModel(layout, sigma)
+            val random = Random(config.seed)
+            val settings = config.prudences.map { PredictionSettings(prudence = it) }
+            val binary = settings.map { SpaceSimulation(listOf(ENGINE_THRESHOLDS)) }
+            val spatial = settings.map { SpaceSimulation(listOf(ENGINE_THRESHOLDS)) }
+            var letters = 0L
+            var wrongLetters = 0L
+            for ((word, count) in words.counts) {
+                repeat(count.toInt()) {
+                    val tapped = model.type(word, random)
+                    letters += word.length
+                    wrongLetters += word.indices.count { word[it] != tapped.typed[it] }
+                    for (i in settings.indices) {
+                        binary[i].record(word, tapped.typed, 1, engineDecider(predictor, state, settings[i]))
+                        spatial[i].record(word, tapped.typed, 1) { prefix ->
+                            decision(predictor.decide(prefix, prefix, state, settings[i], WordTaps(tapped.taps.subList(0, prefix.length))))
+                        }
+                    }
+                }
+            }
+            for ((i, prudence) in config.prudences.withIndex()) {
+                appendLine(spatialRow(sigma, wrongLetters, letters, prudence, "binaire (sans frappes)", binary[i].counters.single()))
+                appendLine(spatialRow(sigma, wrongLetters, letters, prudence, "spatial", spatial[i].counters.single()))
+            }
+            log("M2 ${input.language.code} : score spatial σu ${f(sigma, 2)} en ${(System.nanoTime() - started) / 1_000_000_000} s")
+        }
+        appendLine()
+    }
+
+    private fun spatialRow(sigma: Double, wrong: Long, letters: Long, prudence: Prudence, label: String, c: ThresholdCounters): String {
+        val a = c.attentive
+        return "| ${f(sigma, 2)} | ${pct(ThresholdCounters.ratio(wrong, letters))} | $prudence | $label | ${pct(c.correctAutoRate)} | " +
+            "${pct(ThresholdCounters.ratio(a[SpaceOutcome.AUTO_CORRECTION.ordinal], c.words))} | ${pct(c.falseRate)} | " +
+            "${pct(ThresholdCounters.ratio(a[SpaceOutcome.LITERAL_OTHER.ordinal], c.words))} |"
     }
 
     private fun simulate(
@@ -206,10 +271,12 @@ class EngineAnalysis(private val config: EngineAnalysisConfig = EngineAnalysisCo
             "français" to mapOf("fr" to sets.getValue(Language.FR)),
             "français + anglais" to mapOf("fr" to sets.getValue(Language.FR), "en" to sets.getValue(Language.EN)),
         )
+        val examples = ArrayList<Pair<String, List<Map.Entry<String, Long>>>>()
         for ((label, lexicons) in variants) {
             val predictor = Predictor(lexicons, KeyboardLayouts.of(layoutKind(fr.layout)))
             val state = predictor.initialLanguageState("fr")
             val accented = RestorationCounters()
+            val missed = HashMap<String, Long>()
             var plain = 0L
             var plainWrong = 0L
             for ((form, count) in forms) {
@@ -221,14 +288,13 @@ class EngineAnalysis(private val config: EngineAnalysisConfig = EngineAnalysisCo
                     plain += count
                     if (inserted != key) plainWrong += count
                 } else {
-                    accented.add(
-                        when (inserted) {
-                            form -> Restoration.RESTORED
-                            key -> Restoration.LITERAL
-                            else -> Restoration.WRONG
-                        },
-                        count,
-                    )
+                    val outcome = when (inserted) {
+                        form -> Restoration.RESTORED
+                        key -> Restoration.LITERAL
+                        else -> Restoration.WRONG
+                    }
+                    accented.add(outcome, count)
+                    if (outcome != Restoration.RESTORED) missed.merge("$form (${outcome.name.lowercase()})", count, Long::plus)
                 }
             }
             appendLine(
@@ -236,8 +302,14 @@ class EngineAnalysis(private val config: EngineAnalysisConfig = EngineAnalysisCo
                     "${pct(ThresholdCounters.ratio(accented.wrong, accented.words))} | ${pct(ThresholdCounters.ratio(accented.literal, accented.words))} | " +
                     "${pct(ThresholdCounters.ratio(plainWrong, plain))} |",
             )
+            examples += label to missed.entries.sortedByDescending { it.value }.take(EXAMPLES)
         }
         appendLine()
+        for ((label, top) in examples) {
+            if (top.isEmpty()) continue
+            appendLine("Accents non restitués ($label) : " + top.joinToString(", ") { "`${it.key}` ${it.value}" } + ".")
+            appendLine()
+        }
     }
 
     /**
@@ -258,7 +330,7 @@ class EngineAnalysis(private val config: EngineAnalysisConfig = EngineAnalysisCo
             for (prudence in config.prudences) {
                 log("M2 corpus mixte : fautes ${percent(rate)}, $prudence")
                 val settings = PredictionSettings(prudence = prudence)
-                val counters = MixedCounters(Thresholds(prudence.minProb, 2.0))
+                val counters = MixedCounters(Thresholds(prudence.minProb, prudence.minRatio))
                 val random = Random(config.seed)
                 var state = both.initialLanguageState("fr")
                 var sentenceCorrect = 0L

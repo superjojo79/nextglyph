@@ -522,3 +522,28 @@ Simulation déterministe (`TapKeyZonesSimulationTest`, AZERTY 1 000 × 100 px) :
 - **Apprendre tous les `⌫`** : un `⌫` isolé est souvent une lettre manquée, il tirerait la frontière vers la lettre et renforcerait l'erreur.
 - **Score gaussien pour toutes les touches** : la normalisation favorise les petites touches et l'espace (large) perdrait sans modèle ; il faudrait recalibrer tout le décodeur, sans garantie d'équivalence pour un modèle vide.
 - **Apprendre dans la couche des symboles** : autre géométrie, peu de frappes, gain marginal.
+
+## 2026-11-23 — Classement des candidats : score spatial, accents, seuil de confiance (issue #53)
+
+### Contexte
+
+La validation par espace classait les corrections par `poids(édition) × fréquence`, avec un poids de substitution fixe (0,01 pour une touche voisine, 0,0005 sinon) qui ignorait où le doigt avait réellement touché, alors que l'IME connaît cette position (modèle spatial du §5.3, #30). La restitution des accents était bloquée par les sigles des sources (`CA` empêchait `ca` → `ça`) et par tout mot anglais sans accent dès que l'anglais était actif. L'issue demandait aussi un seuil d'écart avec le deuxième candidat réglable.
+
+### Décision
+
+**Score spatial.** `InputSession` garde en mémoire les frappes du mot en cours (`TypedTap` : lettre décodée et décalage relatif à la touche au repos, au plus 64, vidées à chaque fin de mot) et les passe à `Predictor.predict` (`WordTaps`, avec le modèle spatial appris). `SpatialSubstitution` remplace le poids d'une substitution par `clamp(0,6 × L(p | c) / L(p | t), 0,0005, 1)`, `L` étant la gaussienne de repos du décodeur (σ = 0,35, décalages et facteurs appris). Calibrage : 0,6 redonne l'ancien 0,01 pour une frappe au centre de la touche et une voisine horizontale, si bien que le moteur reste comparable à M0. Les frappes ne s'appliquent que si elles s'alignent sur la clé (même lettre à chaque position connue) ; sinon, et sans positions, les poids fixes s'appliquent et le cache des candidats sert comme avant. Rien n'est persisté : c'est la même donnée que celle déjà mise en attente pour le modèle spatial, gardée le temps du mot.
+
+**Accents.** Les sigles (au moins deux lettres toutes majuscules) et les casses implausibles ne comptent plus dans la dominance d'une orthographe. Entre lexiques, chaque lexique vote pour son orthographe dominante avec `π_L · f_L / masse_L` et l'orthographe retenue doit porter 95 % du total : avec un seul lexique ou des lexiques d'accord, rien ne change ; un mot anglais sans accent ne bloque plus quand le français domine nettement (règle du §10.6 assouplie).
+
+**Seuil de confiance.** Fondu dans le réglage existant « Prudence de la validation » plutôt qu'un second réglage : `Prudence` porte `minProb` et `minRatio` (3 / 2 / 1,5). La mesure montre que le rapport est déjà impliqué par `minProb` (`P(w2) ≤ 1 − P(w1)`) ; des rapports plus stricts ne changent rien de significatif (`docs/analysis/M2-engine.md`, §9.3).
+
+### Mesure
+
+`docs/analysis/M2-engine.md`, §9 : avec des frappes gaussiennes simulées (6,6 % de lettres fausses en français), réglage Normale, fausses validations 2,84 → 2,27 %, fautes non corrigées 14,3 → 11,1 %, mots complétés ou corrigés 20,6 → 23,7 % ; anglais 2,02 → 1,66 %. Accents restitués : 58,5 → 61,3 % (français seul), 50,4 → 56,6 % (deux langues).
+
+### Alternatives écartées
+
+- **Transmettre les scores du décodeur** (`TapDecoding.scores`) : ils incluent l'a priori du modèle de langue de la lettre suivante, qui serait compté deux fois avec la fréquence du mot.
+- **Rapport sans facteur (0,6 → 1)** : bayésien au sens strict, mais il double le poids d'une frappe centrée par rapport à M0 et déplacerait tous les seuils calibrés.
+- **Un second réglage « seuil de confiance »** : redondant avec `minProb`, il aurait ajouté un choix sans effet mesurable.
+- **Restituer `à`, `où`, `là` ou les participes (`demandé`/`demande`)** : ambigus sans contexte ; relèvent de la prédiction par bigrammes (#51).

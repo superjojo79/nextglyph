@@ -1,17 +1,22 @@
 package nextglyph.engine.predict
 
 /**
- * Réglage « Prudence de la validation » (spec §5.5, §14) : seuil `autocommit.minProb`.
+ * Réglage « Prudence de la validation » (spec §5.5, §14) : seuils `autocommit.minProb` (probabilité
+ * minimale du premier candidat) et `autocommit.minRatio` (rapport minimal entre le premier et le
+ * deuxième candidat). Valeurs provisoires, à recalibrer ici et nulle part ailleurs.
+ *
+ * @property minProb probabilité minimale du premier candidat.
+ * @property minRatio rapport minimal `p1 / p2` (au moins 1).
  */
-enum class Prudence(val minProb: Double) {
-    /** Prudente : 0,80. */
-    CAUTIOUS(0.80),
+enum class Prudence(val minProb: Double, val minRatio: Double) {
+    /** Prudente : 0,80 et 3,0. */
+    CAUTIOUS(0.80, 3.0),
 
-    /** Normale (défaut) : 0,70. */
-    NORMAL(0.70),
+    /** Normale (défaut) : 0,70 et 2,0. */
+    NORMAL(0.70, 2.0),
 
-    /** Audacieuse : 0,60. */
-    BOLD(0.60),
+    /** Audacieuse : 0,60 et 1,5. */
+    BOLD(0.60, 1.5),
 }
 
 /**
@@ -58,7 +63,11 @@ data class CorrectionWeights(
  *   en unités de touche (1,5 u, comme l'analyse M0).
  * @property formsPerPrefix nombre de formes lues par préfixe candidat et de candidats conservés par
  *   langue (6, comme l'analyse M0).
- * @property minRatio `autocommit.minRatio` (§5.5) : 2,0.
+ * @property spatialSigma écart type (en largeurs de touche, hauteurs de rangée) de la frappe autour du
+ *   centre d'une touche, pour le score spatial des substitutions : 0,35 (= `TapDecoderConfig.sigma`).
+ * @property spatialScale facteur du rapport de vraisemblances d'une substitution (]0, 1]) : 0,6, de sorte
+ *   qu'une frappe au centre de la touche tapée donne à une voisine horizontale le poids d'environ 0,01
+ *   (`adjacentSubstitution`).
  * @property rejectLimit `autocommit.rejectLimit` (§5.5) : nombre d'annulations d'une même
  *   correction après lequel elle n'est plus validée automatiquement (2).
  * @property languageWindow fenêtre du score de langue, en mots validés (§10.6) : 4.
@@ -74,7 +83,8 @@ data class PredictionConfig(
     val correction: CorrectionWeights = CorrectionWeights(),
     val neighborDistance: Double = 1.5,
     val formsPerPrefix: Int = 6,
-    val minRatio: Double = 2.0,
+    val spatialSigma: Double = 0.35,
+    val spatialScale: Double = 0.6,
     val rejectLimit: Int = 2,
     val languageWindow: Int = 4,
     val languagePrior: Double = 1.0,
@@ -86,7 +96,8 @@ data class PredictionConfig(
     init {
         require(neighborDistance > 0.0) { "La distance de voisinage doit être strictement positive ($neighborDistance)." }
         require(formsPerPrefix >= 1) { "Au moins une forme par préfixe ($formsPerPrefix)." }
-        require(minRatio >= 1.0) { "minRatio doit être au moins 1 ($minRatio)." }
+        require(spatialSigma > 0.0) { "spatialSigma doit être strictement positif ($spatialSigma)." }
+        require(spatialScale > 0.0 && spatialScale <= 1.0) { "spatialScale doit être dans ]0 ; 1] ($spatialScale)." }
         require(rejectLimit >= 1) { "rejectLimit doit être au moins 1 ($rejectLimit)." }
         require(languageWindow >= 1) { "La fenêtre de langue doit contenir au moins un mot ($languageWindow)." }
         require(languagePrior > 0.0) { "Le poids de la langue de départ doit être strictement positif ($languagePrior)." }

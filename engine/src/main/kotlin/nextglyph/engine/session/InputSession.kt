@@ -9,6 +9,7 @@ import nextglyph.engine.edit.SentenceLanguage
 import nextglyph.engine.edit.ShiftState
 import nextglyph.engine.edit.SpaceOrigin
 import nextglyph.engine.edit.TextEditor
+import nextglyph.engine.adapt.TapSpatialModel
 import nextglyph.engine.input.EditOperation
 import nextglyph.engine.input.EnterBehavior
 import nextglyph.engine.input.TextEdit
@@ -24,7 +25,9 @@ import nextglyph.engine.predict.Prediction
 import nextglyph.engine.predict.Predictor
 import nextglyph.engine.predict.SpaceCase
 import nextglyph.engine.predict.Suggestion
+import nextglyph.engine.predict.TypedTap
 import nextglyph.engine.predict.UndoToken
+import nextglyph.engine.predict.WordTaps
 import nextglyph.engine.profile.DecimalSeparatorPolicy
 import nextglyph.engine.profile.FieldKey
 import nextglyph.engine.profile.SeparatorEditor
@@ -112,6 +115,9 @@ class InputSession(
         private set
 
     private var composing = ""
+
+    // Frappes du mot en cours (issue #53) : en mémoire seulement, transmises à la seule prédiction.
+    private val wordTaps = ArrayList<TypedTap?>()
     private var editState = EditState.INITIAL
     private var undo: PendingUndo? = null
     private var manualShift = ShiftState.OFF
@@ -268,6 +274,8 @@ class InputSession(
         val text = if (capital) letter.uppercase(Locale.ROOT) else letter
         measuring?.onKey()
         learning?.onLetter(letter, offset, field.prediction)
+        if (composing.isEmpty()) wordTaps.clear()
+        addTap(letter, offset)
         trackLetter(letter, offset)
         batch { typeIntoWord(text) }
         if (composing == text) {
@@ -294,6 +302,7 @@ class InputSession(
             sign in JOINERS && composing.isNotEmpty() -> {
                 undo = null
                 editState = EditState.INITIAL
+                addTap(null)
                 batch { typeIntoWord(text) }
                 refresh()
             }
@@ -410,6 +419,7 @@ class InputSession(
                 composing.isNotEmpty() -> {
                     heat?.onErase()
                     val n = TextUnits.lastCodePointLength(composing)
+                    wordTaps.removeLastOrNull()
                     composing = composing.dropLast(n)
                     target.setComposingText(composing)
                     move(-n)
@@ -743,8 +753,19 @@ class InputSession(
         val language = language ?: return null
         if (predictors == null || !field.composes || selectionLength > 0) return null
         val before = target.textBeforeCursor(LOOKBACK)
-        return predictorFor(before)?.predict(before, language, field.prediction)
+        return predictorFor(before)?.predict(before, language, field.prediction, currentTaps())
     }
+
+    /** Ajoute la frappe de [letter] (`null` : caractère sans position) ; au plus [MAX_TAPS], les plus anciennes sont retirées. */
+    private fun addTap(letter: String?, offset: TapOffset? = null) {
+        val c = letter?.singleOrNull()
+        wordTaps += if (offset != null && c != null && c in 'a'..'z') TypedTap(c, offset.dx, offset.dy) else null
+        while (wordTaps.size > MAX_TAPS) wordTaps.removeAt(0)
+    }
+
+    /** Frappes du mot en cours avec le modèle spatial appris, ou `null` sans frappe. */
+    private fun currentTaps(): WordTaps? =
+        if (wordTaps.isEmpty()) null else WordTaps(ArrayList(wordTaps), learning?.data?.spatial ?: TapSpatialModel.NONE)
 
     /** Prédicteur du niveau de contexte des contacts (§6.3) pour le texte [before]. */
     private fun predictorFor(before: CharSequence?): Predictor? {
@@ -788,13 +809,15 @@ class InputSession(
     private fun refresh() {
         state = if (!field.readsText) {
             prediction = null
+            wordTaps.clear()
             KeyboardState(shortcutsOrEmpty(), null, null, manualShift, null, languageVersion)
         } else {
             val before = target.textBeforeCursor(LOOKBACK)
             val lang = language
             val predictor = if (lang != null && field.composes && selectionLength == 0) predictorFor(before) else null
-            val p = if (predictor != null && lang != null) predictor.predict(before, lang, field.prediction) else null
+            val p = if (predictor != null && lang != null) predictor.predict(before, lang, field.prediction, currentTaps()) else null
             prediction = p
+            if (p == null || p.word.isEmpty()) wordTaps.clear()
             val shift = if (before == null) manualShift else AutoCapitalization.shiftFor(before, field.textProfile, field.capsMode, manualShift)
             val prefix = if (field.adaptation && lang != null) WordPrefix.of(before, selectionLength, elisionLanguage()) else null
             KeyboardState(bar(p), p?.spaceLabel?.let { "$SPACE_SYMBOL $it" }, languageLabel(lang), shift, prefix, languageVersion)
@@ -843,6 +866,7 @@ class InputSession(
         /** Caractères lus pour vérifier l'insertion du séparateur décimal (§8.1). */
         private const val DECIMAL_LOOKBACK = 32
         private const val MAX_PENDING = 32
+        private const val MAX_TAPS = 64
         private const val JOINERS = "'’-‑"
         private const val SENTENCE_END = ".?!…"
     }

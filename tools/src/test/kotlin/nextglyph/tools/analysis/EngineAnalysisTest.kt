@@ -64,6 +64,10 @@ class EngineAnalysisTest {
                 "## Validation par espace — en (QWERTY), 9 mots",
                 "| 0 % | moteur, NORMAL (0,70) |",
                 "| 50 % | M0, minProb 0,70 |",
+                "## Score spatial (frappes simulées) — fr (AZERTY), 13 mots",
+                "## Score spatial (frappes simulées) — en (QWERTY), 9 mots",
+                "| 0,20 | ",
+                "| NORMAL | spatial |",
                 "## Apostrophes et traits d'union omis — fr",
                 "## Apostrophes et traits d'union omis — en",
                 "## Restitution des accents — fr",
@@ -88,6 +92,7 @@ class EngineAnalysisTest {
             assertThat(report).doesNotContain("Principaux mots non restitués")
             // Accents : école (dominante malgré « écolé »), était, peut-être ; « à » ambigu avec « a ».
             assertThat(report).contains("| français | 4 | 75,00 % | 0,00 % | 25,00 % | 0,00 % |")
+            assertThat(report).contains("Accents non restitués (français) : `à (literal)` 1.")
             assertThat(report).contains("| 0 % | NORMAL | 59,09 % | 7,69 % | 8,33 % | 0,00 % | 90,91 % | 95,45 % |")
         }
 
@@ -169,6 +174,16 @@ class EngineAnalysisTest {
         }
 
         @Test
+        fun `écarts-types spatiaux négatifs ou non finis refusés`() {
+            for (bad in listOf(-0.1, Double.NaN, Double.POSITIVE_INFINITY)) {
+                assertThatThrownBy { EngineAnalysisConfig(spatialSigmas = listOf(0.2, bad)) }
+                    .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("écarts-types")
+            }
+            assertThatThrownBy { EngineAnalysisConfig(errorRates = emptyList()) }.isInstanceOf(IllegalArgumentException::class.java)
+            assertThatThrownBy { EngineAnalysisConfig(prudences = emptyList()) }.isInstanceOf(IllegalArgumentException::class.java)
+        }
+
+        @Test
         fun `décision au format M0 - seul le cas dominant donne un candidat`() {
             assertThat(EngineAnalysis.decision(prediction(SpaceCase.WORD))).isEqualTo(Decision(true, null, 0.0, 0.0))
             assertThat(EngineAnalysis.decision(prediction(SpaceCase.DOMINANT, "bonjour"))).isEqualTo(Decision(false, "bonjour", 1.0, 0.0))
@@ -178,6 +193,37 @@ class EngineAnalysisTest {
 
     @Nested
     inner class BoundaryValues {
+        @Test
+        fun `bornes de la configuration - échantillons de 1 à 100 pour cent`() {
+            assertThat(EngineAnalysisConfig(samplePercent = 1, mixedSamplePercent = 100, spatialSamplePercent = 1)).isNotNull
+            assertThat(EngineAnalysisConfig(samplePercent = 100, mixedSamplePercent = 1, spatialSamplePercent = 100)).isNotNull
+            assertThat(EngineAnalysisConfig(spatialSigmas = listOf(0.0))).isNotNull
+            assertThat(EngineAnalysisConfig(spatialSigmas = emptyList())).isNotNull
+            for (bad in listOf(0, 101)) {
+                assertThatThrownBy { EngineAnalysisConfig(samplePercent = bad) }.isInstanceOf(IllegalArgumentException::class.java)
+                assertThatThrownBy { EngineAnalysisConfig(mixedSamplePercent = bad) }.isInstanceOf(IllegalArgumentException::class.java)
+                assertThatThrownBy { EngineAnalysisConfig(spatialSamplePercent = bad) }.isInstanceOf(IllegalArgumentException::class.java)
+            }
+        }
+
+        @Test
+        fun `valeurs par défaut de la configuration`() {
+            val config = EngineAnalysisConfig()
+
+            assertThat(config.cacheSize).isEqualTo(400_000)
+            assertThat(config.seed).isEqualTo(20261119L)
+            assertThat(config.spatialSamplePercent).isEqualTo(config.samplePercent)
+            assertThat(EngineAnalysisConfig(samplePercent = 7).spatialSamplePercent).isEqualTo(7)
+        }
+
+        @Test
+        fun `sans écart-type spatial la section est omise`() {
+            val report = run(small.copy(spatialSigmas = emptyList()))
+
+            assertThat(report).doesNotContain("Score spatial")
+            assertThat(report).contains("## Restitution des accents")
+        }
+
         @Test
         fun `restitution - complétion avant la fin, faux, tel quel`() {
             val decide = { t: String ->

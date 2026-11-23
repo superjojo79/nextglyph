@@ -25,6 +25,7 @@ class PredictionSettingsTest {
         @Test
         fun `prudence - seuils 0,8 0,7 0,6`() {
             assertThat(Prudence.entries.map { it.minProb }).containsExactly(0.80, 0.70, 0.60)
+            assertThat(Prudence.entries.map { it.minRatio }).containsExactly(3.0, 2.0, 1.5)
         }
 
         @Test
@@ -74,15 +75,18 @@ class PredictionSettingsTest {
         fun `configuration - valeurs par défaut et bornes`() {
             val c = PredictionConfig()
 
-            assertThat(c.minRatio).isEqualTo(2.0)
+            assertThat(c.spatialSigma).isEqualTo(0.35)
+            assertThat(c.spatialScale).isEqualTo(0.6)
             assertThat(c.rejectLimit).isEqualTo(2)
             assertThat(c.languageWindow).isEqualTo(4)
             assertThat(c.correction).isEqualTo(CorrectionWeights(0.01, 0.0005, 0.002, 0.002, 0.002, 0.5))
-            assertThat(PredictionConfig(accentDominance = 1.0, minRatio = 1.0, preferredLanguageShare = 0.0).accentDominance).isEqualTo(1.0)
+            assertThat(PredictionConfig(accentDominance = 1.0, spatialScale = 1.0, preferredLanguageShare = 0.0).accentDominance).isEqualTo(1.0)
             for (bad in listOf<() -> Any>(
                 { PredictionConfig(neighborDistance = 0.0) },
                 { PredictionConfig(formsPerPrefix = 0) },
-                { PredictionConfig(minRatio = 0.99) },
+                { PredictionConfig(spatialSigma = 0.0) },
+                { PredictionConfig(spatialScale = 0.0) },
+                { PredictionConfig(spatialScale = 1.01) },
                 { PredictionConfig(rejectLimit = 0) },
                 { PredictionConfig(languageWindow = 0) },
                 { PredictionConfig(languagePrior = 0.0) },
