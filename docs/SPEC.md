@@ -652,6 +652,18 @@ Issue #36. Le clavier tient des compteurs (`TypingStats`), **jamais de texte** :
 
 Les réglages (section « Mesures de saisie ») affichent : vitesse en mots par minute (5 caractères par mot), part des frappes qui sont des ⌫, part des mots complétés ou corrigés par le clavier, part des validations automatiques annulées (objectif < 3 %, §15.2), avec un bouton de remise à zéro. Les compteurs sont enregistrés localement (préférences à part, à la sortie de chaque champ). Ils servent à calibrer l'étude utilisateur de M5 et à décider des suites de #30 et #32.
 
+### 15.5 Carte de frappe
+
+Issue #46. Le clavier tient, pour chacune des 30 places du modèle spatial (lettres `a`–`z`, puis espace, `↵`, `⌫`, `?123`), des **compteurs seulement** (`KeyHeatmap`) : frappes, erreurs, et une grille de densité de 8 × 6 cases couvrant les décalages dx, dy ∈ [-0,5 ; 0,5] (fraction de la largeur de la touche et de la hauteur de rangée, comme §5.3). Une frappe hors de cette plage ou non finie est ignorée.
+
+**Vie privée.** Rien d'ordonné n'est jamais enregistré : ni séquence, ni horodatage, ni texte. La forme enregistrée (`h1;` puis 30 blocs `frappes,erreurs,c0,…,c47`) ne contient que les compteurs ; les mêmes frappes dans un ordre différent donnent la même chaîne. Rien n'est compté quand l'apprentissage des frappes est interdit (`LearningPolicy.allowsTaps` : incognito, mot de passe, code PIN, pavés numériques).
+
+**Erreurs.** Une erreur est un ⌫ qui efface un caractère tapé juste avant ; elle compte pour la touche de ce caractère. Pour l'attribuer, une petite pile **en mémoire vive seulement** (32 places au plus, sans accesseur, jamais sérialisée, vidée à la lecture et à chaque remise à zéro) retient les dernières places tapées ; un caractère inséré sans position (signe, glissé, menu, émoji) y laisse un marqueur vide pour que les ⌫ restent alignés. Ne sont pas des erreurs, et vident la pile : l'annulation d'une validation automatique (§5.5), l'effacement d'un mot ou d'une sélection, un curseur déplacé, le choix d'une suggestion, un champ quitté ou changé. Le ⌫ et `?123` ne sont pas empilés. Le taux d'erreur n'est affiché qu'à partir de 20 frappes sur la touche, jamais pour ⌫.
+
+**Borne.** Quand les frappes (ou les erreurs) d'une touche atteignent 2000, frappes, erreurs et cases de cette touche sont divisées par deux : le stockage est borné et les frappes récentes pèsent davantage. La relecture d'une forme absente, abîmée, d'une autre version ou incohérente donne une carte vide.
+
+**Affichage.** Les réglages ouvrent un écran « Carte de frappe » qui dessine le clavier au repos selon trois vues : densité des frappes, décalages appris (flèches agrandies) et part d'erreurs. Les boutons d'effacement (« Effacer les données apprises » efface la densité, « Réinitialiser les mesures » les erreurs) sont dans les réglages ; l'écran offre aussi la remise à zéro de l'apprentissage des zones de frappe et de la carte, sans toucher au dictionnaire personnel ni aux mesures de saisie.
+
 ---
 
 ## 16. Jalons
