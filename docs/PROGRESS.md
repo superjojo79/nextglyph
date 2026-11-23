@@ -69,6 +69,7 @@ Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr
 | IME : réglages du §14 (sauf variante anglaise et aperçu, sans objet), export / import TSV, effacement | Fait (vérifié sur émulateur) | — |
 | IME : accessibilité (nœuds virtuels, annonces, contour du focus, contrastes testés) | Fait ; nœuds vérifiés par `uiautomator`, TalkBack non disponible sur l'émulateur | — |
 | Retour haptique | Fait ; non ressenti sur l'émulateur (pas de vibreur) | — |
+| IME : langue de l'interface au choix (#47) ; résumé et explication (i) pour chaque réglage (#48) | Fait ; non vérifié sur émulateur (build `ime` impossible dans l'environnement de rédaction) | — |
 
 ## Problèmes ouverts
 

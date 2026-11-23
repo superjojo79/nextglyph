@@ -590,6 +590,7 @@ docs/        Cette spécification, décisions d'architecture.
 
 | Réglage | Valeurs | Défaut |
 |---|---|---|
+| Langue de l'interface | Système / Français / English | Système |
 | Disposition | AZERTY / QWERTY | Selon la locale système |
 | Langues actives | Français / Anglais / Les deux | Les deux |
 | Langue préférée de départ | Français / Anglais | Selon la locale système |
@@ -608,6 +609,10 @@ docs/        Cette spécification, décisions d'architecture.
 | Données apprises | Exporter / Importer / Effacer | — |
 
 **Réalisation** (`SettingsActivity`, vues du cadre Android ; `docs/DECISIONS.md`, 2026-11-19) : les réglages sont enregistrés dans des `SharedPreferences` exclues des sauvegardes et appliqués aussitôt par le service, sans redémarrage. Deux réglages du tableau ne sont pas proposés en V1 : **Variante anglaise** (un seul lexique anglais est embarqué, le réglage serait sans effet) et **Aperçu agrandi des touches** (le clavier n'a pas d'aperçu). Retour haptique : Désactivé / Léger / Moyen / Fort (`performHapticFeedback` à l'appui d'une touche, sous réserve du réglage système « Retour tactile »). Export et import du dictionnaire personnel en TSV par le Storage Access Framework (`ACTION_CREATE_DOCUMENT`, `ACTION_OPEN_DOCUMENT`, aucune permission) ; effacement de toutes les données apprises après confirmation.
+
+**Langue de l'interface** (issue #47) : l'écran des réglages et les textes propres au clavier suivent la langue du système, ou le français ou l'anglais choisi pour l'application seule. Android 13 et plus : `LocaleManager.applicationLocales` (langue par application, aussi proposée dans les réglages du système, déclarée par `res/xml/locales_config.xml`) ; en dessous : préférence `ui_language` et contexte enrobé dans `attachBaseContext` de l'activité et du service (`AppLocale`), l'activité étant recréée au changement. Ce choix ne modifie ni la disposition par défaut, ni la langue préférée de départ, ni le séparateur décimal, qui restent déduits de la locale du système.
+
+**Explications** (issue #48) : chaque réglage, ainsi que les sections « Données apprises » et « Mesures de saisie », affiche une ligne de résumé sous son titre et un bouton (i) de 48 dp qui ouvre une boîte de dialogue : le nom du réglage, une explication de ce qu'il fait concrètement, de sa valeur par défaut et, le cas échéant, de ses conséquences sur la vie privée. Textes dans `strings_help.xml` (`pref_*_summary`, `pref_*_info`), en anglais et en français ; `StringResourcesTest` vérifie leur présence et la parité des traductions.
 
 ---
 

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Interface language (spec §14). -->
+    <string name="pref_section_interface">Interface</string>
+    <string name="pref_ui_language">Interface language</string>
+    <string name="pref_ui_language_system">System language</string>
+    <string name="language_name_fr" translatable="false">Français</string>
+    <string name="language_name_en" translatable="false">English</string>
+
+    <!-- Explanations: a one-line summary under each setting and a longer text behind the (i) button (spec §14). -->
+    <string name="pref_info_description">More information about %1$s</string>
+
+    <string name="pref_ui_language_summary">Language of the settings screen and of the keyboard\'s own texts.</string>
+    <string name="pref_ui_language_info">Chooses the language of this screen and of the messages shown by the keyboard. \"System language\" follows your phone and is the default. This only changes the interface: the languages you type in are set under \"Languages\". On Android 13 and later, the choice is also available in the system settings, under the language of each app.</string>
+
+    <string name="pref_layout_summary">AZERTY or QWERTY key arrangement.</string>
+    <string name="pref_layout_info">Chooses the arrangement of the letter keys. By default it follows the system language: AZERTY if it is French, QWERTY otherwise. The layout does not depend on the language you type in, so a French speaker who writes English keeps their AZERTY. The change applies at once.</string>
+
+    <string name="pref_adaptation_summary">How much the keys change with the letters that are likely next.</string>
+    <string name="pref_adaptation_info">After each keystroke the keyboard estimates which letters are likely next and shows them more clearly. Off: nothing moves. Calm: likely letters are only more opaque, the others fainter. Reinforced calm (default): in addition, a slight change of label size and key width, kept small. Elastic: the strongest effect, with larger changes of size and width. A faded key can always be pressed normally. With TalkBack on, the keyboard keeps its resting layout.</string>
+
+    <string name="pref_row_height_summary">Height of the key rows, from 34 to 46 dp.</string>
+    <string name="pref_row_height_info">Sets the height of each row of keys, from 34 to 46 dp (default: 38 dp). Taller rows are easier to hit but take more room on the screen; shorter rows leave more of the app visible. The change applies at once.</string>
+
+    <string name="pref_bottom_margin_summary">Extra space under the last row, from 0 to 48 dp.</string>
+    <string name="pref_bottom_margin_info">Adds blank space under the last row, on top of the space the keyboard already leaves for the system navigation bar. It raises the keyboard above the system buttons if you tend to press them by mistake. From 0 to 48 dp (default: 0 dp, no extra space).</string>
+
+    <string name="pref_wide_space_info">On screens at least 400 dp wide, makes the \?123 (or ABC), ↵ and ⌫ keys narrower so that the space bar is wider and easier to hit. It has no effect on narrower screens, in password fields, on the classic layout or on the numeric pads. Default: off.</string>
+
+    <string name="pref_haptics_summary">Strength of the vibration when you press a key.</string>
+    <string name="pref_haptics_info">Chooses how strongly the phone vibrates when you press a key: off, light, medium (default) or strong. The keyboard uses the system\'s haptic feedback, so nothing happens if \"Touch feedback\" (or vibration on touch) is turned off in the Android settings.</string>
+
+    <string name="pref_languages_summary">Languages the keyboard predicts and corrects in.</string>
+    <string name="pref_languages_info">Chooses the languages used for suggestions and corrections: French, English, or both (default). With both, you never need to switch: the keyboard follows the language of the words you type, even within one sentence. Choosing one language removes the other from suggestions, which can avoid mix-ups if you only write in one.</string>
+
+    <string name="pref_preferred_language_summary">Language assumed when you start typing, before any word.</string>
+    <string name="pref_preferred_language_info">Sets the language the keyboard assumes at first, before it has seen any word you typed. It then adapts to your words. By default it follows the system language, provided that language is active; otherwise the first active language is used. It only matters when both languages are active.</string>
+
+    <string name="pref_autocommit_info">When you press the space bar, the keyboard completes or corrects the word if one candidate clearly dominates (for example \"bonjoru\" becomes \"bonjour\"), and the space key then shows the word it will insert. Pressing ⌫ just after cancels the change and restores what you typed. A correction you cancel twice is no longer applied automatically. It is never applied in password, e-mail, URL or numeric fields. Default: on.</string>
+
+    <string name="pref_prudence_summary">How sure the keyboard must be before it replaces a word.</string>
+    <string name="pref_prudence_info">Sets how certain a candidate must be for the space bar to replace what you typed. Cautious: rarely replaces, fewest wrong replacements. Normal (default): in simulations with 5 percent typos, at most about 2 percent of the words were wrongly replaced. Bold: replaces more often, at the cost of more mistakes. It only applies if \"Commit on space\" is on, and suggestions stay available in the bar whatever you choose.</string>
+
+    <string name="pref_french_typography_info">When you type in French, inserts a non-breaking space before ; ! ? and :, and inside « » quotes, as French typography requires, so that the sign never ends up alone at the start of a line. It only applies to sentences detected as French, never to English ones. Default: on.</string>
+
+    <string name="pref_double_space_info">Pressing the space bar twice replaces the space by a period followed by a space, and the next word starts with a capital letter if the field allows it. Default: on.</string>
+
+    <string name="pref_contacts_info">Lets the keyboard suggest the first names, last names and nicknames from your address book, mainly after words such as \"hello\" or \"with\", or in name fields. It needs the contacts permission, requested when you turn this on. Names are read each time the keyboard starts or your contacts change, kept in memory only, never written to storage and never sent anywhere (Nextglyph has no network access). Turning this off, or removing the permission, erases them at once. Default: off.</string>
+
+    <string name="pref_section_learned_summary">Words and habits the keyboard has learned from you.</string>
+    <string name="pref_section_learned_info">The keyboard learns the unknown words you type (after two validations without cancelling), the corrections you reject and how your fingers land on the keys. Nothing is learned in incognito mode, password, e-mail, URL or numeric fields. This data stays in the app\'s private storage and is excluded from backups. You can export the learned words to a TSV file, import such a file, or erase everything with one tap, after confirmation.</string>
+
+    <string name="pref_section_stats_summary">Counters of your typing, kept on this device.</string>
+    <string name="pref_section_stats_info">Shows your typing speed, how often you press ⌫, how many words the keyboard completed or corrected, and how many automatic replacements you cancelled. They help you judge how well the keyboard suits you. Only counters are kept, never any text, and nothing is counted in incognito mode or in password, e-mail, URL or numeric fields. Nothing leaves the device. You can reset them at any time.</string>
+</resources>

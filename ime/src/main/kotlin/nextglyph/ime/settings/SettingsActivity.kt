@@ -3,16 +3,20 @@ package nextglyph.ime.settings
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
 import android.widget.CompoundButton
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -51,6 +55,10 @@ class SettingsActivity : Activity() {
     private lateinit var statsSummary: TextView
     private lateinit var contactsSwitch: Switch
     private val preferences: SharedPreferences get() = services.preferences
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,13 +125,30 @@ class SettingsActivity : Activity() {
     private fun buildPreferences(root: LinearLayout) {
         val current = services.settings
 
+        section(root, R.string.pref_section_interface)
+        choice(
+            root, R.string.pref_ui_language, R.string.pref_ui_language_summary, R.string.pref_ui_language_info,
+            null, storedName(AppLocale.current(this)),
+            listOf(
+                storedName(UiLanguage.SYSTEM) to R.string.pref_ui_language_system,
+                storedName(UiLanguage.FRENCH) to R.string.language_name_fr,
+                storedName(UiLanguage.ENGLISH) to R.string.language_name_en,
+            ),
+        ) { value ->
+            AppLocale.apply(this, UiLanguage.fromStored(value))
+            // Dès Android 13, le système recrée l'activité lui-même ; en dessous, c'est à nous.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) recreate()
+        }
+
         section(root, R.string.pref_section_keyboard)
         choice(
-            root, R.string.pref_layout, KeyboardSettings.KEY_LAYOUT, current.layout?.let(::storedName) ?: AUTO,
+            root, R.string.pref_layout, R.string.pref_layout_summary, R.string.pref_layout_info,
+            KeyboardSettings.KEY_LAYOUT, current.layout?.let(::storedName) ?: AUTO,
             listOf(AUTO to R.string.pref_layout_auto, storedName(LayoutKind.AZERTY) to R.string.pref_layout_azerty, storedName(LayoutKind.QWERTY) to R.string.pref_layout_qwerty),
         )
         choice(
-            root, R.string.pref_adaptation, KeyboardSettings.KEY_ADAPTATION, storedName(current.adaptationMode),
+            root, R.string.pref_adaptation, R.string.pref_adaptation_summary, R.string.pref_adaptation_info,
+            KeyboardSettings.KEY_ADAPTATION, storedName(current.adaptationMode),
             listOf(
                 storedName(AdaptationMode.OFF) to R.string.pref_adaptation_off,
                 storedName(AdaptationMode.CALM) to R.string.pref_adaptation_calm,
@@ -132,13 +157,20 @@ class SettingsActivity : Activity() {
             ),
         )
         slider(
-            root, R.string.pref_row_height, KeyboardSettings.KEY_ROW_HEIGHT,
+            root, R.string.pref_row_height, R.string.pref_row_height_summary, R.string.pref_row_height_info, KeyboardSettings.KEY_ROW_HEIGHT,
             KeyboardSettings.MIN_ROW_HEIGHT_DP..KeyboardSettings.MAX_ROW_HEIGHT_DP, current.rowHeightDp,
         )
-        slider(root, R.string.pref_bottom_margin, KeyboardSettings.KEY_BOTTOM_MARGIN, 0..KeyboardSettings.MAX_BOTTOM_MARGIN_DP, current.bottomMarginDp)
-        toggle(root, R.string.pref_wide_space, R.string.pref_wide_space_summary, KeyboardSettings.KEY_WIDE_SPACE, current.wideSpace)
+        slider(
+            root, R.string.pref_bottom_margin, R.string.pref_bottom_margin_summary, R.string.pref_bottom_margin_info, KeyboardSettings.KEY_BOTTOM_MARGIN,
+            0..KeyboardSettings.MAX_BOTTOM_MARGIN_DP, current.bottomMarginDp,
+        )
+        toggle(
+            root, R.string.pref_wide_space, R.string.pref_wide_space_summary, R.string.pref_wide_space_info,
+            KeyboardSettings.KEY_WIDE_SPACE, current.wideSpace,
+        )
         choice(
-            root, R.string.pref_haptics, KeyboardSettings.KEY_HAPTICS, storedName(current.haptics),
+            root, R.string.pref_haptics, R.string.pref_haptics_summary, R.string.pref_haptics_info,
+            KeyboardSettings.KEY_HAPTICS, storedName(current.haptics),
             listOf(
                 storedName(HapticLevel.OFF) to R.string.pref_haptics_off,
                 storedName(HapticLevel.LIGHT) to R.string.pref_haptics_light,
@@ -150,39 +182,53 @@ class SettingsActivity : Activity() {
         section(root, R.string.pref_section_languages)
         val languages = if (current.languages.size == 2) BOTH else current.languages[0]
         choice(
-            root, R.string.pref_languages, KeyboardSettings.KEY_LANGUAGES, languages,
+            root, R.string.pref_languages, R.string.pref_languages_summary, R.string.pref_languages_info,
+            KeyboardSettings.KEY_LANGUAGES, languages,
             listOf(BOTH to R.string.pref_languages_both, LexiconLanguage.FRENCH to R.string.pref_language_fr, LexiconLanguage.ENGLISH to R.string.pref_language_en),
         )
         choice(
-            root, R.string.pref_preferred_language, KeyboardSettings.KEY_PREFERRED_LANGUAGE, current.preferredLanguage ?: AUTO,
+            root, R.string.pref_preferred_language, R.string.pref_preferred_language_summary, R.string.pref_preferred_language_info,
+            KeyboardSettings.KEY_PREFERRED_LANGUAGE, current.preferredLanguage ?: AUTO,
             listOf(AUTO to R.string.pref_preferred_auto, LexiconLanguage.FRENCH to R.string.pref_language_fr, LexiconLanguage.ENGLISH to R.string.pref_language_en),
         )
 
         section(root, R.string.pref_section_typing)
-        toggle(root, R.string.pref_autocommit, R.string.pref_autocommit_summary, KeyboardSettings.KEY_AUTOCOMMIT, current.autocommit)
+        toggle(
+            root, R.string.pref_autocommit, R.string.pref_autocommit_summary, R.string.pref_autocommit_info,
+            KeyboardSettings.KEY_AUTOCOMMIT, current.autocommit,
+        )
         choice(
-            root, R.string.pref_prudence, KeyboardSettings.KEY_PRUDENCE, storedName(current.prudence),
+            root, R.string.pref_prudence, R.string.pref_prudence_summary, R.string.pref_prudence_info,
+            KeyboardSettings.KEY_PRUDENCE, storedName(current.prudence),
             listOf(
                 storedName(Prudence.CAUTIOUS) to R.string.pref_prudence_cautious,
                 storedName(Prudence.NORMAL) to R.string.pref_prudence_normal,
                 storedName(Prudence.BOLD) to R.string.pref_prudence_bold,
             ),
         )
-        toggle(root, R.string.pref_french_typography, R.string.pref_french_typography_summary, KeyboardSettings.KEY_FRENCH_TYPOGRAPHY, current.frenchTypography)
-        toggle(root, R.string.pref_double_space, R.string.pref_double_space_summary, KeyboardSettings.KEY_DOUBLE_SPACE, current.doubleSpacePeriod)
+        toggle(
+            root, R.string.pref_french_typography, R.string.pref_french_typography_summary, R.string.pref_french_typography_info,
+            KeyboardSettings.KEY_FRENCH_TYPOGRAPHY, current.frenchTypography,
+        )
+        toggle(
+            root, R.string.pref_double_space, R.string.pref_double_space_summary, R.string.pref_double_space_info,
+            KeyboardSettings.KEY_DOUBLE_SPACE, current.doubleSpacePeriod,
+        )
 
         section(root, R.string.pref_section_contacts)
-        contactsSwitch = toggle(root, R.string.pref_contacts, R.string.pref_contacts_summary, null, current.contacts) { checked ->
+        contactsSwitch = toggle(
+            root, R.string.pref_contacts, R.string.pref_contacts_summary, R.string.pref_contacts_info, null, current.contacts,
+        ) { checked ->
             if (checked) enableContacts() else setContacts(false)
         }
 
-        section(root, R.string.pref_section_learned)
+        section(root, R.string.pref_section_learned, R.string.pref_section_learned_summary, R.string.pref_section_learned_info)
         learnedSummary = text(root, "")
         button(root, R.string.pref_export) { startExport() }
         button(root, R.string.pref_import) { startImport() }
         button(root, R.string.pref_clear) { confirmClear() }
 
-        section(root, R.string.pref_section_stats)
+        section(root, R.string.pref_section_stats, R.string.pref_section_stats_summary, R.string.pref_section_stats_info)
         statsSummary = text(root, "")
         button(root, R.string.pref_stats_reset) {
             services.stats.reset()
@@ -289,16 +335,50 @@ class SettingsActivity : Activity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private fun section(root: LinearLayout, title: Int) {
-        root.addView(
-            TextView(this).apply {
-                setText(title)
-                setTextAppearance(android.R.style.TextAppearance_Material_Title)
-                setPadding(0, dp(24), 0, dp(4))
-                isFocusable = false
-                accessibilityHeading()
-            },
-        )
+    /**
+     * Titre d'un réglage ou d'une section : [titleView] (poids 1) suivi, si [info] est donné, du bouton (i) qui ouvre
+     * l'explication détaillée. [title] nomme le réglage dans la boîte de dialogue et pour TalkBack.
+     */
+    private fun titleRow(root: LinearLayout, titleView: View, title: Int, info: Int?, topPaddingDp: Int, bottomPaddingDp: Int = 0) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(topPaddingDp), 0, dp(bottomPaddingDp))
+        }
+        row.addView(titleView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        if (info != null) row.addView(infoButton(title, info), LinearLayout.LayoutParams(dp(MIN_TOUCH_DP), dp(MIN_TOUCH_DP)))
+        root.addView(row)
+    }
+
+    /** Bouton (i) de 48 dp : explication détaillée du réglage [title] dans une boîte de dialogue. */
+    private fun infoButton(title: Int, info: Int): ImageButton = ImageButton(this).apply {
+        setImageResource(R.drawable.ic_info)
+        scaleType = ImageView.ScaleType.CENTER
+        val attributes = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless))
+        background = attributes.getDrawable(0)
+        attributes.recycle()
+        contentDescription = getString(R.string.pref_info_description, getString(title))
+        setOnClickListener { showInfo(title, info) }
+    }
+
+    private fun showInfo(title: Int, info: Int) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(info)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    /** En-tête de section ; avec [summary] et [info], une ligne de résumé et le bouton (i) comme pour un réglage. */
+    private fun section(root: LinearLayout, title: Int, summary: Int? = null, info: Int? = null) {
+        val heading = TextView(this).apply {
+            setText(title)
+            setTextAppearance(android.R.style.TextAppearance_Material_Title)
+            isFocusable = false
+            accessibilityHeading()
+        }
+        titleRow(root, heading, title, info, topPaddingDp = 24, bottomPaddingDp = 4)
+        if (summary != null) text(root, getString(summary))
     }
 
     private fun TextView.accessibilityHeading() {
@@ -311,18 +391,31 @@ class SettingsActivity : Activity() {
         setPadding(0, dp(4), 0, dp(4))
     }.also(root::addView)
 
-    private fun label(root: LinearLayout, title: Int) {
-        root.addView(
-            TextView(this).apply {
-                setText(title)
-                setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
-                setPadding(0, dp(12), 0, 0)
-            },
-        )
+    /** Titre d'un réglage à choix ou à curseur, avec son bouton (i) puis sa ligne de résumé. */
+    private fun label(root: LinearLayout, title: Int, summary: Int, info: Int) {
+        val titleView = TextView(this).apply {
+            setText(title)
+            setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
+        }
+        titleRow(root, titleView, title, info, topPaddingDp = 12)
+        text(root, getString(summary))
     }
 
-    private fun choice(root: LinearLayout, title: Int, key: String, selected: String, options: List<Pair<String, Int>>) {
-        label(root, title)
+    /**
+     * Choix exclusif. La valeur choisie est enregistrée sous [key] si elle est donnée ; [onChange] la reçoit ensuite
+     * (langue de l'interface, qui s'enregistre elle-même).
+     */
+    private fun choice(
+        root: LinearLayout,
+        title: Int,
+        summary: Int,
+        info: Int,
+        key: String?,
+        selected: String,
+        options: List<Pair<String, Int>>,
+        onChange: ((String) -> Unit)? = null,
+    ) {
+        label(root, title, summary, info)
         val group = RadioGroup(this)
         for ((value, text) in options) {
             group.addView(
@@ -337,7 +430,8 @@ class SettingsActivity : Activity() {
         }
         group.setOnCheckedChangeListener { radio, id ->
             val value = radio.findViewById<View>(id)?.tag as? String ?: return@setOnCheckedChangeListener
-            preferences.edit().putString(key, value).apply()
+            if (key != null) preferences.edit().putString(key, value).apply()
+            onChange?.invoke(value)
         }
         root.addView(group)
     }
@@ -346,6 +440,7 @@ class SettingsActivity : Activity() {
         root: LinearLayout,
         title: Int,
         summary: Int,
+        info: Int,
         key: String?,
         checked: Boolean,
         onChange: ((Boolean) -> Unit)? = null,
@@ -355,25 +450,19 @@ class SettingsActivity : Activity() {
             isChecked = checked
             minHeight = dp(MIN_TOUCH_DP)
             setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
-            setPadding(0, dp(12), 0, 0)
         }
         switch.setOnCheckedChangeListener { _: CompoundButton, value: Boolean ->
             if (key != null) preferences.edit().putBoolean(key, value).apply()
             onChange?.invoke(value)
         }
-        root.addView(switch)
-        root.addView(
-            TextView(this).apply {
-                setText(summary)
-                setTextAppearance(android.R.style.TextAppearance_Material_Body1)
-            },
-        )
+        titleRow(root, switch, title, info, topPaddingDp = 12)
+        text(root, getString(summary))
         return switch
     }
 
     /** Curseur d'un réglage en dp ([range]), enregistré sous [key] (hauteur des rangées, marge basse). */
-    private fun slider(root: LinearLayout, title: Int, key: String, range: IntRange, current: Int) {
-        label(root, title)
+    private fun slider(root: LinearLayout, title: Int, summary: Int, info: Int, key: String, range: IntRange, current: Int) {
+        label(root, title, summary, info)
         val value = text(root, getString(R.string.pref_row_height_value, current))
         root.addView(
             SeekBar(this).apply {
