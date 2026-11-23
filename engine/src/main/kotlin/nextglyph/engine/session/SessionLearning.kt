@@ -48,7 +48,7 @@ data class TapOffset(val dx: Double, val dy: Double) {
  */
 class SessionLearning(val data: LearnedData) {
 
-    private class Validated(val word: String, val language: String)
+    private class Validated(val word: String, val language: String, val atSentenceStart: Boolean)
 
     /** Une case par lettre du mot en cours : vrai si sa frappe a été mise en attente. */
     private val taps = ArrayDeque<Boolean>()
@@ -105,7 +105,7 @@ class SessionLearning(val data: LearnedData) {
     fun onValidated(prediction: Prediction, language: LanguageState, settings: PredictionSettings, atSentenceStart: Boolean): LearnOutcome {
         settle()
         val outcome = data.personal.onValidated(prediction, language, settings, atSentenceStart)
-        validate(prediction.word, language.dominant)
+        validate(prediction.word, language.dominant, atSentenceStart)
         return outcome
     }
 
@@ -122,12 +122,21 @@ class SessionLearning(val data: LearnedData) {
     ): LearnOutcome {
         settle()
         val outcome = data.personal.observe(text, language.dominant, unknown, settings, atSentenceStart)
-        validate(text, language.dominant)
+        validate(text, language.dominant, atSentenceStart)
         return outcome
     }
 
-    /** Annulation par ⌫ d'une validation automatique (§5.5). */
-    fun onUndo() = cancel()
+    /**
+     * Annulation par ⌫ d'une validation automatique (§5.5). [refusedWord] : le texte tapé d'une correction dont le
+     * refus vient d'atteindre la limite ; il est alors adopté tout de suite dans le dictionnaire personnel (§10.5),
+     * dans la langue dominante d'avant la validation, si [settings] permet l'apprentissage.
+     */
+    fun onUndo(refusedWord: String? = null, settings: PredictionSettings? = null): LearnOutcome? {
+        val last = validated
+        cancel()
+        if (refusedWord == null || settings == null || last == null) return null
+        return data.personal.adopt(refusedWord, last.language, settings, last.atSentenceStart)
+    }
 
     /** Fin d'un mot sans validation par espace (e-mail, URL, `↵`) : ses frappes sont intégrées. */
     fun onWordEnded() {
@@ -151,8 +160,8 @@ class SessionLearning(val data: LearnedData) {
         data.spatial.confirm()
     }
 
-    private fun validate(word: String, language: String) {
-        validated = Validated(word, language)
+    private fun validate(word: String, language: String, atSentenceStart: Boolean) {
+        validated = Validated(word, language, atSentenceStart)
         taps.clear()
     }
 

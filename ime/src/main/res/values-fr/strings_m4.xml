@@ -77,6 +77,14 @@
         <item quantity="many">%1$d mots importés, %2$d ligne(s) ignorée(s).</item>
         <item quantity="other">%1$d mots importés, %2$d ligne(s) ignorée(s).</item>
     </plurals>
+    <string name="learned_refusals_none">Aucune correction refusée.</string>
+    <plurals name="learned_refusals">
+        <item quantity="one">%1$d correction refusée.</item>
+        <item quantity="many">%1$d corrections refusées.</item>
+        <item quantity="other">%1$d corrections refusées.</item>
+    </plurals>
+    <string name="refusal_item">« %1$s » au lieu de « %2$s »</string>
+    <string name="refusal_forget">Retirer</string>
     <string name="learned_word_removed">« %1$s » retiré du dictionnaire personnel.</string>
 
     <!-- Accessibilité (spec §13). -->
@@ -103,6 +111,9 @@
     <string name="pref_stats_corrections">Corrections (⌫) : %1$s des frappes</string>
     <string name="pref_stats_acceptance">Mots complétés ou corrigés par le clavier : %1$s</string>
     <string name="pref_stats_undo">Validations automatiques annulées : %1$s</string>
+    <string name="pref_stats_auto_corrections">Corrections automatiques : %1$s acceptées, %2$s annulées (%3$s)</string>
+    <string name="pref_stats_restored">Accents et majuscules restitués : %1$s, dont %2$s annulés (%3$s)</string>
+    <string name="pref_stats_by_prudence">Corrections annulées selon la prudence : Prudente %1$s · Normale %2$s · Audacieuse %3$s</string>
     <string name="pref_stats_privacy">Mesuré sur l\'appareil seulement ; aucun texte n\'est enregistré, rien en incognito ni en mot de passe.</string>
     <string name="pref_stats_reset">Remettre les mesures à zéro</string>
     <string name="pref_section_gestures">Gestes</string>

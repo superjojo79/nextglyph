@@ -74,6 +74,13 @@
         <item quantity="one">%1$d word imported, %2$d line(s) skipped.</item>
         <item quantity="other">%1$d words imported, %2$d line(s) skipped.</item>
     </plurals>
+    <string name="learned_refusals_none">No refused correction.</string>
+    <plurals name="learned_refusals">
+        <item quantity="one">%1$d refused correction.</item>
+        <item quantity="other">%1$d refused corrections.</item>
+    </plurals>
+    <string name="refusal_item">“%1$s” instead of “%2$s”</string>
+    <string name="refusal_forget">Remove</string>
     <string name="learned_word_removed">\"%1$s\" removed from the personal dictionary.</string>
 
     <!-- Accessibility (spec §13). -->
@@ -100,6 +107,9 @@
     <string name="pref_stats_corrections">Corrections (⌫): %1$s of keystrokes</string>
     <string name="pref_stats_acceptance">Words completed or corrected by the keyboard: %1$s</string>
     <string name="pref_stats_undo">Automatic validations undone: %1$s</string>
+    <string name="pref_stats_auto_corrections">Automatic corrections: %1$s accepted, %2$s undone (%3$s)</string>
+    <string name="pref_stats_restored">Accents and capitals restored: %1$s, of which %2$s undone (%3$s)</string>
+    <string name="pref_stats_by_prudence">Corrections undone by prudence: Cautious %1$s · Normal %2$s · Bold %3$s</string>
     <string name="pref_stats_privacy">Measured on this device only; no text is recorded, nothing in incognito or password fields.</string>
     <string name="pref_stats_reset">Reset measurements</string>
     <string name="pref_section_gestures">Gestures</string>

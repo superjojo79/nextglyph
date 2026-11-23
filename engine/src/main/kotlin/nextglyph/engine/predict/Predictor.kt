@@ -154,7 +154,7 @@ class Predictor(
             return Commit(TextEdit(listOf(EditOperation.InsertText(" "))), null, language)
         }
         val edit = TextEdit(replace(prediction.word, prediction.inserted + " "), endsWithAutoSpace = true)
-        val undo = if (prediction.inserted != prediction.word) UndoToken(prediction.word, prediction.inserted) else null
+        val undo = if (prediction.inserted != prediction.word) UndoToken(prediction.word, prediction.inserted, prediction.case) else null
         return Commit(edit, undo, observe(language, prediction.inserted, settings))
     }
 
@@ -186,6 +186,12 @@ class Predictor(
         if (settings.learningEnabled) rejections.recordRejection(token.typed, token.inserted)
         return TextEdit(replace(expected, token.typed))
     }
+
+    /**
+     * Vrai si le refus de [token] a atteint `rejectLimit` : la correction n'est plus appliquée (§5.5,
+     * « Apprentissage du refus »). À appeler après [undo].
+     */
+    fun isRefusalLearned(token: UndoToken): Boolean = rejections.rejections(token.typed, token.inserted) >= config.rejectLimit
 
     /**
      * Score de langue après la validation du texte [text] (un mot, ou une élision et son mot :

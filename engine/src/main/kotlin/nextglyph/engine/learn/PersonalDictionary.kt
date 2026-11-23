@@ -117,6 +117,24 @@ class PersonalDictionary(val config: LearningConfig = LearningConfig()) {
         unknown: Boolean,
         settings: PredictionSettings,
         atSentenceStart: Boolean = false,
+    ): LearnOutcome = record(word, language, unknown, settings, atSentenceStart, immediate = false)
+
+    /**
+     * Adopte [word] tout de suite, sans attendre [LearningConfig.minOccurrences] : le refus répété d'une
+     * correction vaut validation du mot tapé (§5.5, §10.5). Comme [observe] d'un mot inconnu, mais le mot est
+     * promu (`PROMOTED`), ou compté s'il l'est déjà (`USED`) ; `IGNORED` si l'apprentissage est interdit ou le
+     * mot invalide. Le mot sort de la liste d'attente.
+     */
+    fun adopt(word: String, language: String, settings: PredictionSettings, atSentenceStart: Boolean = false): LearnOutcome =
+        record(word, language, true, settings, atSentenceStart, immediate = true)
+
+    private fun record(
+        word: String,
+        language: String,
+        unknown: Boolean,
+        settings: PredictionSettings,
+        atSentenceStart: Boolean,
+        immediate: Boolean,
     ): LearnOutcome {
         if (!LearningPolicy.allowsWords(settings) || !isLanguage(language)) return LearnOutcome.IGNORED
         val typed = canonicalForm(word) ?: return LearnOutcome.IGNORED
@@ -133,7 +151,7 @@ class PersonalDictionary(val config: LearningConfig = LearningConfig()) {
         val entry = pending.remove(id) ?: Entry()
         addForm(entry, form)
         revision++
-        if (entry.count() >= config.minOccurrences) {
+        if (immediate || entry.count() >= config.minOccurrences) {
             promote(id, entry)
             return LearnOutcome.PROMOTED
         }

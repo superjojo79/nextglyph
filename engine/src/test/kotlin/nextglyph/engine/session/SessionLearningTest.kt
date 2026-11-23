@@ -130,6 +130,30 @@ class SessionLearningTest {
             assertThat(offset.dx).isCloseTo(0.25, within(1e-9))
             assertThat(offset.dy).isCloseTo(-0.25, within(1e-9))
         }
+
+        @Test
+        fun `annulation d'une correction refusée assez - le texte tapé est adopté dans la langue d'avant la validation`() {
+            val correction = Prediction("zorglub", "zorglub", SpaceCase.DOMINANT, "zorglubs", emptyList(), SuggestionBar.EMPTY, "fr")
+            typeWord("zorglub")
+            learning.onValidated(correction, LanguageState.initial(listOf("fr", "en"), "en"), text, false)
+
+            val outcome = learning.onUndo("zorglub", text)
+
+            assertThat(outcome).isEqualTo(LearnOutcome.PROMOTED)
+            assertThat(data.personal.contains("zorglub", "en")).isTrue()
+            assertThat(data.personal.contains("zorglub", "fr")).isFalse()
+            assertThat(data.spatial.stagedCount).isZero()
+        }
+
+        @Test
+        fun `adoption après une validation en début de phrase - initiale en minuscule`() {
+            val correction = Prediction("Zorglub", "zorglub", SpaceCase.DOMINANT, "Zorglubs", emptyList(), SuggestionBar.EMPTY, "fr")
+            learning.onValidated(correction, language, text, true)
+
+            learning.onUndo("Zorglub", text)
+
+            assertThat(data.personal.words("fr").map { it.form }).containsExactly("zorglub")
+        }
     }
 
     @Nested
@@ -294,6 +318,53 @@ class SessionLearningTest {
 
             assertThat(data.spatial.stagedCount).isEqualTo(2)
         }
+
+        @Test
+        fun `annulation sans mot refusé - rien n'est adopté et le mot en attente est oublié`() {
+            learning.onValidated(literal("zorglub"), language, text, false)
+
+            val outcome = learning.onUndo()
+
+            assertThat(outcome).isNull()
+            assertThat(data.personal.size).isZero()
+            assertThat(data.personal.pendingSize).isZero()
+        }
+
+        @Test
+        fun `annulation sans apprentissage autorisé - rien n'est adopté`() {
+            val incognito = PredictionSettings(incognito = true)
+            learning.onValidated(literal("zorglub"), language, text, false)
+
+            val outcome = learning.onUndo("zorglub", incognito)
+
+            assertThat(outcome).isEqualTo(LearnOutcome.IGNORED)
+            assertThat(data.personal.size).isZero()
+        }
+
+        @Test
+        fun `annulation sans validation en cours - rien n'est adopté`() {
+            assertThat(learning.onUndo("zorglub", text)).isNull()
+            assertThat(learning.onUndo("zorglub", null)).isNull()
+            assertThat(data.personal.size).isZero()
+        }
+
+        @Test
+        fun `mot refusé sans réglages - rien n'est adopté`() {
+            learning.onValidated(literal("zorglub"), language, text, false)
+
+            assertThat(learning.onUndo("zorglub", null)).isNull()
+            assertThat(data.personal.size).isZero()
+        }
+
+        @Test
+        fun `adoption hors début de phrase - la majuscule du mot est conservée`() {
+            val correction = Prediction("Zorglub", "zorglub", SpaceCase.DOMINANT, "Zorglubs", emptyList(), SuggestionBar.EMPTY, "fr")
+            learning.onValidated(correction, language, text, false)
+
+            learning.onUndo("Zorglub", text)
+
+            assertThat(data.personal.words("fr").map { it.form }).containsExactly("Zorglub")
+        }
     }
 
     @Nested
@@ -395,6 +466,17 @@ class SessionLearningTest {
             learning.onValidated(literal("la"), language, text, false)
 
             assertThat(data.spatial.sampleCount('l')).isEqualTo(1)
+        }
+
+        @Test
+        fun `adopter deux fois le même refus compte le mot sans le dupliquer`() {
+            val correction = Prediction("zorglub", "zorglub", SpaceCase.DOMINANT, "zorglubs", emptyList(), SuggestionBar.EMPTY, "fr")
+            repeat(2) {
+                learning.onValidated(correction, language, text, false)
+                learning.onUndo("zorglub", text)
+            }
+
+            assertThat(data.personal.words("fr")).containsExactly(nextglyph.engine.learn.PersonalWord("fr", "zorglub", 2))
         }
     }
 }

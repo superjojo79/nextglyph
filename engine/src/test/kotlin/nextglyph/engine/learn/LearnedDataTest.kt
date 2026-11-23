@@ -88,6 +88,35 @@ class LearnedDataTest {
             assertThat(afterRejection).isGreaterThan(afterWord)
             assertThat(data.revision).isGreaterThan(afterRejection)
         }
+
+        @Test
+        fun `retirer un refus oublie la paire et le mot adopté dans les deux langues`() {
+            val data = LearnedData()
+            repeat(2) { data.rejections.recordRejection("bonj", "bonjour") }
+            data.personal.adopt("bonj", "fr", settings)
+            data.personal.adopt("bonj", "en", settings)
+            data.personal.adopt("autre", "fr", settings)
+
+            val changed = data.forgetRefusal("Bonj", "bonjour")
+
+            assertThat(changed).isTrue()
+            assertThat(data.rejections.rejections("bonj", "bonjour")).isZero()
+            assertThat(data.personal.contains("bonj", "fr")).isFalse()
+            assertThat(data.personal.contains("bonj", "en")).isFalse()
+            assertThat(data.personal.contains("autre", "fr")).isTrue()
+        }
+
+        @Test
+        fun `retirer un refus rend sa correction au prédicteur`() {
+            val data = LearnedData()
+            val predictor = PredictFixtures.frenchPredictor(data.rejections)
+            val state = predictor.initialLanguageState("fr")
+            repeat(2) { data.rejections.recordRejection("bonj", "bonjour") }
+
+            data.forgetRefusal("bonj", "bonjour")
+
+            assertThat(predictor.predict("Il dit bonj", state, settings).case).isEqualTo(SpaceCase.DOMINANT)
+        }
     }
 
     @Nested
@@ -114,6 +143,17 @@ class LearnedDataTest {
 
             assertThat(data.isEmpty).isTrue()
         }
+
+        @Test
+        fun `retirer un refus inconnu ne change rien`() {
+            val data = LearnedData()
+            data.fill()
+            val revision = data.revision
+
+            assertThat(data.forgetRefusal("inconnu", "autre")).isFalse()
+
+            assertThat(data.revision).isEqualTo(revision)
+        }
     }
 
     @Nested
@@ -139,6 +179,24 @@ class LearnedDataTest {
             data.personal.importWord("zorglub", "fr", 2)
 
             assertThat(data.isEmpty).isFalse()
+        }
+
+        @Test
+        fun `retirer un refus dont seul le mot adopté subsiste change quand même`() {
+            val data = LearnedData()
+            data.personal.adopt("bonj", "fr", settings)
+
+            assertThat(data.forgetRefusal("bonj", "bonjour")).isTrue()
+            assertThat(data.isEmpty).isTrue()
+        }
+
+        @Test
+        fun `retirer un refus dont seule la paire subsiste change quand même`() {
+            val data = LearnedData()
+            data.rejections.recordRejection("bonj", "bonjour")
+
+            assertThat(data.forgetRefusal("bonj", "bonjour")).isTrue()
+            assertThat(data.isEmpty).isTrue()
         }
     }
 }

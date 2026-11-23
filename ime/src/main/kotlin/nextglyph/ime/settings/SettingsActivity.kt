@@ -28,6 +28,7 @@ import nextglyph.engine.adapt.AdaptationMode
 import nextglyph.engine.layout.LayoutKind
 import nextglyph.engine.learn.ImportReport
 import nextglyph.engine.lexicon.LexiconLanguage
+import nextglyph.engine.predict.PredictionConfig
 import nextglyph.engine.predict.Prudence
 import nextglyph.ime.AppServices
 import nextglyph.ime.R
@@ -52,6 +53,7 @@ class SettingsActivity : Activity() {
     private lateinit var services: AppServices
     private lateinit var status: TextView
     private lateinit var learnedSummary: TextView
+    private lateinit var refusalsSummary: TextView
     private lateinit var zonesSummary: TextView
     private lateinit var statsSummary: TextView
     private lateinit var contactsSwitch: Switch
@@ -113,12 +115,26 @@ class SettingsActivity : Activity() {
             return
         }
         val percent = NumberFormat.getPercentInstance().apply { maximumFractionDigits = 1 }
+        val integers = NumberFormat.getIntegerInstance()
         fun rate(value: Double?) = value?.let(percent::format) ?: DASH
         statsSummary.text = listOf(
-            getString(R.string.pref_stats_speed, c.wordsPerMinute?.let { NumberFormat.getIntegerInstance().format(it) } ?: DASH),
+            getString(R.string.pref_stats_speed, c.wordsPerMinute?.let { integers.format(it) } ?: DASH),
             getString(R.string.pref_stats_corrections, rate(c.correctionRate)),
             getString(R.string.pref_stats_acceptance, rate(c.acceptanceRate)),
             getString(R.string.pref_stats_undo, rate(c.undoRate)),
+            getString(
+                R.string.pref_stats_auto_corrections,
+                integers.format(c.correctionsTotal - c.correctionsUndoneTotal),
+                integers.format(c.correctionsUndoneTotal),
+                rate(c.correctionUndoRate),
+            ),
+            getString(R.string.pref_stats_restored, integers.format(c.restored), integers.format(c.restoredUndone), rate(c.restoredUndoRate)),
+            getString(
+                R.string.pref_stats_by_prudence,
+                rate(c.correctionUndoRate(Prudence.CAUTIOUS)),
+                rate(c.correctionUndoRate(Prudence.NORMAL)),
+                rate(c.correctionUndoRate(Prudence.BOLD)),
+            ),
             getString(R.string.pref_stats_privacy),
         ).joinToString("\n")
     }
@@ -227,6 +243,9 @@ class SettingsActivity : Activity() {
         learnedSummary = text(root, "")
         button(root, R.string.pref_export) { startExport() }
         button(root, R.string.pref_import) { startImport() }
+        label(root, R.string.pref_refusals, R.string.pref_refusals_summary, R.string.pref_refusals_info)
+        refusalsSummary = text(root, "")
+        button(root, R.string.pref_refusals_open) { showRefusals() }
         button(root, R.string.pref_clear) { confirmClear() }
         label(root, R.string.pref_touch_zones, R.string.pref_touch_zones_summary, R.string.pref_touch_zones_info)
         zonesSummary = text(root, "")
@@ -330,15 +349,48 @@ class SettingsActivity : Activity() {
             .show()
     }
 
+    /** Corrections refusées (§10.5) : liste à cocher ; les cases cochées sont retirées, la correction peut revenir. */
+    private fun showRefusals() {
+        val refusals = services.learned.data?.rejections?.learned(REJECT_LIMIT).orEmpty()
+        if (refusals.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.pref_refusals)
+                .setMessage(R.string.learned_refusals_none)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+        val labels = refusals.map { getString(R.string.refusal_item, it.typed, it.inserted) }.toTypedArray()
+        val checked = BooleanArray(refusals.size)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pref_refusals)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton(R.string.refusal_forget) { _, _ ->
+                for ((index, refusal) in refusals.withIndex()) {
+                    if (checked[index]) services.learned.forgetRefusal(refusal.typed, refusal.inserted)
+                }
+                updateLearnedSummary()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun updateLearnedSummary() {
-        if (!::learnedSummary.isInitialized || !::zonesSummary.isInitialized) return
+        if (!::learnedSummary.isInitialized || !::refusalsSummary.isInitialized || !::zonesSummary.isInitialized) return
         val data = services.learned.data
         if (data == null) {
             learnedSummary.setText(R.string.learned_loading)
+            refusalsSummary.setText(R.string.learned_loading)
             zonesSummary.setText(R.string.learned_loading)
             return
         }
         learnedSummary.text = resources.getQuantityString(R.plurals.learned_summary, data.personal.size, data.personal.size)
+        val refusals = data.rejections.learned(REJECT_LIMIT).size
+        refusalsSummary.text = if (refusals == 0) {
+            getString(R.string.learned_refusals_none)
+        } else {
+            resources.getQuantityString(R.plurals.learned_refusals, refusals, refusals)
+        }
         val taps = data.spatial.totalSamples
         zonesSummary.text = if (taps == 0) {
             getString(R.string.learned_zones_none)
@@ -515,6 +567,9 @@ class SettingsActivity : Activity() {
 
     private companion object {
         const val DASH = "—"
+
+        /** Seuil d'un refus appris : celui du prédicteur (§5.5), pour lister exactement les corrections désactivées. */
+        val REJECT_LIMIT = PredictionConfig().rejectLimit
         const val REQUEST_CONTACTS = 1
         const val REQUEST_EXPORT = 2
         const val REQUEST_IMPORT = 3

@@ -111,6 +111,19 @@ class LearnedStore(
     }
 
     /**
+     * Retire un refus appris (§10.5) : la paire ([typed], [inserted]) et le mot tapé du dictionnaire personnel, pour
+     * que la correction puisse de nouveau s'appliquer. L'état est enregistré et les auditeurs prévenus s'il a changé.
+     * Faux si rien n'a changé (état non chargé, refus inconnu).
+     */
+    fun forgetRefusal(typed: String, inserted: String): Boolean {
+        val data = data ?: return false
+        if (!data.forgetRefusal(typed, inserted)) return false
+        saveIfChanged()
+        notifyChanged(data)
+        return true
+    }
+
+    /**
      * Exporte le dictionnaire personnel en TSV dans le flux ouvert par [open] (§14) ; [done] reçoit vrai si
      * tout a été écrit. Le flux est fermé.
      */

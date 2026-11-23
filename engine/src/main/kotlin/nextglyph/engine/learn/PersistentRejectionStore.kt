@@ -40,6 +40,20 @@ class PersistentRejectionStore(val config: LearningConfig = LearningConfig()) : 
         revision++
     }
 
+    /** Un refus mémorisé : [count] annulations de la correction [typed] → [inserted] (en minuscules). */
+    data class Refusal(val typed: String, val inserted: String, val count: Int)
+
+    /** Les paires dont le compteur atteint [limit] (corrections qui ne s'appliquent plus), la plus récemment refusée d'abord. */
+    fun learned(limit: Int): List<Refusal> =
+        counts.entries.filter { it.value >= limit }.map { (key, count) -> Refusal(key.first, key.second, count) }.asReversed()
+
+    /** Oublie la paire ([typed], [inserted]) (insensible à la casse). Faux si elle n'était pas mémorisée. */
+    fun forget(typed: String, inserted: String): Boolean {
+        if (counts.remove(pair(typed, inserted)) == null) return false
+        revision++
+        return true
+    }
+
     /** Oublie tous les refus (§12). */
     fun clear() {
         counts.clear()
