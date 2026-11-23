@@ -199,7 +199,7 @@ La barre a deux états :
 | État | Contenu |
 |---|---|
 | Mot en cours | 3 suggestions. Au centre, le mot que l'espace insérera (surligné s'il diffère du texte tapé : candidat dominant, accent ou majuscule restitués) ; à gauche, le texte tapé quand il serait remplacé, pour le garder ; sinon les meilleurs candidats. Les variantes d'un mot tapé (`à` pour `a`, `it's` pour `its`, `j'aime` pour `jaime`) y sont proposées sans jamais être insérées automatiquement. |
-| Juste après une validation, ou au début d'un champ | **Prédiction du mot suivant** (issue #51, réglage du §14) : 3 mots probables d'après les deux derniers mots (§10.3) ; le bon peut être un groupe de deux mots (par exemple `il y`). Sans prédiction (réglage désactivé, modèle absent, contexte inconnu), la barre de ponctuation du §5.6 reste affichée. |
+| Juste après une validation, ou au début d'un champ | **Prédiction du mot suivant** (issue #51, réglage du §14) : 3 mots probables d'après les deux derniers mots (§10.3) ; celui de droite peut être un groupe de deux mots quand il est nettement probable. Sans prédiction (réglage désactivé, modèle absent, contexte inconnu), la barre de ponctuation du §5.6 reste affichée. |
 
 Un tap sur une suggestion valide ce mot et ajoute une espace automatique (pas d'espace après une élision, `j'`). Pour un mot suivant, le tap insère le mot, ou le groupe, suivi de cette espace. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
 

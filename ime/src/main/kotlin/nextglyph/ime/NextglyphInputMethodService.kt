@@ -167,8 +167,8 @@ class NextglyphInputMethodService : InputMethodService() {
                 Log.w(LOG_TAG, "Modèle du mot suivant illisible ($language) : prédiction du mot suivant désactivée", error)
             }
         }
-        nextWordLoader = LexiconLoader(openNextWords, executor) { handler.post(it) }.also { nextWordLoader ->
-            nextWordLoader.load(LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)) { _, models ->
+        nextWordLoader = LexiconLoader(openNextWords, executor) { handler.post(it) }.also { created ->
+            created.load(LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)) { _, models ->
                 nextWordModels = models ?: emptyMap()
                 session.setNextWordModels(nextWordModels)
             }
