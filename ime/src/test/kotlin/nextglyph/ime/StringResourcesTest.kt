@@ -89,7 +89,7 @@ class StringResourcesTest {
         fun `tous les réglages de l'écran ont une explication`() {
             val expected = listOf(
                 "ui_language", "layout", "adaptation", "row_height", "bottom_margin", "wide_space", "haptics", "languages",
-                "preferred_language", "autocommit", "prudence", "french_typography", "double_space", "contacts",
+                "preferred_language", "autocommit", "prudence", "french_typography", "double_space", "contacts", "next_word",
                 "section_learned", "refusals", "touch_zones", "section_stats", "heatmap",
             )
             assertThat(english.keys).contains(*expected.map { "pref_${it}_info" }.toTypedArray())

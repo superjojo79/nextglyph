@@ -77,6 +77,7 @@ android {
     // Les lexiques sont lus par mmap directement dans l'APK : ils ne doivent pas être compressés.
     androidResources {
         noCompress += "nglx"
+        noCompress += "ngrm"
     }
 }
 
@@ -160,8 +161,8 @@ androidComponents {
     }
 }
 
-// Copie fr-lexique.nglx, fr-dicollecte.nglx et en.nglx (LexiconLanguage.ALL_FILES) dans les assets de chaque variante. Les entrées viennent de la
-// configuration « lexicons » : Gradle construit donc :tools:buildLexicons au besoin, sans copie manuelle.
+// Copie fr-lexique.nglx, fr-dicollecte.nglx et en.nglx (LexiconLanguage.ALL_FILES), ainsi que fr.ngrm et en.ngrm (mot suivant, #51),
+// dans les assets de chaque variante. Les entrées viennent de la configuration « lexicons » : Gradle construit donc :tools:buildLexicons au besoin, sans copie manuelle.
 abstract class CopyLexiconsTask : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -176,10 +177,10 @@ abstract class CopyLexiconsTask : DefaultTask() {
     @TaskAction
     fun copy() {
         fileSystem.sync {
-            from(lexicons.asFileTree.matching { include("*.nglx") })
+            from(lexicons.asFileTree.matching { include("*.nglx", "*.ngrm") })
             into(outputDir)
         }
-        val missing = listOf("fr-lexique.nglx", "fr-dicollecte.nglx", "en.nglx").filterNot { outputDir.file(it).get().asFile.isFile }
+        val missing = listOf("fr-lexique.nglx", "fr-dicollecte.nglx", "en.nglx", "fr.ngrm", "en.ngrm").filterNot { outputDir.file(it).get().asFile.isFile }
         check(missing.isEmpty()) { "Lexiques absents de la sortie de :tools:buildLexicons : $missing" }
     }
 }

@@ -9,6 +9,7 @@ import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -35,6 +36,7 @@ import nextglyph.engine.layout.LayoutKind
 import nextglyph.engine.learn.LearnedData
 import nextglyph.engine.lexicon.LexiconLanguage
 import nextglyph.engine.lexicon.LexiconSet
+import nextglyph.engine.ngram.NgramModel
 import nextglyph.engine.predict.InMemoryRejectionStore
 import nextglyph.engine.profile.DecimalSeparatorPolicy
 import nextglyph.engine.profile.FieldKey
@@ -88,6 +90,8 @@ class NextglyphInputMethodService : InputMethodService() {
     private var lexicons: Map<String, LexiconSet>? = null
     private var worker: ExecutorService? = null
     private var loader: LexiconLoader<Map<String, LexiconSet>>? = null
+    private var nextWordModels: Map<String, NgramModel> = emptyMap()
+    private var nextWordLoader: LexiconLoader<Map<String, NgramModel>>? = null
 
     /** Génération de la dernière reconstruction demandée : un résultat plus ancien est ignoré. */
     private var stackGeneration = 0
@@ -157,6 +161,18 @@ class NextglyphInputMethodService : InputMethodService() {
                 rebuildPredictors()
             }
         }
+        // Modèles du mot suivant (#51) : chargés à part ; un modèle illisible désactive cette fonction pour sa langue seule.
+        val openNextWords = { key: String ->
+            assets.openNextWords(key.split(LANGUAGE_SEPARATOR)) { language, error ->
+                Log.w(LOG_TAG, "Modèle du mot suivant illisible ($language) : prédiction du mot suivant désactivée", error)
+            }
+        }
+        nextWordLoader = LexiconLoader(openNextWords, executor) { handler.post(it) }.also { nextWordLoader ->
+            nextWordLoader.load(LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)) { _, models ->
+                nextWordModels = models ?: emptyMap()
+                session.setNextWordModels(nextWordModels)
+            }
+        }
         services.preferences.registerOnSharedPreferenceChangeListener(preferencesListener)
         services.learned.addListener(learnedListener)
         services.contacts.addListener(contactsListener)
@@ -177,6 +193,7 @@ class NextglyphInputMethodService : InputMethodService() {
         handler.removeCallbacks(save)
         services.learned.saveIfChanged()
         loader?.cancel()
+        nextWordLoader?.cancel()
         worker?.shutdownNow()
         decimalPolicy.clear()
         super.onDestroy()
@@ -298,7 +315,7 @@ class NextglyphInputMethodService : InputMethodService() {
 
     /** Applique [fieldKeyboard] : comportement de la session, disposition et libellé de `↵`. */
     private fun startField(enter: EnterBehavior, selStart: Int, selEnd: Int) {
-        field = SessionField(fieldKeyboard.profile, enter, settings.autocommit, settings.prudence)
+        field = SessionField(fieldKeyboard.profile, enter, settings.autocommit, settings.prudence, settings.nextWord)
         keyboardView?.let { view ->
             view.setKeyboard(fieldKeyboard, EnterKeyLabel.of(enter))
             view.resetAdaptation()
@@ -472,6 +489,7 @@ class NextglyphInputMethodService : InputMethodService() {
         if (resetLanguage) session.setPredictors(null)
         resetLanguage = false
         session.setPredictors(stack, preferredLanguage())
+        session.setNextWordModels(nextWordModels)
         keyboardView?.let { view ->
             view.languages = stack.languages
             view.setSource(source)
@@ -492,7 +510,7 @@ class NextglyphInputMethodService : InputMethodService() {
         }
         val kindChanged = kind != layoutKind
         if (kindChanged || settings.rowHeightDp != previous.rowHeightDp || settings.wideSpace != previous.wideSpace ||
-            settings.autocommit != previous.autocommit || settings.prudence != previous.prudence
+            settings.autocommit != previous.autocommit || settings.prudence != previous.prudence || settings.nextWord != previous.nextWord
         ) {
             layoutKind = kind
             fieldKeyboard = FieldKeyboard.of(fieldKeyboard.requested, kind, fieldKeyboard.decimalLabel, settings.rowHeightDp.toFloat(), wideSpace())
@@ -516,6 +534,7 @@ class NextglyphInputMethodService : InputMethodService() {
 
     private companion object {
         const val LANGUAGE_SEPARATOR = "+"
+        const val LOG_TAG = "Nextglyph"
         const val SAVE_DELAY_MS = 3000L
         const val KEY_EMOJI_RECENTS = "emoji_recents"
 

@@ -50,7 +50,8 @@ French inflected forms lexicon v7.7 (Dicollecte / Grammalecte)
   to a binary lexicon format. Source: https://www.grammalecte.net/dic/
 
 Tatoeba-derived English frequencies are distributed in en.nglx together with
-the SCOWL word list (see the Tatoeba entry below).
+the SCOWL word list (see the Tatoeba entry below). Tatoeba-derived next-word
+models (word-sequence statistics) are distributed in fr.ngrm and en.ngrm.
 
 SCOWL 2020.12.07 (pre-expanded word lists, sizes 10 to 70 used)
   https://wordlist.aspell.net/ , https://sourceforge.net/projects/wordlist/
@@ -61,10 +62,13 @@ SCOWL 2020.12.07 (pre-expanded word lists, sizes 10 to 70 used)
   in supporting documentation").
 
 Tatoeba sentences (not distributed; English frequency counts derived from them
-are part of en.nglx)
+are part of en.nglx, and French and English word-sequence statistics derived
+from them are the next-word models fr.ngrm and en.ngrm)
   Sentences by the contributors of Tatoeba, https://tatoeba.org/
   License: Creative Commons Attribution 2.0 France
   https://creativecommons.org/licenses/by/2.0/fr/
+  Changes: words counted, word sequences counted and pruned, conversion to a
+  binary format.
 
 unicode-emoji-json 0.9.0 (emoji list, ime/src/main/assets/emoji.txt)
   Copyright (c) 2019 Mu-An Chiou, https://github.com/muan/unicode-emoji-json

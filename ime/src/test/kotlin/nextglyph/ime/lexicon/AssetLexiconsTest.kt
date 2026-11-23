@@ -2,6 +2,9 @@ package nextglyph.ime.lexicon
 
 import nextglyph.engine.lexicon.LexiconBuilder
 import nextglyph.engine.lexicon.LexiconFormatException
+import nextglyph.engine.ngram.NgramFormatException
+import nextglyph.engine.ngram.NgramModelBuilder
+import nextglyph.engine.ngram.NgramPruning
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested
@@ -25,6 +28,11 @@ class AssetLexiconsTest {
         Files.write(file, ByteArray(padding) { 7 } + bytes + ByteArray(trailing) { 9 })
         return file
     }
+
+    private val nextWordBytes: ByteArray = NgramModelBuilder("fr", NgramPruning(minBigramCount = 1, minTrigramCount = 1)).apply {
+        addSentence(listOf("je", "suis", "content"), 3)
+        addSentence(listOf("je", "veux", "partir"))
+    }.build()
 
     private fun <T> Path.channel(block: (FileChannel) -> T): T =
         FileChannel.open(this, StandardOpenOption.READ).use(block)
@@ -50,10 +58,34 @@ class AssetLexiconsTest {
 
             assertThat(lexicon.distribution("bonj").isUnknownPrefix).isFalse()
         }
+
+        @Test
+        fun `projette un modèle de mot suivant placé à un décalage dans l'archive`(@TempDir dir: Path) {
+            val file = dir.resolve("app.apk")
+            Files.write(file, ByteArray(321) { 7 } + nextWordBytes + ByteArray(5) { 9 })
+
+            val model = file.channel { AssetLexicons.loadNextWord(it, 321L, nextWordBytes.size.toLong()) }
+
+            assertThat(model.next(listOf("je"), 1).map { it.text }).containsExactly("suis")
+        }
+
+        @Test
+        fun `le nom de l'asset du mot suivant dépend de la langue`() {
+            assertThat(AssetLexicons.nextWordFileName("fr")).isEqualTo("fr.ngrm")
+            assertThat(AssetLexicons.nextWordFileName("en")).isEqualTo("en.ngrm")
+        }
     }
 
     @Nested
     inner class ErrorCases {
+
+        @Test
+        fun `refuse une zone qui n'est pas un modèle de mot suivant`(@TempDir dir: Path) {
+            val file = archive(dir, padding = 100, trailing = 0)
+
+            assertThatThrownBy { file.channel { AssetLexicons.loadNextWord(it, 0L, 100L) } }
+                .isInstanceOf(NgramFormatException::class.java)
+        }
 
         @Test
         fun `refuse une zone qui n'est pas un lexique`(@TempDir dir: Path) {
