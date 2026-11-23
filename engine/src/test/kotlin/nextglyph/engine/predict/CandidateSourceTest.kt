@@ -3,6 +3,7 @@ package nextglyph.engine.predict
 import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.lexicon.LexiconFixtures
 import nextglyph.engine.lexicon.LexiconSet
+import nextglyph.engine.adapt.TapSpatialModel
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.Assertions.within
@@ -12,6 +13,21 @@ import org.junit.jupiter.api.Test
 class CandidateSourceTest {
 
     private val azerty = KeyAdjacency(KeyboardLayouts.AZERTY)
+
+    private val qwerty = KeyboardLayouts.QWERTY
+
+    /** Source dont les substitutions sont pondérées par la position des frappes (disposition QWERTY). */
+    private fun spatialSource(vararg entries: Pair<String, Long>, config: PredictionConfig = PredictionConfig()) =
+        CandidateSource(
+            LexiconSet(LexiconFixtures.lexicon(entries.toList())),
+            KeyAdjacency(qwerty),
+            config,
+            SpatialSubstitution(qwerty, config),
+        )
+
+    /** Frappes d'un mot de [length] caractères dont la première lettre [letter] est tapée en (dx, dy). */
+    private fun taps(letter: Char, dx: Double, dy: Double, length: Int, model: TapSpatialModel = TapSpatialModel.NONE) =
+        WordTaps(listOf<TypedTap?>(TypedTap(letter, dx, dy)) + List(length - 1) { null }, model)
 
     private fun source(vararg entries: Pair<String, Long>, config: PredictionConfig = PredictionConfig()) =
         CandidateSource(LexiconSet(LexiconFixtures.lexicon(entries.toList())), azerty, config)
@@ -70,6 +86,58 @@ class CandidateSourceTest {
             assertThat(prefix.top.map { it.key }).startsWith("l'ecole", "l'ecoles")
             assertThat(prefix.top[0].restStart).isEqualTo(2)
         }
+
+
+        @Test
+        fun `sans frappes - mêmes poids qu'avant`() {
+            val s = spatialSource("rose" to 10L)
+
+            assertThat(s.edits("eose")).containsEntry("rose", 0.01)
+            assertThat(s.edits("eose", null)).isEqualTo(s.edits("eose"))
+            assertThat(s.edits("eose", WordTaps(listOf(null, null, null, null)))).containsEntry("rose", 0.01)
+        }
+
+        @Test
+        fun `frappe au centre - poids proche de l'ancien 0,01`() {
+            val s = spatialSource("rose" to 10L)
+
+            // « e » → « r » : voisine horizontale à 1 u, frappe centrée.
+            assertThat(s.edits("eose", taps('e', 0.0, 0.0, 4)).getValue("rose")).isCloseTo(0.0101, within(2e-4))
+        }
+
+        @Test
+        fun `frappe à la frontière - la voisine l'emporte sur une autre voisine`() {
+            val s = spatialSource("rose" to 10L, "dose" to 10L)
+
+            val weights = s.edits("eose", taps('e', 0.5, 0.0, 4))
+
+            assertThat(weights.getValue("rose")).isCloseTo(0.6, within(1e-9))
+            assertThat(weights.getValue("dose")).isLessThan(0.05)
+            assertThat(s.lookup("eose", taps('e', 0.5, 0.0, 4)).top.first().key).isEqualTo("rose")
+        }
+
+        @Test
+        fun `frappe au-delà de la frontière - poids plafonné à 1`() {
+            val s = spatialSource("rose" to 10L)
+
+            assertThat(s.edits("eose", taps('e', 0.7, 0.0, 4)).getValue("rose")).isEqualTo(1.0)
+        }
+
+        @Test
+        fun `modèle appris - le centre décalé d'une touche change le classement`() {
+            val s = spatialSource("rose" to 10L, "dose" to 10L)
+            val learned = object : TapSpatialModel by TapSpatialModel.NONE {
+                // Les frappes de « d » tombent 0,325 u plus à droite et 1 u plus haut : sur la frontière e/r.
+                override fun offsetX(letter: Char): Float = if (letter == 'd') 0.325f / 0.95f else 0f
+                override fun offsetY(letter: Char): Float = if (letter == 'd') -1f else 0f
+            }
+
+            val plain = s.lookup("eose", taps('e', 0.5, 0.0, 4))
+            val personal = s.lookup("eose", taps('e', 0.5, 0.0, 4, learned))
+
+            assertThat(plain.top.first().key).isEqualTo("rose")
+            assertThat(personal.top.first().key).isEqualTo("dose")
+        }
     }
 
     @Nested
@@ -97,6 +165,31 @@ class CandidateSourceTest {
 
             assertThat(noElision.lookup("lami").top.map { it.key }).doesNotContain("l'ami")
             assertThat(consonant.lookup("lbateau").top.map { it.key }).doesNotContain("l'bateau")
+        }
+
+
+        @Test
+        fun `frappes qui ne s'alignent pas sur le texte tapé - poids binaire`() {
+            val s = spatialSource("rose" to 10L)
+            val other = WordTaps(listOf(TypedTap('x', 0.5, 0.0), null, null, null))
+
+            assertThat(s.edits("eose", other).getValue("rose")).isEqualTo(0.01)
+        }
+
+        @Test
+        fun `sans substitution spatiale - les frappes sont ignorées`() {
+            val s = source("rose" to 10L)
+
+            assertThat(s.edits("eose", taps('e', 0.5, 0.0, 4)).getValue("rose")).isEqualTo(0.01)
+        }
+
+        @Test
+        fun `caractère voulu hors disposition - poids binaire d'adjacence`() {
+            val s = spatialSource("e-e" to 10L)
+            val taps = WordTaps(listOf(null, TypedTap('s', 0.0, 0.0), null))
+
+            // « s » → « - » : le trait d'union n'a pas de touche lettre, aucun score spatial.
+            assertThat(s.edits("ese", taps).getValue("e-e")).isEqualTo(0.0005)
         }
     }
 
@@ -143,6 +236,32 @@ class CandidateSourceTest {
             val s = source("l'" to 1000L, "a" to 1L, config = PredictionConfig(correction = CorrectionWeights(separator = 1.0)))
 
             assertThat(s.lookup("la").top.first { it.key == "l'a" }.score).isCloseTo(1.0 / 1001, within(1e-9))
+        }
+
+
+        @Test
+        fun `frappe loin de la voisine - plancher de la substitution`() {
+            val s = spatialSource("rose" to 10L)
+
+            // Frappe très à gauche de « e » : « r » est loin, le poids ne descend pas sous 0,0005.
+            assertThat(s.edits("eose", taps('e', -0.45, 0.0, 4)).getValue("rose")).isEqualTo(0.0005)
+        }
+
+        @Test
+        fun `frappe pile sur la frontière - rapport 1`() {
+            val s = spatialSource("rose" to 10L)
+
+            assertThat(s.edits("eose", taps('e', 0.5, 0.0, 4)).getValue("rose")).isCloseTo(0.6, within(1e-9))
+            assertThat(s.edits("eose", taps('e', 0.4, 0.0, 4)).getValue("rose")).isLessThan(0.6)
+            assertThat(s.edits("eose", taps('e', 0.6, 0.0, 4)).getValue("rose")).isGreaterThan(0.6)
+        }
+
+        @Test
+        fun `frappe extrême - pas de dépassement numérique`() {
+            val s = spatialSource("rose" to 10L)
+
+            assertThat(s.edits("eose", taps('e', 5.0, 3.0, 4)).getValue("rose")).isBetween(0.0005, 1.0)
+            assertThat(s.edits("eose", taps('e', -5.0, -3.0, 4)).getValue("rose")).isBetween(0.0005, 1.0)
         }
     }
 }

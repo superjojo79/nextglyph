@@ -71,6 +71,7 @@ Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr
 | Retour haptique | Fait ; non ressenti sur l'émulateur (pas de vibreur) | — |
 | IME : langue de l'interface au choix (#47) ; résumé et explication (i) pour chaque réglage (#48) | Fait ; non vérifié sur émulateur (build `ime` impossible dans l'environnement de rédaction) | — |
 | Zones de frappe des touches de fonction (espace, `↵`, `⌫`, `?123`), frontières personnalisées, indicateur dans les réglages (issue #30) | Fait (moteur testé, IME vérifié par la CI) ; à valider sur le terrain | — |
+| Classement des corrections : score spatial des substitutions (position réelle des frappes), accents (`ca` → `ça`, bilinguisme pondéré), écart avec le 2ᵉ candidat dans « Prudence » (issue #53) | Fait (moteur testé, mesures `docs/analysis/M2-engine.md` §9) ; à valider sur le terrain (taux d'annulation, §15.4) | — |
 
 ## Problèmes ouverts
 

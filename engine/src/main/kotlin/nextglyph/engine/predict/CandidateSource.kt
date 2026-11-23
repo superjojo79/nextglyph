@@ -48,24 +48,27 @@ class CandidateSource(
     val lexicons: LexiconSet,
     private val adjacency: KeyAdjacency,
     private val config: PredictionConfig = PredictionConfig(),
+    private val substitution: SpatialSubstitution? = null,
 ) {
     private val rootMass = lexicons.totalMass
     private val weights = config.correction
     private val elisions: List<Pair<String, Double>> = elisionWeights()
 
     /**
-     * Candidats pour le texte tapé [typed] (clé normalisée non vide).
+     * Candidats pour le texte tapé [typed] (clé normalisée non vide). Si [taps] s'aligne sur [typed]
+     * ([WordTaps.alignedTo]) et que la source a un [SpatialSubstitution], le poids d'une substitution
+     * dépend de la position réelle de la frappe (issue #53) ; sinon il ne dépend que de l'adjacence.
      *
      * @throws IllegalArgumentException si [typed] est vide.
      */
-    fun lookup(typed: String): LanguageCandidates {
+    fun lookup(typed: String, taps: WordTaps? = null): LanguageCandidates {
         require(typed.isNotEmpty()) { "Le texte tapé ne doit pas être vide." }
         val distribution = lexicons.distribution(typed)
         val known = !distribution.isUnknownPrefix
         val isWord = distribution.endProbability > 0.0
         val sources = ArrayList<Source>()
         if (!isWord) {
-            for ((prefix, weightAndMass) in weightedEdits(typed)) sources += Source(prefix, weightAndMass.first, weightAndMass.second)
+            for ((prefix, weightAndMass) in weightedEdits(typed, taps)) sources += Source(prefix, weightAndMass.first, weightAndMass.second)
         }
         if (known) sources += Source(typed, 1.0, distribution.totalMass)
         if (!isWord) addElisions(typed, sources)
@@ -144,10 +147,12 @@ class CandidateSource(
      * éditions donnent le même préfixe). Seules les positions dont le début `typed[0, i)` est un
      * préfixe connu sont explorées : une édition en position `i` le laisse inchangé.
      */
-    fun edits(typed: String): Map<String, Double> = weightedEdits(typed).mapValues { it.value.first }
+    fun edits(typed: String, taps: WordTaps? = null): Map<String, Double> =
+        weightedEdits(typed, taps).mapValues { it.value.first }
 
     /** Comme [edits], avec la masse de chaque préfixe. */
-    private fun weightedEdits(typed: String): Map<String, Pair<Double, Double>> {
+    private fun weightedEdits(typed: String, taps: WordTaps?): Map<String, Pair<Double, Double>> {
+        val aligned = if (substitution != null) taps?.alignedTo(typed) else null
         val result = HashMap<String, Pair<Double, Double>>()
         fun offer(prefix: String, weight: Double) {
             // Le préfixe vide (seul caractère tapé retiré) n'apporte rien : tout le lexique.
@@ -162,7 +167,7 @@ class CandidateSource(
             val typedChar = typed[i]
             val tail = typed.substring(i + 1)
             for (c in before.continuations) {
-                if (c != typedChar) offer(head + c + tail, substitutionWeight(typedChar, c))
+                if (c != typedChar) offer(head + c + tail, substitutionWeight(typedChar, c, aligned?.get(i), taps))
                 offer(head + c + typed.substring(i), if (c == APOSTROPHE || c == '-') weights.separator else weights.omission)
             }
             offer(head + tail, weights.extra)
@@ -173,8 +178,13 @@ class CandidateSource(
         return result
     }
 
-    private fun substitutionWeight(typedChar: Char, intended: Char): Double =
-        if (adjacency.areNeighbors(typedChar, intended)) weights.adjacentSubstitution else weights.otherSubstitution
+    private fun substitutionWeight(typedChar: Char, intended: Char, tap: TypedTap?, taps: WordTaps?): Double {
+        if (tap != null && substitution != null && taps != null) {
+            val spatial = substitution.weight(tap, intended, taps.spatial)
+            if (spatial >= 0.0) return spatial
+        }
+        return if (adjacency.areNeighbors(typedChar, intended)) weights.adjacentSubstitution else weights.otherSubstitution
+    }
 
     /** Poids de chaque élision connue du lexique : `separator × f(e') / masse des initiales admises`. */
     private fun elisionWeights(): List<Pair<String, Double>> {

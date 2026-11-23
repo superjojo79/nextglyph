@@ -64,6 +64,10 @@ class EngineAnalysisTest {
                 "## Validation par espace — en (QWERTY), 9 mots",
                 "| 0 % | moteur, NORMAL (0,70) |",
                 "| 50 % | M0, minProb 0,70 |",
+                "## Score spatial (frappes simulées) — fr (AZERTY), 13 mots",
+                "## Score spatial (frappes simulées) — en (QWERTY), 9 mots",
+                "| 0,20 | ",
+                "| NORMAL | spatial |",
                 "## Apostrophes et traits d'union omis — fr",
                 "## Apostrophes et traits d'union omis — en",
                 "## Restitution des accents — fr",
@@ -88,6 +92,7 @@ class EngineAnalysisTest {
             assertThat(report).doesNotContain("Principaux mots non restitués")
             // Accents : école (dominante malgré « écolé »), était, peut-être ; « à » ambigu avec « a ».
             assertThat(report).contains("| français | 4 | 75,00 % | 0,00 % | 25,00 % | 0,00 % |")
+            assertThat(report).contains("Accents non restitués (français) : `à (literal)` 1.")
             assertThat(report).contains("| 0 % | NORMAL | 59,09 % | 7,69 % | 8,33 % | 0,00 % | 90,91 % | 95,45 % |")
         }
 

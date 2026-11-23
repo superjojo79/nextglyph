@@ -125,3 +125,43 @@ Depuis la séparation de `fr.nglx` (`docs/DECISIONS.md`, 2026-11-19), le moteur 
 | Anglais | — | identique au centième |
 
 Les prédictions sont équivalentes : écarts de 0,02 à 0,09 point (quelques validations sur environ 4 800), dans la variance de l'échantillon et loin de l'objectif de 3 %. Ils viennent du seul écart de données : une forme présente dans les deux sources compte en plus le plancher de Dicollecte (1, soit 0,01 occurrence par million), ce qui déplace à la marge quelques rapports `P(w)` proches des seuils.
+
+## 9. Classement des candidats (issue #53)
+
+Mesures de `./gradlew :tools:analyzeEngine` (échantillon de 5 %, fichiers français séparés, même graine) après les trois changements de l'issue #53 (`docs/DECISIONS.md`, 2026-11-23).
+
+### 9.1 Score spatial des substitutions
+
+Nouvelle section de l'analyse (« Score spatial (frappes simulées) », `GaussianTapModel`) : chaque lettre du mot voulu est frappée en un point tiré d'une gaussienne centrée sur sa touche au repos (écart type `σu` × largeur de la touche, `σu` × hauteur de rangée) ; la lettre tapée est celle de la touche au repos qui contient le point (ce que le décodeur fait sans modèle de langue). On compare le moteur **binaire** (sans les frappes : voisine 0,01, autre 0,0005) au moteur **spatial** (`WordTaps` des k premières frappes pour le préfixe de k lettres). Utilisateur attentif, mêmes tirages pour tous les réglages.
+
+| Langue, `σu` (lettres fausses) | Prudence | Complétées/corrigées binaire → spatial | Fausses (% auto) binaire → spatial | Fautes non corrigées (% mots) binaire → spatial |
+|---|---|---|---|---|
+| FR, 0,20 (1,8 %) | Prudente | 15,56 → 16,17 % | 0,97 → 0,83 % | 4,55 → 3,62 % |
+| FR, 0,20 (1,8 %) | **Normale** | **18,60 → 19,43 %** | **1,25 → 1,07 %** | **3,85 → 2,95 %** |
+| FR, 0,20 (1,8 %) | Audacieuse | 21,10 → 21,79 % | 1,59 → 1,32 % | 3,34 → 2,57 % |
+| FR, 0,25 (6,6 %) | Prudente | 17,24 → 19,99 % | 2,34 → 1,97 % | 16,14 → 13,09 % |
+| FR, 0,25 (6,6 %) | **Normale** | **20,64 → 23,73 %** | **2,84 → 2,27 %** | **14,26 → 11,13 %** |
+| FR, 0,25 (6,6 %) | Audacieuse | 23,64 → 26,26 % | 3,75 → 2,97 % | 12,50 → 9,87 % |
+| EN, 0,20 (1,9 %) | Prudente | 17,64 → 18,33 % | 0,94 → 0,80 % | 5,12 → 4,29 % |
+| EN, 0,20 (1,9 %) | **Normale** | **21,54 → 22,28 %** | **1,06 → 0,82 %** | **4,64 → 3,67 %** |
+| EN, 0,20 (1,9 %) | Audacieuse | 25,40 → 26,24 % | 1,04 → 0,83 % | 3,95 → 3,04 % |
+| EN, 0,25 (7,0 %) | Prudente | 18,26 → 20,49 % | 1,88 → 1,69 % | 17,87 → 15,45 % |
+| EN, 0,25 (7,0 %) | **Normale** | **22,30 → 24,96 %** | **2,02 → 1,66 %** | **16,38 → 13,44 %** |
+| EN, 0,25 (7,0 %) | Audacieuse | 26,75 → 29,40 % | 2,06 → 1,73 % | 14,17 → 11,42 % |
+
+Le score spatial gagne sur les trois mesures à la fois, dans toutes les cases : plus de mots corrigés, moins de fausses validations, environ un cinquième de fautes non corrigées en moins. Avec beaucoup de fautes (6,6 %), le réglage Audacieuse passe sous l'objectif de 3 % en français (3,75 → 2,97 %). Sans frappes connues (tests, champ sans position), le moteur est exactement le moteur binaire : les tableaux du §2 sont inchangés.
+
+Limites : la simulation ignore le modèle de langue du décodeur (`λ`), qui corrige déjà une partie des frappes ambiguës avant la validation, et des frappes réelles ont des queues plus lourdes qu'une gaussienne (d'où le plancher à 0,0005). Le gain réel est à confirmer par les mesures locales (§15.4 de la spec).
+
+### 9.2 Accents
+
+| Lexiques actifs | Restitués avant → après | Faux avant → après | Mots sans accent accentués à tort |
+|---|---|---|---|
+| français | 58,5 → 61,3 % | 0,20 → 0,20 % | 0,02 → 0,02 % |
+| français + anglais (score de départ, français préféré) | 50,4 (liste unique) → 56,6 % | 0,14 → 0,11 % | 0,01 → 0,02 % |
+
+Gains : `ca` → `ça` (les sigles `CA` et les formes `cA` ne comptent plus) et, avec l'anglais actif, les mots que le lexique anglais écrit sans accent ne bloquent plus quand le français domine. Les mots encore laissés sans accent sont les ambiguïtés voulues (`à` 507 occurrences, `où` 49, `là` 18, `dû` 15, `plaît`/`plait`, `sûr`/`sur`) et les participes passés qui sont aussi des formes du présent (`demandé`/`demande`, `donné`/`donne`, `trouvé`/`trouve`, `passé`/`passe`) : seul le contexte (#51) peut les départager.
+
+### 9.3 Écart avec le deuxième candidat
+
+`minRatio` dépend désormais du réglage de prudence. Mais `P(w2) ≤ 1 − P(w1)` : dès que `P(w1) ≥ minProb`, le rapport vaut au moins `minProb / (1 − minProb)`, soit 4 (Prudente), 2,33 (Normale) et 1,5 (Audacieuse). Les rapports 3 / 2 / 1,5 ne changent donc aucune décision (tableaux identiques au centième). Des rapports plus stricts, 5 / 3 / 2, ont été mesurés : fausses validations FR 5 % de fautes 1,84 → 1,81 % (Prudente), 2,26 → 2,30 % (Normale), 2,86 → 2,74 % (Audacieuse), corpus mixte ±0,1 point, pour 0,2 à 0,5 point de mots complétés en moins. Écart dans la variance de l'échantillon : les rapports 3 / 2 / 1,5 sont gardés, et le seuil de confiance reste porté par `minProb`.
