@@ -1,10 +1,18 @@
 package nextglyph.tools.analysis
 
+import nextglyph.engine.layout.Key
+import nextglyph.engine.layout.KeyKind
+import nextglyph.engine.layout.KeyRow
+import nextglyph.engine.layout.KeyboardLayout
 import nextglyph.engine.layout.KeyboardLayouts
+import nextglyph.engine.layout.LayoutKind
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.ln
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -12,6 +20,24 @@ class GaussianTapModelTest {
 
     private val qwerty = GaussianTapModel(KeyboardLayouts.QWERTY, 0.2)
     private val azerty = GaussianTapModel(KeyboardLayouts.AZERTY, 0.2)
+
+    private fun layout(vararg rows: KeyRow) = KeyboardLayout(LayoutKind.QWERTY, rows.toList())
+
+    /** Rangée 0 : « a » [0 ; 2[, trou [2 ; 8[, « b » [8 ; 10[ ; rangée 1 sans lettre ; rangée 2 : « c » [0 ; 5[, « d » [5 ; 10[. */
+    private val gaps = GaussianTapModel(
+        layout(
+            KeyRow(listOf(Key.letter('a', 2f), Key.character('1', 6f), Key.letter('b', 2f))),
+            KeyRow(listOf(Key(KeyKind.SPACE, "", 10f))),
+            KeyRow(listOf(Key.letter('c', 5f), Key.letter('d', 5f))),
+        ),
+        0.2,
+    )
+
+    /** Mêmes tirages que le modèle : Box-Muller, première valeur de `random` pour `u`, seconde pour l'angle. */
+    private fun gaussian(random: Random): Double {
+        val u = 1.0 - random.nextDouble()
+        return sqrt(-2.0 * ln(u)) * cos(2.0 * PI * random.nextDouble())
+    }
 
     @Nested
     inner class HappyPath {
@@ -59,6 +85,33 @@ class GaussianTapModelTest {
             assertThat(a.taps).isEqualTo(b.taps)
         }
 
+        @Test
+        fun `la frappe est le centre de repos plus le tirage gaussien fois sigma et la largeur de la touche`() {
+            val model = GaussianTapModel(layout(KeyRow(listOf(Key.letter('a', 5f), Key.letter('b', 5f)))), 0.01)
+            val reference = Random(42)
+            val gx = gaussian(reference)
+            val gy = gaussian(reference)
+
+            val tap = model.tap('b', Random(42))!!
+
+            assertThat(tap.letter).isEqualTo('b')
+            assertThat(tap.dx).isCloseTo(gx * 0.01, org.assertj.core.data.Offset.offset(1e-12))
+            assertThat(tap.dy).isCloseTo(gy * 0.01, org.assertj.core.data.Offset.offset(1e-12))
+        }
+
+        @Test
+        fun `un point hors de toute lettre donne la lettre la plus proche en tenant compte de la rangée`() {
+            // Trou de la rangée 0 : « a » (centre 1) ou « b » (centre 9).
+            assertThat(gaps.letterAt(3.0, 0.0)).isEqualTo('a')
+            assertThat(gaps.letterAt(7.0, 0.0)).isEqualTo('b')
+            // Rangée 1 sans lettre : la distance verticale décide quand l'écart horizontal seul dirait l'inverse.
+            assertThat(gaps.letterAt(8.2, 0.6)).isEqualTo('b')
+            assertThat(gaps.letterAt(8.6, 1.4)).isEqualTo('d')
+            assertThat(gaps.letterAt(9.0, 0.6)).isEqualTo('b')
+            assertThat(gaps.letterAt(0.5, 1.0)).isEqualTo('a')
+            assertThat(gaps.letterAt(7.0, 1.4)).isEqualTo('d')
+        }
+
         private fun wrongRate(model: GaussianTapModel): Double {
             val random = Random(3)
             val letters = "etaoinshrdlu"
@@ -82,6 +135,32 @@ class GaussianTapModelTest {
         fun `rejette un écart-type infini ou non numérique`() {
             assertThatThrownBy { GaussianTapModel(KeyboardLayouts.QWERTY, Double.POSITIVE_INFINITY) }.isInstanceOf(IllegalArgumentException::class.java)
             assertThatThrownBy { GaussianTapModel(KeyboardLayouts.QWERTY, Double.NaN) }.isInstanceOf(IllegalArgumentException::class.java)
+        }
+
+        @Test
+        fun `rejette une disposition sans lettre a-z`() {
+            assertThatThrownBy { GaussianTapModel(layout(KeyRow(listOf(Key.character('1', 10f)))), 0.2) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("aucune lettre")
+        }
+
+        @Test
+        fun `seules les touches lettre a-z de la disposition sont tapées`() {
+            val model = GaussianTapModel(
+                layout(
+                    KeyRow(listOf(Key.letter('`', 2.5f), Key.letter('a', 2.5f), Key.letter('z', 2.5f), Key.letter('{', 2.5f))),
+                    KeyRow(listOf(Key.letter('é', 2.5f), Key.character('b', 2.5f), Key.letter('y', 5f))),
+                ),
+                0.0,
+            )
+
+            assertThat(model.tap('`', Random(1))).isNull()
+            assertThat(model.tap('{', Random(1))).isNull()
+            assertThat(model.tap('é', Random(1))).isNull()
+            assertThat(model.tap('b', Random(1))).isNull()
+            assertThat(model.tap('a', Random(1))!!.letter).isEqualTo('a')
+            assertThat(model.tap('z', Random(1))!!.letter).isEqualTo('z')
+            assertThat(model.tap('y', Random(1))!!.letter).isEqualTo('y')
         }
 
         @Test
@@ -113,6 +192,34 @@ class GaussianTapModelTest {
                 assertThat(it.dx).isZero()
                 assertThat(it.dy).isZero()
             }
+        }
+
+        @Test
+        fun `les rangées sans lettre sont ignorées et le point est borné aux rangées de lettres`() {
+            assertThat(gaps.letterAt(0.5, -5.0)).isEqualTo('a')
+            assertThat(gaps.letterAt(9.5, 9.0)).isEqualTo('d')
+            assertThat(gaps.letterAt(0.5, 2.0)).isEqualTo('c')
+            assertThat(gaps.letterAt(4.999, 2.0)).isEqualTo('c')
+            assertThat(gaps.letterAt(5.0, 2.0)).isEqualTo('d')
+            assertThat(gaps.letterAt(100.0, 2.0)).isEqualTo('d')
+        }
+
+        @Test
+        fun `sigma est conservé et la frappe d'une lettre en double vise sa première touche`() {
+            val model = GaussianTapModel(
+                layout(KeyRow(listOf(Key.letter('a', 5f), Key.letter('b', 5f))), KeyRow(listOf(Key.letter('b', 5f), Key.letter('a', 5f)))),
+                0.0,
+            )
+
+            val tap = model.tap('a', Random(1))!!
+
+            assertThat(model.sigma).isEqualTo(0.0)
+            assertThat(GaussianTapModel(KeyboardLayouts.QWERTY, 0.37).sigma).isEqualTo(0.37)
+            assertThat(tap.letter).isEqualTo('a')
+            assertThat(tap.dx).isZero()
+            assertThat(tap.dy).isZero()
+            assertThat(model.letterAt(7.5, 1.0)).isEqualTo('a')
+            assertThat(model.letterAt(7.5, 0.0)).isEqualTo('b')
         }
 
         @Test
