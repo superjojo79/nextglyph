@@ -90,7 +90,7 @@ class StringResourcesTest {
             val expected = listOf(
                 "ui_language", "layout", "adaptation", "row_height", "bottom_margin", "wide_space", "haptics", "languages",
                 "preferred_language", "autocommit", "prudence", "french_typography", "double_space", "contacts",
-                "section_learned", "section_stats",
+                "section_learned", "touch_zones", "section_stats",
             )
             assertThat(english.keys).contains(*expected.map { "pref_${it}_info" }.toTypedArray())
         }

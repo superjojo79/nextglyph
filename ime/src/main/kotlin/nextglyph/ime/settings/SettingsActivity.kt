@@ -52,6 +52,7 @@ class SettingsActivity : Activity() {
     private lateinit var services: AppServices
     private lateinit var status: TextView
     private lateinit var learnedSummary: TextView
+    private lateinit var zonesSummary: TextView
     private lateinit var statsSummary: TextView
     private lateinit var contactsSwitch: Switch
     private val preferences: SharedPreferences get() = services.preferences
@@ -227,6 +228,8 @@ class SettingsActivity : Activity() {
         button(root, R.string.pref_export) { startExport() }
         button(root, R.string.pref_import) { startImport() }
         button(root, R.string.pref_clear) { confirmClear() }
+        label(root, R.string.pref_touch_zones, R.string.pref_touch_zones_summary, R.string.pref_touch_zones_info)
+        zonesSummary = text(root, "")
 
         section(root, R.string.pref_section_stats, R.string.pref_section_stats_summary, R.string.pref_section_stats_info)
         statsSummary = text(root, "")
@@ -322,19 +325,19 @@ class SettingsActivity : Activity() {
     }
 
     private fun updateLearnedSummary() {
-        if (!::learnedSummary.isInitialized) return
+        if (!::learnedSummary.isInitialized || !::zonesSummary.isInitialized) return
         val data = services.learned.data
-        learnedSummary.text = if (data == null) {
-            getString(R.string.learned_loading)
+        if (data == null) {
+            learnedSummary.setText(R.string.learned_loading)
+            zonesSummary.setText(R.string.learned_loading)
+            return
+        }
+        learnedSummary.text = resources.getQuantityString(R.plurals.learned_summary, data.personal.size, data.personal.size)
+        val taps = data.spatial.totalSamples
+        zonesSummary.text = if (taps == 0) {
+            getString(R.string.learned_zones_none)
         } else {
-            val words = resources.getQuantityString(R.plurals.learned_summary, data.personal.size, data.personal.size)
-            val taps = data.spatial.totalSamples
-            val zones = if (taps == 0) {
-                getString(R.string.learned_zones_none)
-            } else {
-                resources.getQuantityString(R.plurals.learned_zones, taps, NumberFormat.getIntegerInstance().format(taps))
-            }
-            "$words\n$zones"
+            resources.getQuantityString(R.plurals.learned_zones, taps, NumberFormat.getIntegerInstance().format(taps))
         }
     }
 
