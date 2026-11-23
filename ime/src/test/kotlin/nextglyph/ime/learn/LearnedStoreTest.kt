@@ -103,6 +103,22 @@ class LearnedStoreTest {
         }
 
         @Test
+        fun `retirer un refus l'enlève de la liste, enregistre et prévient`() {
+            val (store, data) = loaded()
+            repeat(2) { data.rejections.recordRejection("zorglub", "zorglube") }
+            store.saveIfChanged()
+            var notified = 0
+            store.addListener { notified++ }
+
+            val forgotten = store.forgetRefusal("Zorglub", "zorglube")
+
+            assertThat(forgotten).isTrue()
+            assertThat(data.rejections.rejections("zorglub", "zorglube")).isZero()
+            assertThat(notified).isEqualTo(1)
+            assertThat(store.saveIfChanged()).isFalse()
+        }
+
+        @Test
         fun `export puis import en TSV`() {
             val (store, data) = loaded()
             data.personal.importWord("zorglub", "fr", 3)
@@ -191,12 +207,25 @@ class LearnedStoreTest {
             var imported: ImportReport? = ImportReport(1, emptyList(), 0, false, false, false)
 
             store.clear()
+            val forgotten = store.forgetRefusal("zorglub", "zorglube")
             store.exportTsv({ ByteArrayOutputStream() }) { exported = it }
             store.importTsv({ ByteArrayInputStream(ByteArray(0)) }) { imported = it }
 
             assertThat(store.saveIfChanged()).isFalse()
+            assertThat(forgotten).isFalse()
             assertThat(exported).isFalse()
             assertThat(imported).isNull()
+        }
+
+        @Test
+        fun `retirer un refus inconnu ne change rien et ne prévient pas`() {
+            val (store, _) = loaded()
+            var notified = 0
+            store.addListener { notified++ }
+
+            assertThat(store.forgetRefusal("zorglub", "zorglube")).isFalse()
+
+            assertThat(notified).isZero()
         }
 
         @Test

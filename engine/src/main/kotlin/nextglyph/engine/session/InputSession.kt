@@ -364,7 +364,14 @@ class InputSession(
                     if (p.inserted != p.word) replaced = p.inserted
                 }
                 learning?.onValidated(p, language, field.prediction, wordAutoCapital)
-                measuring?.onWord(autocommit = replaced != null)
+                measuring?.onWord(
+                    when {
+                        replaced == null -> null
+                        p.case == SpaceCase.WORD -> TypingStats.AutoKind.RESTORATION
+                        else -> TypingStats.AutoKind.CORRECTION
+                    },
+                    field.prediction.prudence,
+                )
             } else {
                 learning?.onWordEnded()
                 finishComposing()
@@ -384,11 +391,11 @@ class InputSession(
      * quelle, sans rien lire du champ.
      */
     fun onBackspace() {
-        measuring?.onBackspace()
         val pendingUndo = undo
         undo = null
         editState = EditState.INITIAL
         if (!field.readsText) {
+            measuring?.onBackspace()
             heatmap?.forgetRecent()
             target.sendBackspaceKey()
             cursor = UNKNOWN
@@ -400,7 +407,10 @@ class InputSession(
         if (pendingUndo != null && predictor != null) {
             val edit = predictor.undo(target.textBeforeCursor(LOOKBACK), pendingUndo.token, field.prediction)
             if (edit != null) {
-                learning?.onUndo()
+                // Une correction refusée assez souvent est adoptée dans le dictionnaire personnel (§5.5, §10.5).
+                val token = pendingUndo.token
+                val refused = token.takeIf { it.case == SpaceCase.DOMINANT && predictor.isRefusalLearned(it) }?.typed
+                learning?.onUndo(refused, field.prediction)
                 measuring?.onUndo()
                 // Annuler une validation automatique n'est pas une erreur de frappe.
                 heatmap?.forgetRecent()
@@ -413,6 +423,7 @@ class InputSession(
                 return
             }
         }
+        measuring?.onBackspace()
         learning?.onErase()
         batch {
             when {

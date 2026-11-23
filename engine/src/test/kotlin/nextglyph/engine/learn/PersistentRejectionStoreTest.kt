@@ -73,6 +73,58 @@ class PersistentRejectionStoreTest {
             assertThat(store.snapshot()).containsExactly(Triple("deux", "2", 1), Triple("un", "1", 2))
             assertThat(copy.snapshot()).isEqualTo(store.snapshot())
         }
+
+        @Test
+        fun `les refus appris sont ceux qui atteignent la limite, le plus récent d'abord`() {
+            repeat(2) { store.recordRejection("un", "1") }
+            store.recordRejection("deux", "2")
+            repeat(3) { store.recordRejection("Trois", "3") }
+
+            assertThat(store.learned(2)).containsExactly(
+                PersistentRejectionStore.Refusal("trois", "3", 3),
+                PersistentRejectionStore.Refusal("un", "1", 2),
+            )
+            assertThat(store.learned(1).map { it.typed }).containsExactly("trois", "deux", "un")
+        }
+
+        @Test
+        fun `oublier un refus le retire, sans tenir compte de la casse, et change la révision`() {
+            store.recordRejection("bonj", "bonjour")
+            store.recordRejection("autre", "x")
+            val before = store.revision
+
+            val forgotten = store.forget("BONJ", "Bonjour")
+
+            assertThat(forgotten).isTrue()
+            assertThat(store.rejections("bonj", "bonjour")).isZero()
+            assertThat(store.rejections("autre", "x")).isEqualTo(1)
+            assertThat(store.size).isEqualTo(1)
+            assertThat(store.revision).isEqualTo(before + 1)
+        }
+
+        @Test
+        fun `oublier un refus rend la correction au prédicteur`() {
+            val predictor = PredictFixtures.frenchPredictor(store)
+            val state = predictor.initialLanguageState("fr")
+            repeat(2) { store.recordRejection("bonj", "bonjour") }
+            assertThat(predictor.predict("Il dit bonj", state, PredictionSettings()).case).isEqualTo(SpaceCase.LITERAL)
+
+            store.forget("bonj", "bonjour")
+
+            assertThat(predictor.predict("Il dit bonj", state, PredictionSettings()).case).isEqualTo(SpaceCase.DOMINANT)
+        }
+
+        @Test
+        fun `un refus appris expose ses trois champs`() {
+            store.recordRejection("Bonj", "Bonjour")
+            store.recordRejection("bonj", "bonjour")
+
+            val refusal = store.learned(2).single()
+
+            assertThat(refusal.typed).isEqualTo("bonj")
+            assertThat(refusal.inserted).isEqualTo("bonjour")
+            assertThat(refusal.count).isEqualTo(2)
+        }
     }
 
     @Nested
@@ -100,6 +152,23 @@ class PersistentRejectionStoreTest {
                 assertThatThrownBy { store.restore(bad) }.isInstanceOf(IllegalArgumentException::class.java)
             }
             assertThat(store.snapshot()).containsExactly(Triple("a", "b", 1))
+        }
+
+        @Test
+        fun `oublier une paire inconnue ne change rien`() {
+            store.recordRejection("a", "b")
+            val before = store.revision
+
+            assertThat(store.forget("a", "autre")).isFalse()
+            assertThat(store.forget("", "")).isFalse()
+
+            assertThat(store.revision).isEqualTo(before)
+            assertThat(store.size).isEqualTo(1)
+        }
+
+        @Test
+        fun `rien n'est appris dans un magasin vide`() {
+            assertThat(store.learned(1)).isEmpty()
         }
     }
 
@@ -155,6 +224,25 @@ class PersistentRejectionStoreTest {
 
             assertThatThrownBy { small.restore(listOf(Triple("a", "b", 1), Triple("c", "d", 1))) }
                 .isInstanceOf(IllegalArgumentException::class.java)
+        }
+
+        @Test
+        fun `appris à la limite exactement, pas à la limite moins un`() {
+            repeat(2) { store.recordRejection("a", "b") }
+
+            assertThat(store.learned(3)).isEmpty()
+            assertThat(store.learned(2)).containsExactly(PersistentRejectionStore.Refusal("a", "b", 2))
+            assertThat(store.learned(1)).containsExactly(PersistentRejectionStore.Refusal("a", "b", 2))
+        }
+
+        @Test
+        fun `oublier la seule paire vide le magasin`() {
+            store.recordRejection("a", "b")
+
+            assertThat(store.forget("a", "b")).isTrue()
+            assertThat(store.forget("a", "b")).isFalse()
+
+            assertThat(store.size).isZero()
         }
     }
 }

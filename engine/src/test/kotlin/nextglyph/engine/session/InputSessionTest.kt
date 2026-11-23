@@ -102,7 +102,8 @@ class InputSessionTest {
             assertThat(s.editor.toString()).isEqualTo("Bonjour comment ")
             assertThat(c.autocommits).isEqualTo(2)
             assertThat(c.chars).isEqualTo(10)
-            assertThat(c.backspaces).isEqualTo(1)
+            assertThat(c.backspaces).isZero()
+            assertThat(c.keys).isEqualTo(11)
             assertThat(c.words).isEqualTo(3)
             assertThat(c.undone).isEqualTo(1)
             assertThat(c.picks).isEqualTo(1)
@@ -430,6 +431,73 @@ class InputSessionTest {
             assertThat(s.session.language!!.locked).isEqualTo("en")
             assertThat(s.session.state.languageVersion).isGreaterThan(0)
         }
+
+        @Test
+        fun `apprentissage du refus - deux annulations adoptent le mot tapé, qui n'est plus corrigé`() {
+            val s = setup()
+            val data = nextglyph.engine.learn.LearnedData()
+            s.session.learning = SessionLearning(data)
+
+            s.type("bonj ")
+            s.backspace()
+            assertThat(data.personal.contains("bonj", "fr")).isFalse()
+            s.type(" ")
+            s.backspace()
+
+            assertThat(rejections.rejections("bonj", "bonjour")).isEqualTo(2)
+            assertThat(data.personal.contains("bonj", "fr")).isTrue()
+            s.type(" ")
+            assertThat(s.editor.toString()).isEqualTo("Bonj ")
+        }
+
+        @Test
+        fun `mesures - une restitution annulée est comptée à part et le ⌫ d'annulation n'est pas un effacement`() {
+            val s = setup()
+            val stats = nextglyph.engine.stats.TypingStats({ 0L })
+            s.session.stats = stats
+
+            s.type("ecole ")
+            s.backspace()
+
+            val c = stats.counters
+            assertThat(c.restored).isEqualTo(1)
+            assertThat(c.restoredUndone).isEqualTo(1)
+            assertThat(c.correctionsTotal).isZero()
+            assertThat(c.undone).isEqualTo(1)
+            assertThat(c.backspaces).isZero()
+            assertThat(c.keys).isEqualTo(7)
+        }
+
+        @Test
+        fun `mesures - corrections et annulations comptées dans la prudence du champ`() {
+            for (prudence in nextglyph.engine.predict.Prudence.entries) {
+                val s = setup(field = SessionField(InputProfileResolver.resolve(C.TYPE_CLASS_TEXT, 0, null), EnterBehavior.EnterKey, prudence = prudence))
+                val stats = nextglyph.engine.stats.TypingStats({ 0L })
+                s.session.stats = stats
+
+                s.type(if (prudence == nextglyph.engine.predict.Prudence.BOLD) "bonj " else "bonjou ")
+                s.backspace()
+
+                val c = stats.counters
+                assertThat(c.corrections(prudence)).isEqualTo(1)
+                assertThat(c.correctionsUndone(prudence)).isEqualTo(1)
+                assertThat(c.correctionsTotal).isEqualTo(1)
+                assertThat(c.correctionsUndoneTotal).isEqualTo(1)
+            }
+        }
+
+        @Test
+        fun `mesures - un effacement ordinaire compte comme ⌫`() {
+            val s = setup()
+            val stats = nextglyph.engine.stats.TypingStats({ 0L })
+            s.session.stats = stats
+
+            s.type("bonj")
+            s.backspace()
+
+            assertThat(stats.counters.backspaces).isEqualTo(1)
+            assertThat(stats.counters.undone).isZero()
+        }
     }
 
     @Nested
@@ -553,6 +621,52 @@ class InputSessionTest {
 
             assertThat(s.editor.toString()).isEqualTo("bonj")
             assertThat(s.editor.calls).contains("region:0:3")
+        }
+
+        @Test
+        fun `apprentissage du refus - une restitution d'accent refusée n'ajoute aucun mot`() {
+            val s = setup()
+            val data = nextglyph.engine.learn.LearnedData()
+            s.session.learning = SessionLearning(data)
+
+            repeat(3) {
+                s.type("ecole ")
+                s.backspace()
+                s.type(" ")
+                s.backspace()
+            }
+
+            assertThat(data.personal.size).isZero()
+        }
+
+        @Test
+        fun `apprentissage du refus - rien en incognito`() {
+            val s = setup(field = field(imeOptions = C.IME_FLAG_NO_PERSONALIZED_LEARNING))
+            val data = nextglyph.engine.learn.LearnedData()
+            s.session.learning = SessionLearning(data)
+
+            repeat(3) {
+                s.type("bonj ")
+                s.backspace()
+            }
+
+            assertThat(data.personal.size).isZero()
+            assertThat(data.personal.pendingSize).isZero()
+        }
+
+        @Test
+        fun `mesures - un mot connu validé tel quel n'est ni une correction ni une restitution`() {
+            val s = setup()
+            val stats = nextglyph.engine.stats.TypingStats({ 0L })
+            s.session.stats = stats
+
+            s.type("bonjour ")
+
+            val c = stats.counters
+            assertThat(c.words).isEqualTo(1)
+            assertThat(c.autocommits).isZero()
+            assertThat(c.restored).isZero()
+            assertThat(c.correctionsTotal).isZero()
         }
     }
 
@@ -706,6 +820,19 @@ class InputSessionTest {
 
             assertThat(states).hasSize(1)
             assertThat(states.last()).isEqualTo(s.session.state)
+        }
+
+        @Test
+        fun `apprentissage du refus - une seule annulation n'adopte rien`() {
+            val s = setup()
+            val data = nextglyph.engine.learn.LearnedData()
+            s.session.learning = SessionLearning(data)
+
+            s.type("bonj ")
+            s.backspace()
+
+            assertThat(data.personal.size).isZero()
+            assertThat(data.personal.pendingSize).isZero()
         }
     }
 }

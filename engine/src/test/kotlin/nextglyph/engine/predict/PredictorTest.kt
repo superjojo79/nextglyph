@@ -370,6 +370,29 @@ class PredictorTest {
             assertThat(again.candidates[0].key).isEqualTo("dose")
             assertThat(cached.cachedTexts()).containsExactly(1)
         }
+
+        @Test
+        fun `le jeton d'une correction porte le cas DOMINANT, celui d'une restitution le cas WORD`() {
+            val correction = fr.commitSpace(fr.at("Il dit bonj", frState), frState, settings)
+            val restoration = fr.commitSpace(fr.at("Il dit ecole", frState), frState, settings)
+
+            assertThat(correction.undo!!.case).isEqualTo(SpaceCase.DOMINANT)
+            assertThat(restoration.undo).isEqualTo(UndoToken("ecole", "école", SpaceCase.WORD))
+        }
+
+        @Test
+        fun `le refus est appris dès que le compteur atteint la limite`() {
+            val store = InMemoryRejectionStore()
+            val predictor = PredictFixtures.frenchPredictor(store)
+            val token = UndoToken("bonj", "bonjour")
+
+            store.recordRejection("bonj", "bonjour")
+            val afterOne = predictor.isRefusalLearned(token)
+            store.recordRejection("bonj", "bonjour")
+
+            assertThat(afterOne).isFalse()
+            assertThat(predictor.isRefusalLearned(token)).isTrue()
+        }
     }
 
     @Nested
@@ -482,6 +505,21 @@ class PredictorTest {
 
             assertThat(misaligned.candidates.map { it.key }).startsWith("dose", "rose")
         }
+
+        @Test
+        fun `un refus jamais enregistré n'est pas appris`() {
+            assertThat(fr.isRefusalLearned(UndoToken("bonj", "bonjour"))).isFalse()
+        }
+
+        @Test
+        fun `incognito - même annulée plusieurs fois, la correction n'est pas apprise`() {
+            val predictor = PredictFixtures.frenchPredictor()
+            val token = UndoToken("bonj", "bonjour")
+
+            repeat(3) { predictor.undo("bonjour ", token, PredictionSettings(incognito = true)) }
+
+            assertThat(predictor.isRefusalLearned(token)).isFalse()
+        }
     }
 
     @Nested
@@ -563,6 +601,19 @@ class PredictorTest {
             val p = roses.predict("eose", state, PredictionSettings(noSuggestions = true), taps)
 
             assertThat(p.case).isEqualTo(SpaceCase.DISABLED)
+        }
+
+        @Test
+        fun `appris à rejectLimit annulations exactement, pas à rejectLimit moins un, et au-delà`() {
+            for (limit in listOf(1, 2, 3)) {
+                val predictor = PredictFixtures.frenchPredictor(config = PredictionConfig(rejectLimit = limit))
+                val token = UndoToken("bonj", "bonjour")
+                for (count in 1..limit + 1) {
+                    predictor.undo("bonjour ", token, settings)
+
+                    assertThat(predictor.isRefusalLearned(token)).isEqualTo(count >= limit)
+                }
+            }
         }
     }
 }

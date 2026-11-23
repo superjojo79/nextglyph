@@ -390,6 +390,46 @@ class PersonalDictionaryTest {
             assertThat(dictionary.onValidated(dominant, state, settings)).isEqualTo(LearnOutcome.IGNORED)
             assertThat(dictionary.pendingWords().single().form).isEqualTo("zorglub")
         }
+
+        @Test
+        fun `adopter promeut tout de suite un mot inconnu`() {
+            val outcome = dictionary.adopt("zorglub", "fr", settings)
+
+            assertThat(outcome).isEqualTo(LearnOutcome.PROMOTED)
+            assertThat(dictionary.contains("zorglub", "fr")).isTrue()
+            assertThat(dictionary.words("fr")).containsExactly(PersonalWord("fr", "zorglub", 1))
+            assertThat(dictionary.lexiconRevision).isEqualTo(1)
+        }
+
+        @Test
+        fun `adopter un mot déjà promu le compte seulement`() {
+            dictionary.adopt("zorglub", "fr", settings)
+
+            val outcome = dictionary.adopt("zorglub", "fr", settings)
+
+            assertThat(outcome).isEqualTo(LearnOutcome.USED)
+            assertThat(dictionary.words("fr")).containsExactly(PersonalWord("fr", "zorglub", 2))
+        }
+
+        @Test
+        fun `adopter un mot en attente le promeut en gardant ses validations`() {
+            dictionary.see("zorglub")
+            assertThat(dictionary.pendingSize).isEqualTo(1)
+
+            val outcome = dictionary.adopt("zorglub", "fr", settings)
+
+            assertThat(outcome).isEqualTo(LearnOutcome.PROMOTED)
+            assertThat(dictionary.pendingSize).isZero()
+            assertThat(dictionary.words("fr")).containsExactly(PersonalWord("fr", "zorglub", 2))
+        }
+
+        @Test
+        fun `adopter en début de phrase ramène l'initiale en minuscule`() {
+            dictionary.adopt("Zorglub", "fr", settings, atSentenceStart = true)
+            dictionary.adopt("Machin", "fr", settings)
+
+            assertThat(dictionary.words("fr").map { it.form }).containsExactly("Machin", "zorglub")
+        }
     }
 
     @Nested
@@ -492,6 +532,23 @@ class PersonalDictionaryTest {
             assertThatThrownBy { dictionary.restore(listOf(good), listOf(good)) }
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("promu et en attente")
             assertThat(dictionary.words().single().form).isEqualTo("zorglub")
+        }
+
+        @Test
+        fun `adopter est ignoré sans apprentissage, sans suggestions, pour un mot invalide ou une langue invalide`() {
+            val ignored = listOf(
+                dictionary.adopt("zorglub", "fr", PredictionSettings(incognito = true)),
+                dictionary.adopt("zorglub", "fr", PredictionSettings(profile = FieldProfile.PASSWORD)),
+                dictionary.adopt("zorglub", "fr", PredictionSettings(noSuggestions = true)),
+                dictionary.adopt("zorg1ub", "fr", settings),
+                dictionary.adopt("a", "fr", settings),
+                dictionary.adopt("zorglub", "FR", settings),
+                dictionary.adopt("zorglub", "", settings),
+            )
+
+            assertThat(ignored).containsOnly(LearnOutcome.IGNORED)
+            assertThat(dictionary.size).isZero()
+            assertThat(dictionary.revision).isZero()
         }
     }
 
@@ -623,6 +680,22 @@ class PersonalDictionaryTest {
             assertThat(small.pendingSize).isEqualTo(1)
             assertThatThrownBy { small.restore(listOf(stored, other), emptyList()) }.isInstanceOf(IllegalArgumentException::class.java)
             assertThatThrownBy { small.restore(emptyList(), listOf(stored, other)) }.isInstanceOf(IllegalArgumentException::class.java)
+        }
+
+        @Test
+        fun `adopter - longueur minimale acceptée, longueur minimale moins un refusée`() {
+            val min = dictionary.config.minWordLength
+
+            assertThat(dictionary.adopt("a".repeat(min), "fr", settings)).isEqualTo(LearnOutcome.PROMOTED)
+            assertThat(dictionary.adopt("b".repeat(min - 1), "fr", settings)).isEqualTo(LearnOutcome.IGNORED)
+        }
+
+        @Test
+        fun `adopter - longueur maximale acceptée, plus un refusée`() {
+            val max = dictionary.config.maxWordLength
+
+            assertThat(dictionary.adopt("a".repeat(max), "fr", settings)).isEqualTo(LearnOutcome.PROMOTED)
+            assertThat(dictionary.adopt("b".repeat(max + 1), "fr", settings)).isEqualTo(LearnOutcome.IGNORED)
         }
     }
 }

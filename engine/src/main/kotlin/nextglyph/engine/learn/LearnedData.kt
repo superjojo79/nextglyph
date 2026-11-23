@@ -1,5 +1,7 @@
 package nextglyph.engine.learn
 
+import nextglyph.engine.lexicon.LexiconLanguage
+
 /**
  * Tout ce que le clavier apprend, au même endroit (spec §10.5, §5.5, §5.3, §12) : dictionnaire
  * personnel, mémoire des refus et modèle spatial. Un seul fichier ([LearnedDataFile]), un seul
@@ -19,6 +21,17 @@ class LearnedData(
 
     /** Vrai si rien n'a été appris : ni mot (promu ou en attente), ni refus, ni frappe. */
     val isEmpty: Boolean get() = personal.size == 0 && personal.pendingSize == 0 && rejections.size == 0 && spatial.isEmpty
+
+    /**
+     * Retire un refus appris (§10.5, réglages) : oublie la paire ([typed], [inserted]) **et** le mot [typed] du
+     * dictionnaire personnel (toutes langues), pour que la correction puisse de nouveau s'appliquer.
+     * Vrai si quelque chose a changé.
+     */
+    fun forgetRefusal(typed: String, inserted: String): Boolean {
+        var changed = rejections.forget(typed, inserted)
+        for (language in LexiconLanguage.SUPPORTED) changed = personal.remove(typed, language) || changed
+        return changed
+    }
 
     /**
      * Efface tout l'état appris (§12, « Effacer les données apprises ») : mots promus et en attente,

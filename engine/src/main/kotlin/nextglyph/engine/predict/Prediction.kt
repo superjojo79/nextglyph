@@ -87,8 +87,9 @@ class Prediction(
  *
  * @property typed texte tapé à l'origine, restitué par l'annulation.
  * @property inserted texte inséré à sa place (sans l'espace automatique qui le suit).
+ * @property case [SpaceCase.DOMINANT] pour une correction, [SpaceCase.WORD] pour une restitution d'accent ou de casse.
  */
-data class UndoToken(val typed: String, val inserted: String)
+data class UndoToken(val typed: String, val inserted: String, val case: SpaceCase = SpaceCase.DOMINANT)
 
 /**
  * Effet d'une validation : modification du texte, jeton d'annulation éventuel, score de langue mis à jour.
