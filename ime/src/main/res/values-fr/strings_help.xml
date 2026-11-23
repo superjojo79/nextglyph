@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Langue de l'interface (spec §14). -->
+    <string name="pref_section_interface">Interface</string>
+    <string name="pref_ui_language">Langue de l\'interface</string>
+    <string name="pref_ui_language_system">Langue du système</string>
+
+    <!-- Explications : une ligne de résumé sous chaque réglage et un texte plus long derrière le bouton (i) (spec §14). -->
+    <string name="pref_info_description">Plus d\'informations sur «&#160;%1$s&#160;»</string>
+
+    <string name="pref_ui_language_summary">Langue de l\'écran des réglages et des textes propres au clavier.</string>
+    <string name="pref_ui_language_info">Choisit la langue de cet écran et des messages affichés par le clavier. «&#160;Langue du système&#160;» suit celle de votre téléphone et c\'est le réglage par défaut. Seule l\'interface change&#160;: les langues dans lesquelles vous écrivez se règlent dans «&#160;Langues&#160;». Depuis Android&#160;13, ce choix est aussi proposé dans les réglages du système, avec la langue de chaque application.</string>
+
+    <string name="pref_layout_summary">Disposition des touches&#160;: AZERTY ou QWERTY.</string>
+    <string name="pref_layout_info">Choisit la disposition des lettres. Par défaut, elle suit la langue du système&#160;: AZERTY si elle est française, QWERTY sinon. La disposition ne dépend pas de la langue dans laquelle vous écrivez&#160;: une personne francophone qui écrit en anglais garde son AZERTY. Le changement est immédiat.</string>
+
+    <string name="pref_adaptation_summary">Mesure dans laquelle les touches changent selon les lettres probables.</string>
+    <string name="pref_adaptation_info">Après chaque frappe, le clavier estime les lettres les plus probables et les met en valeur. Désactivé&#160;: rien ne bouge. Calme&#160;: les lettres probables sont seulement plus opaques, les autres plus pâles. Calme renforcé (par défaut)&#160;: en plus, légère variation de la taille du libellé et de la largeur des touches, volontairement faible. Élastique&#160;: l\'effet le plus marqué, avec de plus grands changements de taille et de largeur. Une touche pâle reste utilisable normalement. Avec TalkBack, le clavier garde sa disposition de repos.</string>
+
+    <string name="pref_row_height_summary">Hauteur des rangées de touches, de 34 à 46 dp.</string>
+    <string name="pref_row_height_info">Règle la hauteur de chaque rangée de touches, de 34 à 46 dp (par défaut&#160;: 38 dp). Des rangées plus hautes sont plus faciles à viser mais prennent plus de place à l\'écran&#160;; des rangées plus basses laissent voir davantage de l\'application. Le changement est immédiat.</string>
+
+    <string name="pref_bottom_margin_summary">Espace ajouté sous la dernière rangée, de 0 à 48 dp.</string>
+    <string name="pref_bottom_margin_info">Ajoute un espace vide sous la dernière rangée, en plus de la place que le clavier laisse déjà à la barre de navigation du système. Il remonte le clavier au-dessus des boutons système si vous les touchez par erreur. De 0 à 48 dp (par défaut&#160;: 0 dp, aucun espace ajouté).</string>
+
+    <string name="pref_wide_space_info">Sur les écrans d\'au moins 400 dp de large, rétrécit les touches \?123 (ou ABC), ↵ et ⌫ pour que la barre d\'espace soit plus large et plus facile à viser. Sans effet sur les écrans plus étroits, dans les champs de mot de passe, sur la disposition classique et sur les pavés numériques. Par défaut&#160;: désactivé.</string>
+
+    <string name="pref_haptics_summary">Force de la vibration quand vous appuyez sur une touche.</string>
+    <string name="pref_haptics_info">Choisit l\'intensité de la vibration à chaque appui sur une touche&#160;: désactivé, léger, moyen (par défaut) ou fort. Le clavier utilise le retour haptique du système&#160;: rien ne vibre si le «&#160;retour tactile&#160;» (ou la vibration au toucher) est désactivé dans les réglages d\'Android.</string>
+
+    <string name="pref_languages_summary">Langues dans lesquelles le clavier prédit et corrige.</string>
+    <string name="pref_languages_info">Choisit les langues utilisées pour les suggestions et les corrections&#160;: français, anglais, ou les deux (par défaut). Avec les deux, vous n\'avez jamais à changer de langue&#160;: le clavier suit celle des mots que vous écrivez, même au sein d\'une phrase. Choisir une seule langue retire l\'autre des suggestions, ce qui évite les confusions si vous n\'écrivez que dans celle-là.</string>
+
+    <string name="pref_preferred_language_summary">Langue supposée au début de la saisie, avant tout mot.</string>
+    <string name="pref_preferred_language_info">Définit la langue que le clavier suppose au départ, avant d\'avoir vu un seul mot de votre part. Il s\'adapte ensuite à vos mots. Par défaut, il suit la langue du système, à condition qu\'elle soit active&#160;; sinon la première langue active est utilisée. Ce réglage ne compte que si les deux langues sont actives.</string>
+
+    <string name="pref_autocommit_info">À l\'appui sur la barre d\'espace, le clavier complète ou corrige le mot si un candidat domine nettement (par exemple «&#160;bonjoru&#160;» devient «&#160;bonjour&#160;»), et la touche espace affiche alors le mot qu\'elle va insérer. Un appui sur ⌫ juste après annule le changement et rend ce que vous aviez tapé. Une correction annulée deux fois n\'est plus appliquée automatiquement. Elle ne l\'est jamais dans les champs de mot de passe, d\'e-mail, d\'URL ou numériques. Par défaut&#160;: activée.</string>
+
+    <string name="pref_prudence_summary">Degré de certitude requis avant de remplacer un mot.</string>
+    <string name="pref_prudence_info">Règle le degré de certitude qu\'un candidat doit atteindre pour que l\'espace remplace ce que vous avez tapé. Prudente&#160;: remplace rarement, le moins d\'erreurs. Normale (par défaut)&#160;: dans des simulations avec 5 pour cent de fautes de frappe, au plus 2 pour cent environ des mots étaient remplacés à tort. Audacieuse&#160;: remplace plus souvent, au prix de plus d\'erreurs. Ce réglage ne compte que si «&#160;Validation par espace&#160;» est activée, et les suggestions restent disponibles dans la barre quel que soit votre choix.</string>
+
+    <string name="pref_french_typography_info">Quand vous écrivez en français, insère une espace insécable avant ; ! ? et :, ainsi qu\'à l\'intérieur des guillemets « », comme l\'exige la typographie française, pour qu\'un signe ne se retrouve jamais seul en début de ligne. S\'applique seulement aux phrases détectées comme françaises, jamais aux phrases anglaises. Par défaut&#160;: activée.</string>
+
+    <string name="pref_double_space_info">Appuyer deux fois sur la barre d\'espace remplace l\'espace par un point suivi d\'une espace, et le mot suivant commence par une majuscule si le champ le permet. Par défaut&#160;: activé.</string>
+
+    <string name="pref_section_learned_summary">Mots et habitudes que le clavier a appris de vous.</string>
+    <string name="pref_section_learned_info">Le clavier apprend les mots inconnus que vous tapez (après deux validations sans annulation), les corrections que vous refusez et la façon dont vos doigts tombent sur les touches. Rien n\'est appris en mode incognito, ni dans les champs de mot de passe, d\'e-mail, d\'URL ou numériques. Ces données restent dans le stockage privé de l\'application et sont exclues des sauvegardes. Vous pouvez exporter les mots appris dans un fichier TSV, importer un tel fichier, ou tout effacer d\'un geste, après confirmation.</string>
+
+    <string name="pref_section_stats_summary">Compteurs de votre saisie, conservés sur cet appareil.</string>
+    <string name="pref_section_stats_info">Affiche votre vitesse de frappe, la fréquence de vos appuis sur ⌫, le nombre de mots complétés ou corrigés par le clavier et celui des remplacements automatiques que vous avez annulés. Ils aident à juger si le clavier vous convient. Seuls des compteurs sont conservés, jamais de texte, et rien n\'est compté en mode incognito ni dans les champs de mot de passe, d\'e-mail, d\'URL ou numériques. Rien ne quitte l\'appareil. Vous pouvez les remettre à zéro à tout moment.</string>
+
+    <string name="pref_contacts_info">Permet au clavier de proposer les prénoms, noms et surnoms de votre carnet d\'adresses, surtout après des mots comme «&#160;bonjour&#160;» ou «&#160;avec&#160;», ou dans les champs de nom. Il faut la permission d\'accès aux contacts, demandée à l\'activation. Les noms sont relus à chaque démarrage du clavier et à chaque modification de vos contacts, gardés en mémoire seulement, jamais écrits dans le stockage ni envoyés où que ce soit (Nextglyph n\'a aucun accès au réseau). Désactiver la fonction, ou retirer la permission, les efface aussitôt. Par défaut&#160;: désactivé.</string>
+</resources>

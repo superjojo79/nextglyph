@@ -1,8 +1,10 @@
 package nextglyph.ime
 
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.Resources
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
@@ -49,6 +51,7 @@ import nextglyph.ime.contacts.ContactsRepository
 import nextglyph.ime.learn.LearnedStore
 import nextglyph.ime.lexicon.AssetLexicons
 import nextglyph.ime.lexicon.LexiconLoader
+import nextglyph.ime.settings.AppLocale
 import nextglyph.ime.settings.KeyboardSettings
 import nextglyph.ime.settings.SettingsActivity
 import nextglyph.ime.view.KeyboardView
@@ -121,10 +124,17 @@ class NextglyphInputMethodService : InputMethodService() {
     private val learnedListener = LearnedStore.Listener { data -> onLearnedChanged(data) }
     private val contactsListener = ContactsRepository.Listener { _ -> rebuildPredictors() }
 
+    /** Locale du système, non celle de l'interface (§14) : disposition, langue de départ et séparateur décimal en dépendent. */
+    private fun systemLocale() = Resources.getSystem().configuration.locales.get(0)
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
+
     override fun onCreate() {
         super.onCreate()
         services = AppServices.get(this)
-        val locale = resources.configuration.locales.get(0)
+        val locale = systemLocale()
         decimalPolicy = DecimalSeparatorPolicy(DecimalSeparators.preferred(locale))
         settings = services.settings
         layoutKind = settings.layoutFor(locale?.language)
@@ -468,7 +478,7 @@ class NextglyphInputMethodService : InputMethodService() {
     private fun applySettings() {
         val previous = settings
         settings = services.settings
-        val kind = settings.layoutFor(resources.configuration.locales.get(0)?.language)
+        val kind = settings.layoutFor(systemLocale()?.language)
         session.setEditConfig(settings.editConfig)
         keyboardView?.let { view ->
             view.adaptationMode = settings.adaptationMode
@@ -496,7 +506,7 @@ class NextglyphInputMethodService : InputMethodService() {
 
     private fun preferredLanguage(): String {
         val subtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
-        return settings.preferredFor(subtype?.languageTag, resources.configuration.locales.get(0)?.toLanguageTag())
+        return settings.preferredFor(subtype?.languageTag, systemLocale()?.toLanguageTag())
     }
 
     private companion object {
