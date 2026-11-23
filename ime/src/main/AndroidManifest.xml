@@ -39,5 +39,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Carte de frappe (issue #46) : ouverte depuis les réglages, jamais depuis une autre application. -->
+        <activity
+            android:name=".settings.HeatmapActivity"
+            android:exported="false"
+            android:label="@string/heatmap_title" />
     </application>
 </manifest>

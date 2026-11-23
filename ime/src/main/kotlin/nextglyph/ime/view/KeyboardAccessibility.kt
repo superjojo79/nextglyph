@@ -33,6 +33,9 @@ internal class KeyboardAccessibility(private val view: View, private val host: H
         fun nodeAt(x: Float, y: Float): Int
 
         fun click(id: Int): Boolean
+
+        /** Faux pour une vue en lecture seule (carte de frappe) : les nœuds ne se déclarent pas activables. */
+        val clickable: Boolean get() = true
     }
 
     private var focused = View.NO_ID
@@ -67,9 +70,9 @@ internal class KeyboardAccessibility(private val view: View, private val host: H
         }
         info.isEnabled = true
         info.isVisibleToUser = true
-        info.isClickable = true
+        info.isClickable = host.clickable
         info.isFocusable = true
-        info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK)
+        if (host.clickable) info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK)
         if (focused == virtualViewId) {
             info.isAccessibilityFocused = true
             info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLEAR_ACCESSIBILITY_FOCUS)

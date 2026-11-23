@@ -230,12 +230,16 @@ class SettingsActivity : Activity() {
         button(root, R.string.pref_clear) { confirmClear() }
         label(root, R.string.pref_touch_zones, R.string.pref_touch_zones_summary, R.string.pref_touch_zones_info)
         zonesSummary = text(root, "")
+        button(root, R.string.pref_heatmap_open) { startActivity(Intent(this, HeatmapActivity::class.java)) }
 
         section(root, R.string.pref_section_stats, R.string.pref_section_stats_summary, R.string.pref_section_stats_info)
         statsSummary = text(root, "")
         button(root, R.string.pref_stats_reset) {
             services.stats.reset()
             services.saveStats()
+            // Les erreurs de la carte de frappe font partie des mesures ; la densité suit les données apprises.
+            services.heatmap.resetErrors()
+            services.saveHeatmap()
             updateStatsSummary()
         }
 
@@ -317,6 +321,8 @@ class SettingsActivity : Activity() {
             .setMessage(R.string.clear_confirm)
             .setPositiveButton(R.string.clear_action) { _, _ ->
                 services.learned.clear()
+                services.heatmap.resetDensity()
+                services.saveHeatmap()
                 updateLearnedSummary()
                 Toast.makeText(this, R.string.clear_done, Toast.LENGTH_SHORT).show()
             }

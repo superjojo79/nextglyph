@@ -146,6 +146,7 @@ class NextglyphInputMethodService : InputMethodService() {
         }
         session.onWordReplaced = { word -> keyboardView?.announceInserted(word) }
         session.stats = services.stats
+        session.heatmap = services.heatmap
         val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nextglyph-lexicon").apply { isDaemon = true } }
         worker = executor
         val assets = AssetLexicons(assets)
@@ -168,6 +169,7 @@ class NextglyphInputMethodService : InputMethodService() {
     override fun onDestroy() {
         clipboard?.removePrimaryClipChangedListener(clipListener)
         services.saveStats()
+        services.saveHeatmap()
         clipHistory.clear()
         services.preferences.unregisterOnSharedPreferenceChangeListener(preferencesListener)
         services.learned.removeListener(learnedListener)
@@ -275,6 +277,7 @@ class NextglyphInputMethodService : InputMethodService() {
 
     override fun onFinishInput() {
         services.saveStats()
+        services.saveHeatmap()
         session.onFinishInput()
         handler.removeCallbacks(save)
         if (::services.isInitialized) services.learned.saveIfChanged()

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Carte de frappe (issue #46). -->
+    <string name="pref_heatmap_open">View the typing map</string>
+    <string name="heatmap_title">Typing map</string>
+    <string name="pref_heatmap_summary">Where you tap on each key, where your fingers drift, and which keys you correct most.</string>
+    <string name="pref_heatmap_info">The map draws the keyboard at rest and shows, for each key, three views. Density: the spots of the key where your taps land. Learned offsets: the average shift of your taps from the key center, drawn as an arrow. Errors: the share of taps followed by a ⌫ that erased the character you had just typed. Only counters per key are kept: no text, no order of taps, no time. Nothing is counted in incognito mode, in password fields or in numeric fields. Nothing leaves the device. The erase and reset buttons of the settings also clear this map.</string>
+
+    <string name="heatmap_mode_title">View</string>
+    <string name="heatmap_mode_density">Density</string>
+    <string name="heatmap_mode_offsets">Learned offsets</string>
+    <string name="heatmap_mode_errors">Errors</string>
+    <string name="heatmap_layout_title">Layout shown</string>
+
+    <string name="heatmap_legend_density">The brighter a spot, the more taps landed there. Each key is split into a grid of the places where your finger touched it.</string>
+    <string name="heatmap_legend_offsets">Dot: the center of the key. Arrow: where your taps land on average, enlarged %1$d times to be visible. Small number: taps learned for this key.</string>
+    <string name="heatmap_legend_errors">Red: share of taps followed by a ⌫ that erased the character. Grey and a dash: fewer than %1$d taps, too few to tell. The ⌫ key itself has no error rate.</string>
+    <string name="heatmap_privacy">Local data: only counters per key, no text is recorded, nothing in incognito mode or in password fields. The buttons to erase them are in the settings: \"Erase learned data\" clears the tap density, \"Reset measurements\" clears the errors.</string>
+
+    <string name="heatmap_empty">No data yet. Type a few messages and come back.</string>
+    <plurals name="heatmap_total">
+        <item quantity="one">%1$s tap counted.</item>
+        <item quantity="other">%1$s taps counted.</item>
+    </plurals>
+
+    <string name="heatmap_reset_learning">Reset touch-zone learning</string>
+    <string name="heatmap_reset_confirm">The learned touch zones and this typing map will be erased. The personal dictionary and the typing measurements are kept. This cannot be undone.</string>
+    <string name="heatmap_reset_action">Reset</string>
+    <string name="heatmap_reset_done">Touch-zone learning reset.</string>
+
+    <plurals name="heatmap_a11y_density">
+        <item quantity="one">%1$s: %2$d tap</item>
+        <item quantity="other">%1$s: %2$d taps</item>
+    </plurals>
+    <string name="heatmap_a11y_offset">%1$s: %2$s</string>
+    <string name="heatmap_a11y_errors_none">%1$s: error rate not measured for this key</string>
+    <string name="heatmap_a11y_errors_unknown">%1$s: not enough taps to estimate errors</string>
+    <plurals name="heatmap_a11y_errors">
+        <item quantity="one">%1$s: %2$s of errors over %3$d tap</item>
+        <item quantity="other">%1$s: %2$s of errors over %3$d taps</item>
+    </plurals>
+    <string name="heatmap_offset_unknown">no learned offset yet</string>
+    <string name="heatmap_offset_centered">taps centered on the key</string>
+    <string name="heatmap_strength_slight">slight</string>
+    <string name="heatmap_strength_clear">clear</string>
+    <string name="heatmap_side_left">the left</string>
+    <string name="heatmap_side_right">the right</string>
+    <string name="heatmap_side_top">the top</string>
+    <string name="heatmap_side_bottom">the bottom</string>
+    <string name="heatmap_sides_pair">%1$s and %2$s</string>
+    <string name="heatmap_offset_phrase">%1$s offset toward %2$s</string>
+</resources>

@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.ContactsContract
+import nextglyph.engine.stats.KeyHeatmap
 import nextglyph.engine.stats.TypingStats
 import nextglyph.ime.contacts.ContactsRepository
 import nextglyph.ime.contacts.ContactsSource
@@ -62,6 +63,19 @@ class AppServices private constructor(context: Context) {
         stats.markSaved()
     }
 
+    /**
+     * Carte de frappe (issue #46) : compteurs par touche (frappes, erreurs, densité), jamais de texte. Même fichier
+     * de préférences que les mesures, exclu des sauvegardes.
+     */
+    val heatmap: KeyHeatmap = KeyHeatmap.parse(statsPreferences.getString(KEY_HEATMAP, null))
+
+    /** Enregistre la carte de frappe si elle a changé. */
+    fun saveHeatmap() {
+        if (!heatmap.changed) return
+        statsPreferences.edit().putString(KEY_HEATMAP, heatmap.serialize()).apply()
+        heatmap.markSaved()
+    }
+
     val settings: KeyboardSettings get() = KeyboardSettings.read { preferences.all[it] }
 
     /**
@@ -85,6 +99,7 @@ class AppServices private constructor(context: Context) {
         const val LEARNED_FILE = "learned.ngls"
         const val STATS_PREFERENCES = "nextglyph_stats"
         private const val KEY_STATS = "typing_stats"
+        private const val KEY_HEATMAP = "key_heatmap"
         private const val CONTACTS_DEBOUNCE_MS = 2000L
 
         @Volatile

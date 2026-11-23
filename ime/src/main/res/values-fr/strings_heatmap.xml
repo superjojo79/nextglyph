@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Carte de frappe (issue #46). -->
+    <string name="pref_heatmap_open">Voir la carte de frappe</string>
+    <string name="heatmap_title">Carte de frappe</string>
+    <string name="pref_heatmap_summary">Où vous appuyez sur chaque touche, où vos doigts dérivent et les touches que vous corrigez le plus.</string>
+    <string name="pref_heatmap_info">La carte dessine le clavier au repos et montre, pour chaque touche, trois vues. Densité : les endroits de la touche où tombent vos appuis. Décalages appris : le décalage moyen de vos appuis par rapport au centre de la touche, dessiné par une flèche. Erreurs : la part des appuis suivis d\'un ⌫ qui a effacé le caractère que vous veniez de taper. Seuls des compteurs par touche sont conservés : aucun texte, aucun ordre de frappe, aucune heure. Rien n\'est compté en mode incognito, dans les champs de mot de passe ni dans les champs numériques. Rien ne quitte l\'appareil. Les boutons d\'effacement et de remise à zéro des réglages vident aussi cette carte.</string>
+
+    <string name="heatmap_mode_title">Vue</string>
+    <string name="heatmap_mode_density">Densité</string>
+    <string name="heatmap_mode_offsets">Décalages appris</string>
+    <string name="heatmap_mode_errors">Erreurs</string>
+    <string name="heatmap_layout_title">Disposition affichée</string>
+
+    <string name="heatmap_legend_density">Plus un endroit est clair, plus d\'appuis y sont tombés. Chaque touche est découpée en une grille des endroits où votre doigt l\'a touchée.</string>
+    <string name="heatmap_legend_offsets">Point : le centre de la touche. Flèche : où tombent en moyenne vos appuis, agrandie %1$d fois pour être visible. Petit nombre : appuis appris pour cette touche.</string>
+    <string name="heatmap_legend_errors">Rouge : part des appuis suivis d\'un ⌫ qui a effacé le caractère. Gris et tiret : moins de %1$d appuis, trop peu pour conclure. La touche ⌫ elle-même n\'a pas de taux d\'erreur.</string>
+    <string name="heatmap_privacy">Données locales : seulement des compteurs par touche, aucun texte n\'est enregistré, rien en mode incognito ni dans les champs de mot de passe. Les boutons pour les effacer sont dans les réglages : « Effacer les données apprises » vide la densité des appuis, « Remettre les mesures à zéro » vide les erreurs.</string>
+
+    <string name="heatmap_empty">Pas encore de données. Écrivez quelques messages puis revenez.</string>
+    <plurals name="heatmap_total">
+        <item quantity="one">%1$s appui compté.</item>
+        <item quantity="many">%1$s appuis comptés.</item>
+        <item quantity="other">%1$s appuis comptés.</item>
+    </plurals>
+
+    <string name="heatmap_reset_learning">Réinitialiser l\'apprentissage des zones</string>
+    <string name="heatmap_reset_confirm">Les zones de frappe apprises et cette carte de frappe seront effacées. Le dictionnaire personnel et les mesures de saisie sont conservés. Cette action est définitive.</string>
+    <string name="heatmap_reset_action">Réinitialiser</string>
+    <string name="heatmap_reset_done">Apprentissage des zones réinitialisé.</string>
+
+    <plurals name="heatmap_a11y_density">
+        <item quantity="one">%1$s : %2$d frappe</item>
+        <item quantity="many">%1$s : %2$d frappes</item>
+        <item quantity="other">%1$s : %2$d frappes</item>
+    </plurals>
+    <string name="heatmap_a11y_offset">%1$s : %2$s</string>
+    <string name="heatmap_a11y_errors_none">%1$s : taux d\'erreur non mesuré pour cette touche</string>
+    <string name="heatmap_a11y_errors_unknown">%1$s : pas assez de frappes pour estimer les erreurs</string>
+    <plurals name="heatmap_a11y_errors">
+        <item quantity="one">%1$s : %2$s d\'erreurs sur %3$d frappe</item>
+        <item quantity="many">%1$s : %2$s d\'erreurs sur %3$d frappes</item>
+        <item quantity="other">%1$s : %2$s d\'erreurs sur %3$d frappes</item>
+    </plurals>
+    <string name="heatmap_offset_unknown">aucun décalage appris pour l\'instant</string>
+    <string name="heatmap_offset_centered">appuis centrés sur la touche</string>
+    <string name="heatmap_strength_slight">léger</string>
+    <string name="heatmap_strength_clear">net</string>
+    <string name="heatmap_side_left">la gauche</string>
+    <string name="heatmap_side_right">la droite</string>
+    <string name="heatmap_side_top">le haut</string>
+    <string name="heatmap_side_bottom">le bas</string>
+    <string name="heatmap_sides_pair">%1$s et %2$s</string>
+    <string name="heatmap_offset_phrase">décalage %1$s vers %2$s</string>
+</resources>
