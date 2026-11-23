@@ -204,8 +204,14 @@ class InputSession(
     /**
      * Appui validé sur [key] ; [upper] : glissé vers le haut sur une lettre (majuscule, §5.7) ; [offset] :
      * position de la frappe par rapport à la touche au repos (modèle spatial, §5.3), `null` si inconnue.
+     *
+     * Pour toute touche qui n'est pas une lettre, la frappe est d'abord signalée à l'apprentissage
+     * ([SessionLearning.onKeyTap], touches de fonction apprises : espace, entrée, ⌫, `?123`), avant d'être
+     * exécutée. Seul `onKey` rapporte des frappes : les appels directs à [onSpace], [onBackspace] ou
+     * [onEnter] (glissés, gestes, répétition) n'en rapportent aucune.
      */
     fun onKey(key: Key, upper: Boolean = false, offset: TapOffset? = null) {
+        if (key.kind != KeyKind.LETTER) learning?.onKeyTap(key.kind, offset, field.prediction)
         when (key.kind) {
             KeyKind.LETTER -> onLetter(key.label, upper, offset)
             KeyKind.CHARACTER -> onCharacter(key.label)
@@ -216,6 +222,14 @@ class InputSession(
             // gérés par l'IME (dispositions du profil, M3). Touches PC : événements clavier envoyés par l'IME (§5.10).
             KeyKind.SYMBOLS, KeyKind.LETTERS, KeyKind.SHIFT, KeyKind.DECIMAL, KeyKind.EMPTY, KeyKind.PC, KeyKind.NAV -> Unit
         }
+    }
+
+    /**
+     * Changement de couche par [key] (`?123` ou `ABC`), géré par la vue et non par la session : informe
+     * seulement l'apprentissage ([SessionLearning.onKeyTap]) ; [offset] : position de la frappe, `null` si inconnue.
+     */
+    fun onLayerKey(key: Key, offset: TapOffset? = null) {
+        learning?.onKeyTap(key.kind, offset, field.prediction)
     }
 
     /**

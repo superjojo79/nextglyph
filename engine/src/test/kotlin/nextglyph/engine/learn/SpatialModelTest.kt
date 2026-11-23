@@ -1,5 +1,6 @@
 package nextglyph.engine.learn
 
+import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyboardGeometry
 import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.predict.FieldProfile
@@ -29,8 +30,123 @@ class SpatialModelTest {
         }
     }
 
+    private fun SpatialModel.learnKey(kind: KeyKind, dx: Double, dy: Double, times: Int) {
+        repeat(times) {
+            assertThat(stageKey(kind, dx, dy, settings)).isTrue()
+            assertThat(confirmKey()).isTrue()
+        }
+    }
+
     @Nested
     inner class HappyPath {
+
+        @Test
+        fun `les touches apprises sont espace, entrée, retour arrière et symboles, dans cet ordre`() {
+            assertThat(SpatialModel.LEARNED_KEYS).containsExactly(KeyKind.SPACE, KeyKind.ENTER, KeyKind.BACKSPACE, KeyKind.SYMBOLS)
+        }
+
+        @Test
+        fun `une frappe de touche en attente n'est pas apprise avant confirmation`() {
+            assertThat(model.stageKey(KeyKind.SPACE, 0.2, -0.1, settings)).isTrue()
+
+            assertThat(model.pendingKey).isEqualTo(KeyKind.SPACE)
+            assertThat(model.sampleCount(KeyKind.SPACE)).isZero()
+            assertThat(model.isEmpty).isTrue()
+            assertThat(model.totalSamples).isZero()
+        }
+
+        @Test
+        fun `la confirmation intègre la frappe de touche et change la révision`() {
+            model.stageKey(KeyKind.ENTER, 0.2, -0.1, settings)
+            val before = model.revision
+
+            assertThat(model.confirmKey()).isTrue()
+
+            assertThat(model.pendingKey).isNull()
+            assertThat(model.sampleCount(KeyKind.ENTER)).isEqualTo(1)
+            assertThat(model.revision).isEqualTo(before + 1)
+            assertThat(model.isEmpty).isFalse()
+        }
+
+        @Test
+        fun `l'écart d'une touche de fonction est ramené vers zéro selon la confiance`() {
+            model.learnKey(KeyKind.SPACE, -0.2, 0.1, 20)
+
+            // n / (n + priorWeight) = 20 / 40 = 0,5.
+            assertThat(model.keyOffsetX(KeyKind.SPACE)).isCloseTo(-0.1f, Offset.offset(1e-6f))
+            assertThat(model.keyOffsetY(KeyKind.SPACE)).isCloseTo(0.05f, Offset.offset(1e-6f))
+            assertThat(model.keyOffsetX(KeyKind.ENTER)).isZero()
+        }
+
+        @Test
+        fun `chaque touche apprise a son propre compteur et le total les additionne avec les lettres`() {
+            model.learn('e', 0.1, 0.0, 3)
+            model.learnKey(KeyKind.SPACE, 0.1, 0.0, 2)
+            model.learnKey(KeyKind.ENTER, 0.1, 0.0, 4)
+            model.learnKey(KeyKind.BACKSPACE, 0.1, 0.0, 5)
+            model.learnKey(KeyKind.SYMBOLS, 0.1, 0.0, 6)
+
+            assertThat(model.sampleCount(KeyKind.SPACE)).isEqualTo(2)
+            assertThat(model.sampleCount(KeyKind.ENTER)).isEqualTo(4)
+            assertThat(model.sampleCount(KeyKind.BACKSPACE)).isEqualTo(5)
+            assertThat(model.sampleCount(KeyKind.SYMBOLS)).isEqualTo(6)
+            assertThat(model.sampleCount('e')).isEqualTo(3)
+            assertThat(model.totalSamples).isEqualTo(20)
+        }
+
+        @Test
+        fun `la confirmation des lettres ne touche pas la frappe de touche en attente`() {
+            model.stage('e', 0.1, 0.0, settings)
+            model.stageKey(KeyKind.SPACE, 0.1, 0.0, settings)
+
+            model.confirm()
+            assertThat(model.pendingKey).isEqualTo(KeyKind.SPACE)
+            model.discardStaged()
+            model.discardLast()
+
+            assertThat(model.pendingKey).isEqualTo(KeyKind.SPACE)
+            assertThat(model.sampleCount('e')).isEqualTo(1)
+        }
+
+        @Test
+        fun `un enregistrement de 30 entrées est restauré avec les touches`() {
+            model.learn('e', 0.1, 0.0, 5)
+            model.learnKey(KeyKind.SYMBOLS, 0.2, -0.2, 7)
+            val copy = SpatialModel()
+
+            copy.restore(model.snapshot())
+
+            assertThat(model.snapshot()).hasSize(30)
+            assertThat(copy.sampleCount(KeyKind.SYMBOLS)).isEqualTo(7)
+            assertThat(copy.keyOffsetX(KeyKind.SYMBOLS)).isEqualTo(model.keyOffsetX(KeyKind.SYMBOLS))
+            assertThat(copy.keyOffsetY(KeyKind.SYMBOLS)).isEqualTo(model.keyOffsetY(KeyKind.SYMBOLS))
+            assertThat(copy.totalSamples).isEqualTo(12)
+        }
+
+        @Test
+        fun `un enregistrement de 26 lettres laisse les touches vides`() {
+            model.learnKey(KeyKind.SPACE, 0.2, 0.0, 10)
+            val letters = SpatialModel().apply { learn('e', 0.1, 0.0, 5) }.snapshot().take(26)
+
+            model.restore(letters)
+
+            assertThat(model.sampleCount('e')).isEqualTo(5)
+            assertThat(model.sampleCount(KeyKind.SPACE)).isZero()
+            assertThat(model.keyOffsetX(KeyKind.SPACE)).isZero()
+        }
+
+        @Test
+        fun `l'effacement oublie aussi les touches et la frappe de touche en attente`() {
+            model.learnKey(KeyKind.SPACE, 0.2, 0.0, 10)
+            model.stageKey(KeyKind.ENTER, 0.1, 0.0, settings)
+
+            model.reset()
+
+            assertThat(model.isEmpty).isTrue()
+            assertThat(model.totalSamples).isZero()
+            assertThat(model.pendingKey).isNull()
+            assertThat(model.keyOffsetX(KeyKind.SPACE)).isZero()
+        }
 
         @Test
         fun `après l'effacement, un nouvel apprentissage repart de zéro`() {
@@ -225,6 +341,95 @@ class SpatialModelTest {
     inner class ErrorCases {
 
         @Test
+        fun `une frappe de touche est refusée là où l'apprentissage est interdit`() {
+            for (profile in listOf(FieldProfile.PASSWORD, FieldProfile.NUMERIC)) {
+                val refused = model.stageKey(KeyKind.SPACE, 0.1, 0.0, PredictionSettings(profile = profile))
+
+                assertThat(refused).describedAs(profile.name).isFalse()
+            }
+            assertThat(model.stageKey(KeyKind.SPACE, 0.1, 0.0, PredictionSettings(incognito = true))).isFalse()
+            assertThat(model.pendingKey).isNull()
+        }
+
+        @Test
+        fun `une touche qui n'est pas apprise est refusée`() {
+            for (kind in KeyKind.entries.filter { it !in SpatialModel.LEARNED_KEYS }) {
+                assertThat(model.stageKey(kind, 0.0, 0.0, settings)).describedAs(kind.name).isFalse()
+                assertThat(model.sampleCount(kind)).isZero()
+                assertThat(model.keyOffsetX(kind)).isZero()
+                assertThat(model.keyOffsetY(kind)).isZero()
+            }
+            assertThat(model.pendingKey).isNull()
+        }
+
+        @Test
+        fun `une frappe de touche non finie ou hors du rectangle est refusée`() {
+            assertThat(model.stageKey(KeyKind.SPACE, Double.NaN, 0.0, settings)).isFalse()
+            assertThat(model.stageKey(KeyKind.SPACE, 0.0, Double.POSITIVE_INFINITY, settings)).isFalse()
+            assertThat(model.stageKey(KeyKind.SPACE, 0.51, 0.0, settings)).isFalse()
+            assertThat(model.stageKey(KeyKind.SPACE, 0.0, -0.51, settings)).isFalse()
+            assertThat(model.pendingKey).isNull()
+        }
+
+        @Test
+        fun `un refus ne remplace pas la frappe de touche en attente`() {
+            model.stageKey(KeyKind.SPACE, 0.1, 0.0, settings)
+
+            model.stageKey(KeyKind.ENTER, 0.9, 0.0, settings)
+
+            assertThat(model.pendingKey).isEqualTo(KeyKind.SPACE)
+        }
+
+        @Test
+        fun `confirmer ou écarter sans frappe de touche en attente renvoie faux`() {
+            assertThat(model.confirmKey()).isFalse()
+            assertThat(model.discardKey()).isFalse()
+            assertThat(model.revision).isZero()
+        }
+
+        @Test
+        fun `écarter la frappe de touche en attente ne l'apprend pas`() {
+            model.stageKey(KeyKind.SPACE, 0.1, 0.0, settings)
+            val before = model.revision
+
+            assertThat(model.discardKey()).isTrue()
+
+            assertThat(model.pendingKey).isNull()
+            assertThat(model.confirmKey()).isFalse()
+            assertThat(model.totalSamples).isZero()
+            assertThat(model.revision).isEqualTo(before)
+        }
+
+        @Test
+        fun `une restauration écarte la frappe de touche en attente`() {
+            model.stageKey(KeyKind.SPACE, 0.1, 0.0, settings)
+
+            model.restore(SpatialModel().snapshot())
+
+            assertThat(model.pendingKey).isNull()
+        }
+
+        @Test
+        fun `un enregistrement de taille invalide est refusé`() {
+            val ok = model.snapshot()
+
+            for (size in listOf(0, 25, 27, 29, 31)) {
+                val bad = List(size) { ok[0] }
+                assertThatThrownBy { model.restore(bad) }.describedAs("taille $size").isInstanceOf(IllegalArgumentException::class.java)
+            }
+        }
+
+        @Test
+        fun `un enregistrement invalide sur une touche de fonction est refusé sans rien modifier`() {
+            model.learnKey(KeyKind.SPACE, 0.2, 0.0, 10)
+            val bad = model.snapshot().mapIndexed { i, s -> if (i == 29) LetterStats(1, 0.6, 0.0, 0.0, 0.0) else s }
+
+            assertThatThrownBy { model.restore(bad) }.isInstanceOf(IllegalArgumentException::class.java)
+
+            assertThat(model.sampleCount(KeyKind.SPACE)).isEqualTo(10)
+        }
+
+        @Test
         fun `chaque valeur non finie est ignorée, quel que soit l'axe`() {
             assertThat(model.stage('e', 0.0, Double.NaN, settings)).isFalse()
             assertThat(model.stage('e', Double.POSITIVE_INFINITY, 0.0, settings)).isFalse()
@@ -322,6 +527,40 @@ class SpatialModelTest {
 
     @Nested
     inner class BoundaryValues {
+
+        @Test
+        fun `une frappe de touche à exactement maxSampleOffset est retenue`() {
+            assertThat(model.stageKey(KeyKind.BACKSPACE, 0.5, -0.5, settings)).isTrue()
+        }
+
+        @Test
+        fun `l'écart d'une touche de fonction est borné par maxOffset`() {
+            val big = SpatialModel(SpatialConfig(priorWeight = 0.0))
+            big.learnKey(KeyKind.SPACE, 0.5, -0.5, 10)
+
+            assertThat(big.keyOffsetX(KeyKind.SPACE)).isEqualTo(0.25f)
+            assertThat(big.keyOffsetY(KeyKind.SPACE)).isEqualTo(-0.25f)
+        }
+
+        @Test
+        fun `le compteur d'une touche ne dépasse pas la fenêtre`() {
+            val small = SpatialModel(SpatialConfig(window = 5))
+
+            small.learnKey(KeyKind.ENTER, 0.1, 0.0, 9)
+
+            assertThat(small.sampleCount(KeyKind.ENTER)).isEqualTo(5)
+            assertThat(small.totalSamples).isEqualTo(5)
+        }
+
+        @Test
+        fun `un modèle vide a un total nul et des touches centrées`() {
+            assertThat(model.totalSamples).isZero()
+            for (kind in SpatialModel.LEARNED_KEYS) {
+                assertThat(model.keyOffsetX(kind)).isZero()
+                assertThat(model.keyOffsetY(kind)).isZero()
+                assertThat(model.sampleCount(kind)).isZero()
+            }
+        }
 
         @Test
         fun `sans poids des valeurs par défaut, un modèle vide reste neutre`() {

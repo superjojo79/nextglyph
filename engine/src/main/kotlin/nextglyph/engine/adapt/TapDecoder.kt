@@ -8,6 +8,7 @@ import nextglyph.engine.layout.KeyboardLayout
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 
 /** Comment un tap a été décodé. */
@@ -82,12 +83,23 @@ class TapDecoding(val layout: KeyboardLayout) {
  * scores ; une touche au repos (ou des poids absents) a un a priori neutre.
  *
  * **Règles de frontière** (voir `docs/DECISIONS.md`) :
- * - la *nature* de la touche est celle de la touche affichée sous le doigt : un tap sur une touche
+ * - la *nature* de la touche est celle de la touche affichée sous le doigt (après déplacement appris des
+ *   frontières des touches de fonction, voir plus bas) : un tap sur une touche
  *   de fonction la produit toujours, et un tap sur une lettre produit toujours une lettre, même
  *   tout près de l'espace ou de ⌫ ; le décodage probabiliste ne départage que des lettres ;
  * - **noyau** : un tap dans la fraction centrale [TapDecoderConfig.coreFraction] (en largeur et en
  *   hauteur) d'une lettre affichée produit cette lettre, même atténuée : c'est la garantie « un tap
  *   franchement au centre d'une touche atténuée produit cette lettre ».
+ *
+ * **Zones de frappe des touches de fonction** ([TapSpatialModel.keyOffsetX], [TapSpatialModel.keyOffsetY]) :
+ * la frontière entre deux touches dont l'une au moins n'est pas une lettre (espace/lettre, `?123`/lettre,
+ * ⌫/lettre, ↵/lettre, et les frontières verticales de ces touches avec les lettres de la rangée voisine)
+ * est déplacée de la moyenne des décalages appris des deux touches (en pixels), bornée par
+ * [TapDecoderConfig.maxBoundaryShift]. L'utilisateur qui vise l'espace un peu trop à gauche agrandit
+ * ainsi l'espace de ce côté. Les frontières lettre/lettre ne bougent pas (le score s'en charge). C'est
+ * déterministe, borné et indépendant du modèle de langue. Si une frontière horizontale et une frontière
+ * verticale revendiquent toutes deux le point, la frontière horizontale l'emporte. Avec un modèle vide
+ * ou [TapDecoderConfig.maxBoundaryShift] à 0, la touche retenue est celle sous le doigt.
  *
  * **Modèle spatial personnalisé** ([spatial], §5.3) : pour chaque lettre, les deux centres sont décalés
  * du décalage moyen appris et `σ` est multiplié par le facteur appris. Avec [TapSpatialModel.NONE]
@@ -121,7 +133,8 @@ class TapDecoder(
         require(out.layout === layout) { "Le résultat doit porter sur la disposition du décodeur." }
         out.clear()
 
-        val touched = displayed.keyAt(x, y) ?: return false
+        val base = displayed.keyAt(x, y) ?: return false
+        val touched = personalized(base, x, y, displayed, rest)
         if (touched.key.kind != KeyKind.LETTER) {
             out.set(touched, TapDecision.FUNCTION_KEY)
             return true
@@ -168,6 +181,65 @@ class TapDecoder(
         out.set(if (inCore) touched else best, if (inCore) TapDecision.CORE else TapDecision.SCORE)
         return true
     }
+
+    /**
+     * Touche retenue pour le point `(x, y)` dont la touche affichée est [base] : [base], ou sa voisine si une
+     * frontière avec une touche de fonction, déplacée par les décalages appris, passe de l'autre côté du point.
+     */
+    private fun personalized(base: KeyRect, x: Float, y: Float, displayed: KeyboardGeometry, rest: KeyboardGeometry): KeyRect {
+        if (config.maxBoundaryShift <= 0f) return base
+        return horizontalNeighbor(base, x, displayed, rest) ?: verticalNeighbor(base, x, y, displayed, rest) ?: base
+    }
+
+    private fun horizontalNeighbor(base: KeyRect, x: Float, displayed: KeyboardGeometry, rest: KeyboardGeometry): KeyRect? {
+        val row = displayed.rows[base.rowIndex]
+        val toLeft = x < base.centerX
+        val neighbor = row.getOrNull(if (toLeft) base.keyIndex - 1 else base.keyIndex + 1) ?: return null
+        if (!differentNature(base, neighbor)) return null
+        val left = if (toLeft) neighbor else base
+        val right = if (toLeft) base else neighbor
+        val restRow = rest.rows[base.rowIndex]
+        val leftRest = restRow[left.keyIndex]
+        val rightRest = restRow[right.keyIndex]
+        val shift = (offsetX(left.key) * leftRest.width + offsetX(right.key) * rightRest.width) / 2
+        val limit = config.maxBoundaryShift * min(leftRest.width, rightRest.width)
+        val boundary = left.right + shift.coerceIn(-limit, limit)
+        // Sans décalage, `boundary == left.right` : `keyAt` a déjà attribué le point (gauche si x < right).
+        val crossed = if (toLeft) x < boundary else x >= boundary
+        return if (crossed) neighbor else null
+    }
+
+    private fun verticalNeighbor(base: KeyRect, x: Float, y: Float, displayed: KeyboardGeometry, rest: KeyboardGeometry): KeyRect? {
+        val above = y < base.centerY
+        val row = base.rowIndex + if (above) -1 else 1
+        if (row < 0 || row >= displayed.rows.size) return null
+        val neighbor = displayed.rows[row].let { keys -> keys.firstOrNull { x < it.right } ?: keys.last() }
+        if (!differentNature(base, neighbor)) return null
+        val upper = if (above) neighbor else base
+        val lower = if (above) base else neighbor
+        val shift = (offsetY(upper.key) + offsetY(lower.key)) * rest.rowHeight / 2
+        // Sans décalage appris, `keyAt` décide seul (évite tout écart d'arrondi sur la frontière).
+        if (shift == 0f) return null
+        val limit = config.maxBoundaryShift * rest.rowHeight
+        // Même frontière que `keyAt` : le début de la rangée du bas, écart compris dans la rangée du haut.
+        val boundary = (upper.rowIndex + 1) * (displayed.rowHeight + displayed.rowGap) + shift.coerceIn(-limit, limit)
+        val crossed = if (above) y < boundary else y >= boundary
+        return if (crossed) neighbor else null
+    }
+
+    /** Vrai si au moins une des deux touches n'est pas une lettre, et aucune n'est un emplacement vide. */
+    private fun differentNature(a: KeyRect, b: KeyRect): Boolean {
+        val ka = a.key.kind
+        val kb = b.key.kind
+        if (ka == KeyKind.EMPTY || kb == KeyKind.EMPTY) return false
+        return ka != KeyKind.LETTER || kb != KeyKind.LETTER
+    }
+
+    private fun offsetX(key: Key): Float =
+        if (key.kind == KeyKind.LETTER) spatial.offsetX(key.label[0]) else spatial.keyOffsetX(key.kind)
+
+    private fun offsetY(key: Key): Float =
+        if (key.kind == KeyKind.LETTER) spatial.offsetY(key.label[0]) else spatial.keyOffsetY(key.kind)
 
     private fun gaussian(x: Float, y: Float, centerX: Float, centerY: Float, sx: Double, sy: Double): Double {
         val dx = (x - centerX) / sx

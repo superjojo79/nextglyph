@@ -56,6 +56,12 @@
         <item quantity="many">%1$d mots appris.</item>
         <item quantity="other">%1$d mots appris.</item>
     </plurals>
+    <string name="learned_zones_none">Pas encore apprises.</string>
+    <plurals name="learned_zones">
+        <item quantity="one">Apprises sur %1$s frappe.</item>
+        <item quantity="many">Apprises sur %1$s frappes.</item>
+        <item quantity="other">Apprises sur %1$s frappes.</item>
+    </plurals>
     <string name="pref_export">Exporter le dictionnaire (TSV)</string>
     <string name="pref_import">Importer un dictionnaire (TSV)</string>
     <string name="pref_clear">Effacer les données apprises</string>

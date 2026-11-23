@@ -59,7 +59,7 @@ class LoadResult(val data: LearnedData, val issues: List<LoadIssue>) {
  * |---|---|---|
  * | 1 | Dictionnaire personnel | `n` promus puis `m` en attente (`varInt`), du moins récent au plus récent ; chaque mot : langue (chaîne), nombre de formes, puis (forme, compteur) |
  * | 2 | Refus | `n` (`varInt`), puis (texte tapé, texte inséré, compteur), du moins récent au plus récent |
- * | 3 | Modèle spatial | 26 lettres `a`–`z` : frappes (`varInt`), moyennes x et y, variances x et y (`double`) |
+ * | 3 | Modèle spatial | version 2 : 26 lettres `a`–`z` puis 4 touches de fonction (`SpatialModel.LEARNED_KEYS` : espace, entrée, ⌫, `?123`) ; chaque entrée : frappes (`varInt`), moyennes x et y, variances x et y (`double`). La version 1 (26 lettres seules) est encore lue, touches vides |
  *
  * **Lecture tolérante.** Chaque section porte sa somme de contrôle : un octet altéré est toujours
  * détecté. La lecture s'arrête à la première section illisible (sa longueur n'est plus fiable) en
@@ -80,6 +80,9 @@ object LearnedDataFile {
     private const val TAG_REJECTIONS = 2
     private const val TAG_SPATIAL = 3
     private const val SECTION_VERSION = 1
+
+    /** Version de la section du modèle spatial : 2 depuis l'ajout des touches de fonction (1 : lettres seules). */
+    private const val SPATIAL_VERSION = 2
     private const val MAX_LANGUAGE_BYTES = 8
     private const val MAX_FORM_BYTES = 256
     private const val MAX_TEXT_BYTES = 4 * PersistentRejectionStore.MAX_TEXT_LENGTH
@@ -90,9 +93,9 @@ object LearnedDataFile {
         file.bytes(MAGIC)
         file.u16(VERSION)
         file.u8(SECTIONS)
-        section(file, TAG_PERSONAL, personalPayload(data.personal))
-        section(file, TAG_REJECTIONS, rejectionsPayload(data.rejections))
-        section(file, TAG_SPATIAL, spatialPayload(data.spatial))
+        section(file, TAG_PERSONAL, SECTION_VERSION, personalPayload(data.personal))
+        section(file, TAG_REJECTIONS, SECTION_VERSION, rejectionsPayload(data.rejections))
+        section(file, TAG_SPATIAL, SPATIAL_VERSION, spatialPayload(data.spatial))
         out.write(file.toByteArray())
         out.flush()
     }
@@ -151,9 +154,12 @@ object LearnedDataFile {
             }
             try {
                 when (tag) {
-                    TAG_PERSONAL -> readPersonal(known(sectionVersion, payload), data.personal, config)
-                    TAG_REJECTIONS -> readRejections(known(sectionVersion, payload), data.rejections, config)
-                    TAG_SPATIAL -> readSpatial(known(sectionVersion, payload), data.spatial)
+                    TAG_PERSONAL -> readPersonal(known(sectionVersion, SECTION_VERSION, payload), data.personal, config)
+                    TAG_REJECTIONS -> readRejections(known(sectionVersion, SECTION_VERSION, payload), data.rejections, config)
+                    TAG_SPATIAL -> {
+                        require(sectionVersion in 1..SPATIAL_VERSION) { "version de section $sectionVersion non prise en charge" }
+                        readSpatial(ByteReader(payload), data.spatial, if (sectionVersion == 1) SPATIAL_LETTERS else SPATIAL_LETTERS + SpatialModel.LEARNED_KEYS.size)
+                    }
                     else -> Unit // Section d'une version plus récente : ignorée.
                 }
             } catch (e: IllegalArgumentException) {
@@ -164,8 +170,8 @@ object LearnedDataFile {
         return LoadResult(data, issues)
     }
 
-    private fun known(sectionVersion: Int, payload: ByteArray): ByteReader {
-        require(sectionVersion == SECTION_VERSION) { "version de section $sectionVersion non prise en charge" }
+    private fun known(sectionVersion: Int, expected: Int, payload: ByteArray): ByteReader {
+        require(sectionVersion == expected) { "version de section $sectionVersion non prise en charge" }
         return ByteReader(payload)
     }
 
@@ -173,10 +179,10 @@ object LearnedDataFile {
     private const val SECTION_HEADER_BYTES = 6
     private const val HEADER_BYTES = 7
 
-    private fun section(file: ByteWriter, tag: Int, payload: ByteArray) {
+    private fun section(file: ByteWriter, tag: Int, version: Int, payload: ByteArray) {
         val section = ByteWriter()
         section.u8(tag)
-        section.u8(SECTION_VERSION)
+        section.u8(version)
         section.u32(payload.size.toLong())
         section.bytes(payload)
         val body = section.toByteArray()
@@ -248,8 +254,8 @@ object LearnedDataFile {
         return w.toByteArray()
     }
 
-    private fun readSpatial(r: ByteReader, model: SpatialModel) {
-        val stats = List(SPATIAL_LETTERS) {
+    private fun readSpatial(r: ByteReader, model: SpatialModel, entries: Int) {
+        val stats = List(entries) {
             LetterStats(r.varInt(Int.MAX_VALUE), r.double(), r.double(), r.double(), r.double())
         }
         r.requireEnd()

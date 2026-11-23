@@ -4,6 +4,7 @@ import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.layout.KeyRect
 import nextglyph.engine.learn.LearnOutcome
 import nextglyph.engine.learn.LearnedData
+import nextglyph.engine.learn.SpatialModel
 import nextglyph.engine.predict.LanguageState
 import nextglyph.engine.predict.Prediction
 import nextglyph.engine.predict.PredictionSettings
@@ -16,10 +17,10 @@ data class TapOffset(val dx: Double, val dy: Double) {
     companion object {
         /**
          * Décalage de la frappe ([x], [y]) (pixels, repère de la géométrie au repos) par rapport à [rest] ; `null`
-         * si la touche n'est pas une lettre.
+         * si la touche n'est ni une lettre ni une touche de fonction apprise ([SpatialModel.LEARNED_KEYS]).
          */
         fun of(x: Float, y: Float, rest: KeyRect): TapOffset? {
-            if (rest.key.kind != KeyKind.LETTER) return null
+            if (rest.key.kind != KeyKind.LETTER && rest.key.kind !in SpatialModel.LEARNED_KEYS) return null
             return TapOffset((x - rest.centerX).toDouble() / rest.width, (y - rest.centerY).toDouble() / rest.height)
         }
     }
@@ -34,6 +35,10 @@ data class TapOffset(val dx: Double, val dy: Double) {
  * - **Frappes** : chaque lettre tapée met sa frappe en attente ([onLetter]) ; une lettre effacée retire la
  *   sienne. Les frappes d'un mot validé ne sont intégrées qu'au début du mot suivant ou à la sortie du
  *   champ ([settle]) : un ⌫ juste après la validation (annulation, ou correction du mot) les écarte.
+ * - **Touches de fonction** : la frappe sur espace, entrée, ⌫ ou `?123` est mise en attente à son tour
+ *   ([onKeyTap], une seule à la fois) puis validée ou écartée d'après l'événement qui la suit : ⌫ écarte
+ *   espace et entrée (correction) ; un ⌫ isolé n'est pas appris (c'était peut-être un `m` ou un `n` manqué),
+ *   une série de ⌫ si ; `?123` est écartée par un retour immédiat à `ABC` ou un ⌫.
  * - **Mots** : la validation d'un mot ([onValidated], [onSuggestionPicked]) est observée par le dictionnaire
  *   personnel ; annulée (⌫ immédiat, [onUndo] ou [onErase]), le mot en attente est oublié.
  * - Dans un champ sans validation par espace (e-mail, URL, `NO_SUGGESTIONS`), la fin d'un mot ([onWordEnded])
@@ -51,10 +56,34 @@ class SessionLearning(val data: LearnedData) {
 
     /** Lettre [letter] tapée dans le mot en cours ; [offset] : position de la frappe, `null` hors tap (menu, glissé). */
     fun onLetter(letter: String, offset: TapOffset?, settings: PredictionSettings) {
+        resolveKey(KeyKind.LETTER)
         settle()
         val staged = offset != null && letter.length == 1 && data.spatial.stage(letter[0], offset.dx, offset.dy, settings)
         taps.addLast(staged)
         if (taps.size > MAX_TRACKED) taps.removeFirst()
+    }
+
+    /**
+     * Frappe sur la touche [kind] qui n'est pas une lettre (espace, entrée, ⌫, `?123`, `ABC`, caractère…) ;
+     * [offset] : sa position, `null` hors tap ou touche non apprise. D'abord, la frappe de touche en attente
+     * est résolue d'après [kind] (règles dans la description de la classe) ; puis celle-ci est mise en
+     * attente si elle est apprise ([SpatialModel.LEARNED_KEYS]) et localisée. Les frappes de lettres, elles,
+     * résolvent la frappe en attente par [onLetter].
+     */
+    fun onKeyTap(kind: KeyKind, offset: TapOffset?, settings: PredictionSettings) {
+        resolveKey(kind)
+        if (offset != null) data.spatial.stageKey(kind, offset.dx, offset.dy, settings)
+    }
+
+    /** Résout la frappe de touche en attente d'après l'événement suivant [next] (`LETTER` pour une lettre). */
+    private fun resolveKey(next: KeyKind) {
+        val pending = data.spatial.pendingKey ?: return
+        val keep = when (pending) {
+            KeyKind.BACKSPACE -> next == KeyKind.BACKSPACE
+            KeyKind.SYMBOLS -> next != KeyKind.LETTERS && next != KeyKind.BACKSPACE
+            else -> next != KeyKind.BACKSPACE
+        }
+        if (keep) data.spatial.confirmKey() else data.spatial.discardKey()
     }
 
     /**
@@ -107,8 +136,9 @@ class SessionLearning(val data: LearnedData) {
         taps.clear()
     }
 
-    /** Mot en cours abandonné (curseur déplacé, champ quitté ou changé) : ses frappes sont écartées. */
+    /** Mot en cours abandonné (curseur déplacé, champ quitté ou changé) : ses frappes, et la frappe de touche en attente, sont écartées. */
     fun onWordAbandoned() {
+        data.spatial.discardKey()
         settle()
         data.spatial.discardStaged()
         taps.clear()

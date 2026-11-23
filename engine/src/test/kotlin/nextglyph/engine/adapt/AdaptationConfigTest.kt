@@ -47,6 +47,7 @@ class AdaptationConfigTest {
             assertThat(config.decoder.sigma).isEqualTo(0.35f)
             assertThat(config.decoder.minPrior).isEqualTo(0.05f)
             assertThat(config.decoder.coreFraction).isEqualTo(0.5f)
+            assertThat(config.decoder.maxBoundaryShift).isEqualTo(0.2f)
         }
 
         @Test
@@ -69,6 +70,7 @@ class AdaptationConfigTest {
         fun `le décodeur spatial a lambda nul`() {
             assertThat(TapDecoderConfig.SPATIAL.lambda).isEqualTo(0f)
             assertThat(TapDecoderConfig.SPATIAL.alpha).isEqualTo(0.5f)
+            assertThat(TapDecoderConfig.SPATIAL.maxBoundaryShift).isEqualTo(0.2f)
         }
     }
 
@@ -91,6 +93,12 @@ class AdaptationConfigTest {
             rejects("labelStrength") { ModeProfile(0f, value) }
             rejects("alpha") { TapDecoderConfig(alpha = value) }
             rejects("coreFraction") { TapDecoderConfig(coreFraction = value) }
+        }
+
+        @ParameterizedTest
+        @ValueSource(floats = [-0.01f, 0.51f, 1f, Float.NaN, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY])
+        fun `rejette un déplacement maximal de frontière hors de 0 à 0,5`(value: Float) {
+            rejects("maxBoundaryShift") { TapDecoderConfig(maxBoundaryShift = value) }
         }
 
         @Test
@@ -140,13 +148,19 @@ class AdaptationConfigTest {
     inner class BoundaryValues {
 
         @Test
+        fun `accepte un déplacement de frontière de 0 (désactivé) et de 0,5`() {
+            assertThat(TapDecoderConfig(maxBoundaryShift = 0f).maxBoundaryShift).isZero()
+            assertThat(TapDecoderConfig(maxBoundaryShift = 0.5f).maxBoundaryShift).isEqualTo(0.5f)
+        }
+
+        @Test
         fun `accepte les bornes incluses`() {
             AdaptationConfig(
                 maxDisplacement = 1f, calmReinforcedDisplacement = 0f, minOpacity = 0f, opacityBase = 1f, opacitySlope = 0f,
                 minLabelScale = 1f, minWidth = 1f, gain = 0f, spaceGain = 0f, wordStartIntensity = 1f, correctionIntensity = 0f,
                 correctionNeighborRadius = 0f, correctionDeletionWeight = 1f, correctionInsertionWeight = 0f,
                 correctionMaxCandidates = 0, animationMs = 0L, easeOutPower = 1f, fastTypingMs = 0L,
-                decoder = TapDecoderConfig(alpha = 0f, lambda = 0f, minPrior = 1f, coreFraction = 1f),
+                decoder = TapDecoderConfig(alpha = 0f, lambda = 0f, minPrior = 1f, coreFraction = 1f, maxBoundaryShift = 0.5f),
             )
             AdaptationConfig(spaceGain = AdaptationConfig.MAX_SPACE_GAIN, opacityBase = 0f, opacitySlope = 1f)
             ModeProfile(1f, 1f)
