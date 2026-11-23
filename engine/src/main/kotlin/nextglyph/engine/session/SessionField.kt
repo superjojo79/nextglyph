@@ -19,12 +19,14 @@ import nextglyph.engine.profile.ShortcutBar
  *
  * @param autocommit réglage utilisateur « Validation par espace » (§14).
  * @param prudence réglage utilisateur « Prudence de la validation » (§5.5, §14).
+ * @param nextWord réglage utilisateur « Prédiction du mot suivant » (issue #51, §14).
  */
 class SessionField(
     val profile: InputProfile,
     val enter: EnterBehavior = EnterBehavior.EnterKey,
     autocommit: Boolean = true,
     prudence: Prudence = Prudence.NORMAL,
+    nextWord: Boolean = true,
 ) {
     /** Réglages de la prédiction : profil, `NO_SUGGESTIONS`, incognito (aucun refus mémorisé, §9.2). */
     val prediction: PredictionSettings = PredictionSettings(
@@ -33,6 +35,7 @@ class SessionField(
         incognito = profile.incognito || !profile.learning,
         autocommit = autocommit,
         prudence = prudence,
+        nextWord = nextWord,
     )
 
     /** Profil d'édition : typographie et espace automatique seulement pour la prose (§9.1). */
