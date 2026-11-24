@@ -1,0 +1,35 @@
+name: Diag deps (temporaire)
+on:
+  push:
+    branches: [claude/project-thread-o9ozr8]
+permissions:
+  contents: read
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: ./.github/actions/android-sdk
+      - name: Arbres
+        run: |
+          ./gradlew -q buildEnvironment > be.txt || true
+          ./gradlew -q :ime:buildEnvironment > be-ime.txt || true
+          ./gradlew -q :ime:dependencies > deps-ime.txt || true
+          ./gradlew -q :tools:dependencies :engine:dependencies > deps-other.txt || true
+          for g in bcprov-jdk18on bcpkix-jdk18on bcutil-jdk18on jdom2 guava jose4j commons-lang3 httpclient; do
+            echo "===== $g"
+            grep -h -n "$g" be.txt be-ime.txt deps-ime.txt deps-other.txt | sed 's/^[ |\\+-]*//' | sort | uniq -c | head -20
+          done
+          echo "===== buildEnvironment racine"
+          cat be.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diag
+          path: "*.txt"
