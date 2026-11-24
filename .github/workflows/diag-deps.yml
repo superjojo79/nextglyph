@@ -23,12 +23,10 @@ jobs:
           ./gradlew -q :ime:buildEnvironment > be-ime.txt || true
           ./gradlew -q :ime:dependencies > deps-ime.txt || true
           ./gradlew -q :tools:dependencies :engine:dependencies > deps-other.txt || true
-          for g in bcprov-jdk18on bcpkix-jdk18on bcutil-jdk18on jdom2 guava jose4j commons-lang3 httpclient; do
-            echo "===== $g"
-            grep -h -n "$g" be.txt be-ime.txt deps-ime.txt deps-other.txt | sed 's/^[ |\\+-]*//' | sort | uniq -c | head -20
+          for f in be.txt be-ime.txt deps-ime.txt deps-other.txt; do
+            echo "##### $f"
+            awk '/^[a-zA-Z]/{cfg=$1} /bcprov|bcpkix|bcutil|jdom2|com.google.guava:guava:|jose4j|commons-lang3|httpclient:/{l=$0; sub(/^[ |+\\-]*/,"",l); sub(/ \(\*\)$/,"",l); print cfg " :: " l}' "$f" | sort -u
           done
-          echo "===== buildEnvironment racine"
-          cat be.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: diag
