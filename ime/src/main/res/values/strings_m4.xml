@@ -33,6 +33,8 @@
     <string name="pref_section_typing">Typing</string>
     <string name="pref_autocommit">Commit on space</string>
     <string name="pref_autocommit_summary">Space completes or corrects the word when one candidate dominates. ⌫ right after undoes it.</string>
+    <string name="pref_next_word">Next-word prediction</string>
+    <string name="pref_next_word_summary">After a space, the bar offers three likely next words.</string>
     <string name="pref_prudence">Commit caution</string>
     <string name="pref_prudence_cautious">Cautious</string>
     <string name="pref_prudence_normal">Normal</string>

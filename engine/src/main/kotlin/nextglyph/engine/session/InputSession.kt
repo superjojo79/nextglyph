@@ -19,12 +19,16 @@ import nextglyph.engine.layout.Key
 import nextglyph.engine.layout.KeyKind
 import nextglyph.engine.lexicon.Distribution
 import nextglyph.engine.lexicon.LexiconLanguage
+import nextglyph.engine.ngram.NextWordContext
+import nextglyph.engine.ngram.NextWordPredictor
+import nextglyph.engine.ngram.NgramModel
 import nextglyph.engine.predict.FieldProfile
 import nextglyph.engine.predict.LanguageState
 import nextglyph.engine.predict.Prediction
 import nextglyph.engine.predict.Predictor
 import nextglyph.engine.predict.SpaceCase
 import nextglyph.engine.predict.Suggestion
+import nextglyph.engine.predict.SuggestionBar
 import nextglyph.engine.predict.TypedTap
 import nextglyph.engine.predict.UndoToken
 import nextglyph.engine.predict.WordTaps
@@ -70,6 +74,16 @@ class InputSession(
     /** Prédicteurs par niveau de contexte des contacts (§6.3), ou `null` tant qu'ils ne sont pas prêts. */
     var predictors: PredictionStack? = null
         private set
+
+    /**
+     * Prédicteur du mot suivant (issue #51), ou `null` : pas de modèle, la barre garde alors la ponctuation. Il ne
+     * retient rien : le texte qui précède le curseur est lu à chaque rafraîchissement.
+     */
+    var nextWords: NextWordPredictor? = null
+        private set
+
+    // La barre affichée propose les mots suivants (et non les suggestions du mot en cours) : un tap les insère.
+    private var nextWordBar = false
 
     /** Mesures locales (issue #36), ou `null` ; alimentées seulement dans les champs qui apprennent (§9.2). */
     var stats: TypingStats? = null
@@ -156,6 +170,16 @@ class InputSession(
             else -> predictor.initialLanguageState(if (preferred in predictor.languages) preferred else predictor.languages[0])
         }
         languageVersion++
+        refresh()
+    }
+
+    /**
+     * Installe les modèles de mot suivant (issue #51) par code de langue (`fr`, `en`), ou les retire si [models] est
+     * vide. Sans modèle d'une langue active, cette langue ne propose rien. Le réglage « Prédiction du mot suivant »
+     * se règle à chaque champ par [SessionField].
+     */
+    fun setNextWordModels(models: Map<String, NgramModel>) {
+        nextWords = if (models.isEmpty()) null else NextWordPredictor(models)
         refresh()
     }
 
@@ -528,7 +552,7 @@ class InputSession(
         val bar = state.bar
         val item = bar.items.getOrNull(index) ?: return
         when (bar.mode) {
-            BarMode.WORDS -> pickSuggestion(item)
+            BarMode.WORDS -> pickBarWord(item)
             BarMode.PUNCTUATION -> onCharacter(item.text)
             BarMode.SHORTCUTS -> onShortcut(item.text)
             BarMode.EMPTY -> Unit
@@ -543,7 +567,7 @@ class InputSession(
     fun onSpaceSwipeUp() {
         val bar = state.bar
         val center = bar.items.getOrNull(CENTER_ITEM)
-        if (bar.mode == BarMode.WORDS && center != null) pickSuggestion(center) else onSpace()
+        if (bar.mode == BarMode.WORDS && center != null) pickBarWord(center) else onSpace()
     }
 
     /** Menu de l'espace : verrouille [code], ou revient au mode automatique si `null` (§10.6). */
@@ -628,6 +652,34 @@ class InputSession(
         val base = letter.lowercase(Locale.ROOT).singleOrNull()
         val counted = offset != null && base != null && map.onTap(base, offset.dx, offset.dy, field.prediction)
         if (!counted) map.onUntracked()
+    }
+
+    private fun pickBarWord(item: BarItem) {
+        if (nextWordBar) pickNextWord(item) else pickSuggestion(item)
+    }
+
+    /**
+     * Insère le mot suivant [item] (ou le groupe de deux mots) suivi d'une espace automatique, sauf après une
+     * élision (`j'`) : le mot d'après commence sans espace. Pas d'annulation, rien n'est appris ni mémorisé.
+     */
+    private fun pickNextWord(item: BarItem) {
+        val predictor = predictor ?: return
+        val language = language ?: return
+        undo = null
+        heatmap?.forgetRecent()
+        batch {
+            val elision = item.text.last() in ELISION_ENDS
+            commit(if (elision) item.text else item.text + " ")
+            editState = when {
+                elision -> EditState.INITIAL
+                atEnd() -> EditState(SpaceOrigin.AUTO)
+                else -> EditState(SpaceOrigin.TYPED)
+            }
+            var next = language
+            for (word in item.text.split(' ')) next = predictor.observe(next, word, field.prediction)
+            setLanguage(next)
+        }
+        refresh()
     }
 
     private fun pickSuggestion(item: BarItem) {
@@ -831,14 +883,29 @@ class InputSession(
             if (p == null || p.word.isEmpty()) wordTaps.clear()
             val shift = if (before == null) manualShift else AutoCapitalization.shiftFor(before, field.textProfile, field.capsMode, manualShift)
             val prefix = if (field.adaptation && lang != null) WordPrefix.of(before, selectionLength, elisionLanguage()) else null
-            KeyboardState(bar(p), p?.spaceLabel?.let { "$SPACE_SYMBOL $it" }, languageLabel(lang), shift, prefix, languageVersion)
+            val following = if (p?.word.isNullOrEmpty()) nextWordSuggestions(lang, shift != ShiftState.OFF) else emptyList()
+            nextWordBar = following.isNotEmpty() && field.shortcuts.isEmpty() && (p == null || p.bar.isEmpty)
+            KeyboardState(bar(p, following), p?.spaceLabel?.let { "$SPACE_SYMBOL $it" }, languageLabel(lang), shift, prefix, languageVersion)
         }
         onStateChanged?.invoke(state)
     }
 
-    private fun bar(p: Prediction?): Bar = when {
+    /**
+     * Mots suivants (issue #51) quand le curseur suit une espace (ou une élision) ou le début du champ : aucun mot
+     * en cours, réglage actif, pas de sélection, pas de lettre juste après le curseur. [capitalize] : début de phrase.
+     */
+    private fun nextWordSuggestions(lang: LanguageState?, capitalize: Boolean): List<Suggestion> {
+        val predictor = nextWords ?: return emptyList()
+        if (lang == null || !field.composes || selectionLength > 0 || !field.prediction.nextWordEnabled) return emptyList()
+        val after = target.textAfterCursor(1)
+        if (!after.isNullOrEmpty() && after[0].isLetterOrDigit()) return emptyList()
+        return predictor.suggest(target.textBeforeCursor(NextWordContext.LOOKBACK), lang, capitalize)
+    }
+
+    private fun bar(p: Prediction?, following: List<Suggestion>): Bar = when {
         field.shortcuts.isNotEmpty() -> shortcutsOrEmpty()
         p != null && !p.bar.isEmpty -> Bar(BarMode.WORDS, listOf(p.bar.left, p.bar.center, p.bar.right).map { it?.toItem() })
+        following.isNotEmpty() -> SuggestionBar.of(following).let { Bar(BarMode.WORDS, listOf(it.left, it.center, it.right).map { s -> s?.toItem() }) }
         field.composes && editState.trailingSpace == SpaceOrigin.AUTO && p?.word.isNullOrEmpty() ->
             Bar(BarMode.PUNCTUATION, PUNCTUATION_BAR.map { BarItem(it) })
         else -> Bar.EMPTY
@@ -879,6 +946,7 @@ class InputSession(
         private const val MAX_PENDING = 32
         private const val MAX_TAPS = 64
         private const val JOINERS = "'’-‑"
+        private const val ELISION_ENDS = "'’"
         private const val SENTENCE_END = ".?!…"
     }
 }

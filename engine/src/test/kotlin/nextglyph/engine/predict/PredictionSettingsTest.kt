@@ -23,6 +23,13 @@ class PredictionSettingsTest {
         }
 
         @Test
+        fun `mot suivant - actif par défaut dans la prose`() {
+            assertThat(PredictionSettings().nextWord).isTrue()
+            assertThat(PredictionSettings().nextWordEnabled).isTrue()
+            assertThat(PredictionSettings(profile = FieldProfile.PERSON_NAME).nextWordEnabled).isTrue()
+        }
+
+        @Test
         fun `prudence - seuils 0,8 0,7 0,6`() {
             assertThat(Prudence.entries.map { it.minProb }).containsExactly(0.80, 0.70, 0.60)
             assertThat(Prudence.entries.map { it.minRatio }).containsExactly(3.0, 2.0, 1.5)
@@ -51,6 +58,7 @@ class PredictionSettingsTest {
 
             assertThat(s.suggestionsEnabled).isFalse()
             assertThat(s.autocommitEnabled).isFalse()
+            assertThat(s.nextWordEnabled).isFalse()
         }
 
         @Test
@@ -69,6 +77,14 @@ class PredictionSettingsTest {
             assertThat(PredictionSettings(noSuggestions = true).autocommitEnabled).isFalse()
             assertThat(PredictionSettings(autocommit = false).suggestionsEnabled).isTrue()
             assertThat(PredictionSettings(autocommit = false).autocommitEnabled).isFalse()
+        }
+
+        @Test
+        fun `mot suivant - désactivé par le réglage ou par NO_SUGGESTIONS, indépendant de la validation par espace`() {
+            assertThat(PredictionSettings(nextWord = false).nextWordEnabled).isFalse()
+            assertThat(PredictionSettings(noSuggestions = true).nextWordEnabled).isFalse()
+            assertThat(PredictionSettings(autocommit = false).nextWordEnabled).isTrue()
+            assertThat(PredictionSettings(nextWord = false).suggestionsEnabled).isTrue()
         }
 
         @Test

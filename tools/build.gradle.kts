@@ -96,14 +96,17 @@ pitest {
 // ---------------------------------------------------------------------------
 
 // build/lexicons/<lang>.nglx (LexiconBuilder, politique SKIP) et build/lexicons/report.md
-// (nombre de clés et de formes, taille, chargement, latence de `distribution`, budgets §11.3).
+// (nombre de clés et de formes, taille, chargement, latence de `distribution`, budgets §11.3), puis
+// build/lexicons/<lang>.ngrm et build/lexicons/ngram-report.md (modèles de mot suivant, issue #51 :
+// phrases d'entraînement Tatoeba, taux de réussite sur le corpus de test, budget de 5 Mio par langue).
 tasks.register<JavaExec>("buildLexicons") {
     group = "data"
-    description = "Construit les lexiques binaires FR/EN (build/lexicons/*.nglx) et leur rapport."
+    description = "Construit les lexiques binaires FR/EN (build/lexicons/*.nglx), les modèles de mot suivant (*.ngrm) et leurs rapports."
     dependsOn("buildWordLists")
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("nextglyph.tools.lexicons.BuildLexiconsMainKt")
-    maxHeapSize = "1g"
+    // Les occurrences de bigrammes et de trigrammes du corpus anglais (14 millions de mots) sont tenues en mémoire.
+    maxHeapSize = "3g"
     args(
         layout.buildDirectory.dir("wordlists").get().asFile.path,
         layout.buildDirectory.dir("corpus").get().asFile.path,
@@ -112,7 +115,7 @@ tasks.register<JavaExec>("buildLexicons") {
     // Entrées et sorties déclarées (au lieu de « toujours exécutée ») : le module ime consomme
     // build/lexicons/*.nglx comme assets, la tâche ne doit pas être refaite sans changement des listes.
     inputs.dir(layout.buildDirectory.dir("wordlists"))
-    inputs.files(layout.buildDirectory.dir("corpus").map { it.asFileTree.matching { include("*-test.txt") } })
+    inputs.files(layout.buildDirectory.dir("corpus").map { it.asFileTree.matching { include("*-test.txt", "*-train.txt") } })
     outputs.dir(layout.buildDirectory.dir("lexicons"))
 }
 

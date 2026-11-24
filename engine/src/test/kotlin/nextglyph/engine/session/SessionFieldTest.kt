@@ -114,6 +114,17 @@ class SessionFieldTest {
         }
 
         @Test
+        fun `mot suivant - réglage transmis aux réglages de prédiction`() {
+            val on = SessionField(InputProfileResolver.resolve(C.TYPE_CLASS_TEXT, 0, null))
+            val off = SessionField(InputProfileResolver.resolve(C.TYPE_CLASS_TEXT, 0, null), nextWord = false)
+
+            assertThat(on.prediction.nextWordEnabled).isTrue()
+            assertThat(off.prediction.nextWord).isFalse()
+            assertThat(off.prediction.nextWordEnabled).isFalse()
+            assertThat(off.composes).isTrue()
+        }
+
+        @Test
         fun `champ par défaut - texte ordinaire, touche Entrée`() {
             assertThat(SessionField.DEFAULT.textProfile).isEqualTo(TextProfile.TEXT)
             assertThat(SessionField.DEFAULT.enter).isEqualTo(EnterBehavior.EnterKey)

@@ -214,6 +214,10 @@ class SettingsActivity : Activity() {
             root, R.string.pref_autocommit, R.string.pref_autocommit_summary, R.string.pref_autocommit_info,
             KeyboardSettings.KEY_AUTOCOMMIT, current.autocommit,
         )
+        toggle(
+            root, R.string.pref_next_word, R.string.pref_next_word_summary, R.string.pref_next_word_info,
+            KeyboardSettings.KEY_NEXT_WORD, current.nextWord,
+        )
         choice(
             root, R.string.pref_prudence, R.string.pref_prudence_summary, R.string.pref_prudence_info,
             KeyboardSettings.KEY_PRUDENCE, storedName(current.prudence),

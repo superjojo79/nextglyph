@@ -27,6 +27,7 @@ enum class HapticLevel {
  * @property contacts réglage « Noms des contacts » : effectif seulement avec la permission (§6.1).
  * @property bottomMarginDp marge ajoutée sous la dernière rangée, en plus des encarts système, de 0 à
  *   [MAX_BOTTOM_MARGIN_DP] dp (§13, §14) : remonte le clavier au-dessus des boutons système.
+ * @property nextWord réglage « Prédiction du mot suivant » (§5.4, §14) : trois mots proposés après une validation.
  * @property wideSpace réglage « Espace large » (§5.1, §14) : effectif sur les écrans d'au moins
  *   `KeyboardLayouts.WIDE_SPACE_MIN_SCREEN_DP` dp.
  */
@@ -44,6 +45,7 @@ data class KeyboardSettings(
     val haptics: HapticLevel = HapticLevel.MEDIUM,
     val bottomMarginDp: Int = 0,
     val wideSpace: Boolean = false,
+    val nextWord: Boolean = true,
 ) {
     init {
         require(rowHeightDp in MIN_ROW_HEIGHT_DP..MAX_ROW_HEIGHT_DP) { "Hauteur de rangée hors de $MIN_ROW_HEIGHT_DP..$MAX_ROW_HEIGHT_DP : $rowHeightDp." }
@@ -86,6 +88,7 @@ data class KeyboardSettings(
         const val KEY_DOUBLE_SPACE = "double_space_period"
         const val KEY_CONTACTS = "contacts"
         const val KEY_HAPTICS = "haptics"
+        const val KEY_NEXT_WORD = "next_word"
 
         /** Valeur « selon la locale » de [KEY_LAYOUT] et [KEY_PREFERRED_LANGUAGE]. */
         const val AUTO = "auto"
@@ -97,6 +100,7 @@ data class KeyboardSettings(
         val KEYS: List<String> = listOf(
             KEY_LAYOUT, KEY_LANGUAGES, KEY_PREFERRED_LANGUAGE, KEY_ADAPTATION, KEY_ROW_HEIGHT, KEY_BOTTOM_MARGIN, KEY_WIDE_SPACE, KEY_AUTOCOMMIT,
             KEY_PRUDENCE, KEY_FRENCH_TYPOGRAPHY, KEY_DOUBLE_SPACE, KEY_CONTACTS, KEY_HAPTICS,
+            KEY_NEXT_WORD,
         )
 
         /**
@@ -126,6 +130,7 @@ data class KeyboardSettings(
                 haptics = enumOrNull<HapticLevel>(string(KEY_HAPTICS)) ?: defaults.haptics,
                 bottomMarginDp = (values(KEY_BOTTOM_MARGIN) as? Int)?.takeIf { it in 0..MAX_BOTTOM_MARGIN_DP } ?: defaults.bottomMarginDp,
                 wideSpace = boolean(KEY_WIDE_SPACE, defaults.wideSpace),
+                nextWord = boolean(KEY_NEXT_WORD, defaults.nextWord),
             )
         }
 

@@ -73,6 +73,7 @@ Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr
 | Zones de frappe des touches de fonction (espace, `↵`, `⌫`, `?123`), frontières personnalisées, indicateur dans les réglages (issue #30) | Fait (moteur testé, IME vérifié par la CI) ; à valider sur le terrain | — |
 | Carte de frappe : densité, décalages appris et erreurs par touche, compteurs seuls (issue #46, §15.5) | Moteur fait et testé ; écran IME écrit sans compilation locale (à vérifier par la CI) | — |
 | Classement des corrections : score spatial des substitutions (position réelle des frappes), accents (`ca` → `ça`, bilinguisme pondéré), écart avec le 2ᵉ candidat dans « Prudence » (issue #53) | Fait (moteur testé, mesures `docs/analysis/M2-engine.md` §9) ; à valider sur le terrain (taux d'annulation, §15.4) | — |
+| Prédiction du mot suivant (issue #51) : modèles de bigrammes et trigrammes appris sur Tatoeba (`fr.ngrm`, `en.ngrm`), trois mots dans la barre après une validation, réglage « Prédiction du mot suivant » | Fait (moteur et outils testés, mesures `docs/analysis/M51-ngrams.md`) ; IME écrit sans compilation locale (à vérifier par la CI) ; à valider sur le terrain | — |
 
 ## Problèmes ouverts
 

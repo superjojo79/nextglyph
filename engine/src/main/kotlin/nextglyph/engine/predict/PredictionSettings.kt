@@ -28,6 +28,7 @@ enum class FieldProfile {
  * @property incognito `IME_FLAG_NO_PERSONALIZED_LEARNING` ou mode forcé : aucune écriture (pas de
  *   compteur de refus).
  * @property autocommit réglage utilisateur « Validation par espace ».
+ * @property nextWord réglage utilisateur « Prédiction du mot suivant » (issue #51, §14).
  */
 data class PredictionSettings(
     val profile: FieldProfile = FieldProfile.TEXT,
@@ -35,6 +36,7 @@ data class PredictionSettings(
     val incognito: Boolean = false,
     val autocommit: Boolean = true,
     val prudence: Prudence = Prudence.NORMAL,
+    val nextWord: Boolean = true,
 ) {
     /** Barre de suggestions de mots active (profils Texte et Nom de personne, sans `NO_SUGGESTIONS`). */
     val suggestionsEnabled: Boolean
@@ -45,6 +47,12 @@ data class PredictionSettings(
      * casse, complétion et correction. Sinon, l'espace insère une espace et rien d'autre.
      */
     val autocommitEnabled: Boolean get() = suggestionsEnabled && autocommit
+
+    /**
+     * Mots suivants proposés dans la barre (issue #51) : réglage actif et suggestions autorisées. Aucun mot
+     * n'est retenu, la prédiction ne fait que lire le texte qui précède le curseur.
+     */
+    val nextWordEnabled: Boolean get() = nextWord && suggestionsEnabled
 
     /** Apprentissage autorisé (compteurs de refus) : ni incognito, ni mot de passe. */
     val learningEnabled: Boolean get() = !incognito && profile != FieldProfile.PASSWORD

@@ -194,15 +194,14 @@ P(point | c) = α · N(point ; centre_affiché(c), σ) + (1 − α) · N(point ;
 
 ### 5.4 Barre de suggestions
 
-La barre a trois états :
+La barre a deux états :
 
 | État | Contenu |
 |---|---|
 | Mot en cours | 3 suggestions. Au centre, le mot que l'espace insérera (surligné s'il diffère du texte tapé : candidat dominant, accent ou majuscule restitués) ; à gauche, le texte tapé quand il serait remplacé, pour le garder ; sinon les meilleurs candidats. Les variantes d'un mot tapé (`à` pour `a`, `it's` pour `its`, `j'aime` pour `jaime`) y sont proposées sans jamais être insérées automatiquement. |
-| Juste après une validation | Ponctuation (§5.6). |
-| Champ vide / début de texte | Mots probables en début de phrase (prédiction du mot suivant, V2), sinon vide. |
+| Juste après une validation, ou au début d'un champ | **Prédiction du mot suivant** (issue #51, réglage du §14) : 3 mots probables d'après les deux derniers mots (§10.3) ; celui de droite peut être un groupe de deux mots quand il est nettement probable. Sans prédiction (réglage désactivé, modèle absent, contexte inconnu), la barre de ponctuation du §5.6 reste affichée. |
 
-Un tap sur une suggestion valide ce mot et ajoute une espace automatique. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
+Un tap sur une suggestion valide ce mot et ajoute une espace automatique (pas d'espace après une élision, `j'`). Pour un mot suivant, le tap insère le mot, ou le groupe, suivi de cette espace. Glisser vers le haut sur l'espace fait de même avec la suggestion centrale (§5.9), sans viser la barre.
 
 **Menu rapide `⚙`** (issue #27). À gauche de la barre, un bouton `⚙` (40 dp) ouvre dès l'appui un menu sur la première rangée : `⚙` (ouvre les réglages ; un simple tap le choisit), `📋` (historique du presse-papiers, §5.13), le mode d'adaptation suivant (Fixe → Calme → Renforcé → Élastique), l'autre disposition (AZERTY ↔ QWERTY), et « Classique » (échappatoire du §4) dans les profils qui la proposent. On glisse jusqu'à la case et on relâche, comme pour un menu d'appui long. Les choix sont enregistrés comme réglages (§14) et appliqués aussitôt. À droite, un bouton `✥` de même largeur ouvre le panneau Navigation (§5.12) ; les trois cases de suggestions se partagent la largeur restante.
 
@@ -496,7 +495,8 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 ### 10.3 Contexte
 
 - V1 : `P(c | p)` conditionné uniquement par le préfixe.
-- V2 : modèle de bigrammes de mots (« mot précédent → mot »), utilisé pour pondérer les initiales, départager les ambiguïtés d'accent (`a`/`à`) et prédire le mot suivant.
+- V1.x : **prédiction du mot suivant** (issue #51, implémentée). Modèle de bigrammes et de trigrammes de mots (`NgramModel`, fichiers `fr.ngrm` et `en.ngrm`, projetés en mémoire comme les lexiques), appris hors ligne par `:tools:buildLexicons` sur les phrases Tatoeba (partie entraînement) et élagué (comptes minimaux 2 / 2, 8 suivants par bigramme et 4 par trigramme, vocabulaire de 30 000 mots). Prédiction par repli « stupid backoff » : les suivants du trigramme (deux derniers mots) gardent leur probabilité, ceux du bigramme absents du trigramme comptent 0,4 fois la leur ; un dernier mot inconnu ne donne aucune proposition. Les trois meilleurs alimentent la barre (§5.4). Mesures : `docs/analysis/M51-ngrams.md`.
+- V2 : le même modèle pour pondérer les initiales et départager les ambiguïtés d'accent (`a`/`à`, issue #55, non implémenté).
 
 ### 10.4 Correction
 
@@ -575,6 +575,7 @@ docs/        Cette spécification, décisions d'architecture.
 
 - Pas de permission `INTERNET`, pas de SDK tiers, pas de télémétrie.
 - Permissions : `READ_CONTACTS` (optionnelle) seulement. `VIBRATE` n'est pas nécessaire : le retour haptique passe par `View.performHapticFeedback`, qui n'en demande pas. `ManifestTest` interdit toute autre permission dangereuse.
+- Prédiction du mot suivant (issue #51) : le contexte (les deux derniers mots avant le curseur) n'est lu qu'au moment de la prédiction, par la lecture du contexte du §11 ; il n'est ni stocké, ni journalisé, ni appris : le modèle est un fichier en lecture seule construit hors ligne, qui n'évolue pas avec ce que l'on tape. Aucune séquence de mots n'est conservée.
 - Aucune journalisation du texte saisi, y compris en debug pour les profils mot de passe et code PIN.
 - Toutes les données apprises (mots promus et en attente, refus, modèle spatial) sont effaçables en un geste depuis les réglages (`LearnedData.clear()`).
 - Le dictionnaire personnel et le modèle spatial sont exclus des sauvegardes automatiques Android (`android:allowBackup`/`dataExtractionRules`), sauf choix contraire de l'utilisateur.
@@ -606,6 +607,7 @@ docs/        Cette spécification, décisions d'architecture.
 | Marge basse | 0–48 dp, ajoutée aux encarts système (§13) | 0 dp |
 | Espace large | `?123`, `↵`, `⌫` à 0,8 u, espace élargie, écrans ≥ 400 dp (§5.1) | Désactivé |
 | Validation par espace | Oui / Non | Oui |
+| Prédiction du mot suivant | Oui / Non (§5.4, §10.3) | Oui |
 | Prudence de la validation | Prudente / Normale / Audacieuse (modifie les seuils `minProb` et `minRatio` du §5.5) | Normale |
 | Typographie française | Oui / Non | Oui |
 | Double espace → point | Oui / Non | Oui |

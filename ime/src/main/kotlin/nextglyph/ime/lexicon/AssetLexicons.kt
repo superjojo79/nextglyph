@@ -4,13 +4,15 @@ import android.content.res.AssetManager
 import nextglyph.engine.lexicon.Lexicon
 import nextglyph.engine.lexicon.LexiconLanguage
 import nextglyph.engine.lexicon.LexiconSet
+import nextglyph.engine.ngram.NgramModel
 import java.nio.channels.FileChannel
 
 /**
  * Lexiques embarqués dans l'APK (`assets/fr-lexique.nglx`, `assets/fr-dicollecte.nglx`,
  * `assets/en.nglx`, produits par `:tools:buildLexicons`). Ils sont stockés non compressés
  * (`noCompress` dans la configuration Gradle) : chaque fichier est projeté en mémoire (`mmap`) à
- * l'endroit où il se trouve dans l'APK, sans copie ni lecture complète.
+ * l'endroit où il se trouve dans l'APK, sans copie ni lecture complète. Les modèles de mot suivant
+ * (`assets/fr.ngrm`, `assets/en.ngrm`, #51) sont projetés de la même façon.
  */
 class AssetLexicons(private val assets: AssetManager) {
 
@@ -36,7 +38,38 @@ class AssetLexicons(private val assets: AssetManager) {
             }
         }
 
+    /** Ouvre le fichier d'asset [fileName] comme modèle de mot suivant. */
+    fun openNextWord(fileName: String): NgramModel =
+        assets.openFd(fileName).use { descriptor ->
+            descriptor.createInputStream().channel.use { channel ->
+                loadNextWord(channel, descriptor.startOffset, descriptor.declaredLength)
+            }
+        }
+
+    /**
+     * Modèles de mot suivant des [languages] (`fr.ngrm`, `en.ngrm`). Un modèle illisible est signalé à [onFailure]
+     * et simplement absent du résultat : la prédiction du mot suivant est alors désactivée pour cette langue seule.
+     */
+    fun openNextWords(languages: List<String>, onFailure: (String, Exception) -> Unit = { _, _ -> }): Map<String, NgramModel> {
+        val models = LinkedHashMap<String, NgramModel>()
+        for (language in languages) {
+            try {
+                models[language] = openNextWord(nextWordFileName(language))
+            } catch (error: Exception) {
+                onFailure(language, error)
+            }
+        }
+        return models
+    }
+
     companion object {
+        /** Nom de l'asset du modèle de mot suivant de [language]. */
+        fun nextWordFileName(language: String): String = "$language.ngrm"
+
+        /** Projette [length] octets de [channel] à partir de [offset] et les charge comme modèle de mot suivant. */
+        fun loadNextWord(channel: FileChannel, offset: Long, length: Long): NgramModel =
+            NgramModel.load(channel.map(FileChannel.MapMode.READ_ONLY, offset, length))
+
         /** Projette [length] octets de [channel] à partir de [offset] et les charge comme lexique. */
         fun load(channel: FileChannel, offset: Long, length: Long): Lexicon =
             Lexicon.load(channel.map(FileChannel.MapMode.READ_ONLY, offset, length))
