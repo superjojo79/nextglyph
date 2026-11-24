@@ -145,7 +145,8 @@ Les captures et la vidéo des stores sont produites automatiquement, en françai
 
 1. Onglet **Actions** → **Visuels des stores** → **Run workflow** (le workflow se lance aussi à chaque push sur une branche `claude/**` qui touche ces fichiers).
 2. Images brutes : artefacts `store-media-fr-FR` et `store-media-en-US` (14 jours), ou, sans passer par GitHub Actions, la branche orpheline **`store-media-raw`** (jamais fusionnée, réécrite à chaque exécution) : dossiers `fr-FR/` et `en-US/` avec `00-repos.png` … `06-carte-de-frappe.png` et `promo.mp4`.
-3. Les images **finales** (annotées, recadrées, avec accroche) vont dans `fastlane/metadata/android/<locale>/images/` (`phoneScreenshots/`, `featureGraphic.png`, `icon.png`).
+3. Les images **finales** (annotées, recadrées, avec accroche) vont dans `fastlane/metadata/android/<locale>/images/` (`phoneScreenshots/`, `featureGraphic.png`, `icon.png`). Captures : `node scripts/store-visuals/compose.js <brut> <locale> fastlane/metadata/android/<locale>/images/phoneScreenshots` (Playwright ; légendes dans `scripts/store-visuals/captions.json`, logo dans `docs/brand`).
+4. Vidéo promo (30 s environ, 1080 × 1920, sans musique) : `scripts/store-visuals/make-video.sh <brut> <locale> sortie.mp4 [début-s] [vitesse]` (ffmpeg et Playwright). Elle n'est pas versionnée : Google Play demande une URL YouTube, F-Droid n'affiche pas de vidéo.
 
 Pour lancer à la main sur un appareil dans la bonne langue : `./gradlew :ime:assembleDebug :ime:assembleDebugAndroidTest && bash scripts/store-media.sh sortie`.
 
