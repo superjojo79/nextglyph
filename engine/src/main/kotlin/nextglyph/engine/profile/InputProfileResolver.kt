@@ -75,6 +75,7 @@ object InputProfileResolver {
         zeroLambda = true, keyPreview = false, multiLine = false, incognito = incognito,
         contactsPriority = false, shortcutBar = ShortcutBar.NONE,
         numberSigned = signed, numberDecimal = decimal, dateTimeVariant = variant,
+        autocommit = false,
     )
 
     private fun text(inputType: Int, variation: Int, incognito: Boolean): InputProfile {
@@ -115,6 +116,8 @@ object InputProfileResolver {
                 else -> ShortcutBar.NONE
             },
             numberSigned = false, numberDecimal = false, dateTimeVariant = null,
+            // Filtre et adresse postale : suggestions gardées, mais aucun remplacement automatique (§4).
+            autocommit = prose && variation != C.TYPE_TEXT_VARIATION_FILTER && variation != C.TYPE_TEXT_VARIATION_POSTAL_ADDRESS,
         )
     }
 }

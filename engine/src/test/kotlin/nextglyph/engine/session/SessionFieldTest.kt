@@ -69,6 +69,17 @@ class SessionFieldTest {
         fun `majuscules demandées par le champ`(flag: Int, mode: CapsMode) {
             assertThat(field(C.TYPE_CLASS_TEXT or flag).capsMode).isEqualTo(mode)
         }
+
+        @Test
+        fun `filtre et adresse postale - suggestions conservées, aucune validation automatique`() {
+            for (variation in listOf(C.TYPE_TEXT_VARIATION_FILTER, C.TYPE_TEXT_VARIATION_POSTAL_ADDRESS)) {
+                val f = field(C.TYPE_CLASS_TEXT or variation)
+
+                assertThat(f.composes).isTrue()
+                assertThat(f.prediction.suggestionsEnabled).isTrue()
+                assertThat(f.prediction.autocommitEnabled).isFalse()
+            }
+        }
     }
 
     @Nested

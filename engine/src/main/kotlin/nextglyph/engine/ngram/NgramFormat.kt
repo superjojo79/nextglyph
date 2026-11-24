@@ -12,7 +12,7 @@ import nextglyph.engine.lexicon.LexiconFormat
  * ```
  * En-tête
  *   magic          4 octets  "NGRM"
- *   version        u16       1
+ *   version        u16       2
  *   tagLength      u8        1..MAX_TAG_LENGTH
  *   tag            tagLength octets ASCII (étiquette de langue BCP 47)
  *   vocabCount     i32       nombre de mots (hors début de phrase), ≤ MAX_VOCABULARY
@@ -20,6 +20,7 @@ import nextglyph.engine.lexicon.LexiconFormat
  *   bigramRecords  i32       nombre de suivants de la zone des bigrammes
  *   trigramCount   i32       nombre de contextes de trigrammes
  *   trigramRecords i32       nombre de suivants de la zone des trigrammes
+ *   confusionBytes i32       taille de la zone des confusions (issue #55)
  * Zone des mots
  *   offsets        u32 × (vocabCount + 1)   début de chaque mot dans la zone, puis la taille
  *   zone           pour chaque mot : u8 longueur de la clé, clé (ASCII), u8 longueur de la forme
@@ -31,6 +32,11 @@ import nextglyph.engine.lexicon.LexiconFormat
  *   contextes      u32 × trigramCount       (identifiant 1 << 16) | identifiant 2, strictement croissants
  *   offsets        u32 × (trigramCount + 1)
  *   suivants       comme pour les bigrammes
+ * Zone des confusions (issue #55)
+ *   setCount       u8        nombre d'ensembles de formes confondues (`a`/`à`, `ces`/`ses`...)
+ *   pour chaque ensemble : formCount u8 (2..MAX_CONFUSION_FORMS), puis pour chaque forme u8 longueur et forme UTF-8,
+ *     entryCount u32, puis entryCount entrées (u16 identifiant du mot précédent ≥ 1, u16 × formCount occurrences
+ *     de chaque forme juste après lui), par identifiant strictement croissant
  * ```
  *
  * Le fichier se termine juste après le dernier suivant. Les nombres, positions et identifiants
@@ -39,7 +45,7 @@ import nextglyph.engine.lexicon.LexiconFormat
 internal object NgramFormat {
 
     val MAGIC: ByteArray = byteArrayOf('N'.code.toByte(), 'G'.code.toByte(), 'R'.code.toByte(), 'M'.code.toByte())
-    const val VERSION: Int = 1
+    const val VERSION: Int = 2
 
     const val MAX_TAG_LENGTH: Int = LexiconFormat.MAX_TAG_LENGTH
 
@@ -49,11 +55,17 @@ internal object NgramFormat {
     /** Plus grand vocabulaire : les identifiants `1..MAX_VOCABULARY` tiennent sur 16 bits. */
     const val MAX_VOCABULARY: Int = 0xFFFF
 
+    /** Plus grand nombre de formes d'un ensemble de confusion. */
+    const val MAX_CONFUSION_FORMS: Int = 8
+
+    /** Plus grand nombre d'occurrences d'une forme après un mot : u16. */
+    const val MAX_CONFUSION_COUNT: Int = 0xFFFF
+
     /** Taille d'un suivant : identifiant u16 et probabilité u8. */
     const val RECORD_SIZE: Int = 3
 
     /** Taille de l'en-tête hors étiquette de langue. */
-    const val FIXED_HEADER_SIZE: Int = 4 + 2 + 1 + 5 * 4
+    const val FIXED_HEADER_SIZE: Int = 4 + 2 + 1 + 6 * 4
 
     fun isValidTag(tag: String): Boolean = LexiconFormat.isValidTag(tag)
 }

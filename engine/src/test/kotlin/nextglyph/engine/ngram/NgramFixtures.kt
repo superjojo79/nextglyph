@@ -13,6 +13,7 @@ object NgramFixtures {
         maxTrigramFollowers = 4,
         maxVocabulary = 1000,
         minTrigramGain = 0.0,
+        minConfusionCount = 1,
     )
 
     /** Phrases françaises (déjà découpées, élisions séparées) avec leur nombre d'occurrences. */

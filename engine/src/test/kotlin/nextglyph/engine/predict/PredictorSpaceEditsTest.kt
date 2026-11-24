@@ -87,10 +87,11 @@ class PredictorSpaceEditsTest {
         }
 
         @Test
-        fun `un mot tapé tout en majuscules donne deux mots en majuscules`() {
+        fun `un mot tapé tout en majuscules n'est pas coupé (sigle)`() {
             val p = plain.predict("JESUIS", state, settings)
 
-            assertThat(p.inserted).isEqualTo("JE SUIS")
+            assertThat(p.inserted).isEqualTo("JESUIS")
+            assertThat(p.case).isEqualTo(SpaceCase.LITERAL)
         }
 
         @Test

@@ -4,6 +4,8 @@ import nextglyph.engine.lexicon.ByteSink
 import nextglyph.engine.lexicon.LexiconAlphabet
 import nextglyph.engine.text.TextNormalizer
 import java.util.Arrays
+import java.util.Locale
+import java.util.TreeMap
 
 /**
  * Construit le fichier d'un modèle de mot suivant (format : [NgramFormat]) à partir de phrases
@@ -19,6 +21,10 @@ import java.util.Arrays
  * - Les probabilités sont `P(suivant | contexte)` calculées sur **toutes** les occurrences du
  *   contexte, y compris celles élaguées : les listes gardées ne somment donc pas à 1.
  *
+ * - Les **confusions** (issue #55) sont des ensembles de formes que le clavier peut prendre l'une pour l'autre
+ *   (`a`/`à`, `ces`/`ses`) et que les clés fusionnent ou que le repli des bigrammes élague : le modèle garde pour
+ *   chacun, mot précédent par mot précédent, le nombre d'occurrences de chaque forme, sans élagage des suivants.
+ *
  * Consomme de la mémoire proportionnelle au nombre de mots ajoutés (8 octets par bigramme et par
  * trigramme). Non thread-safe.
  */
@@ -26,11 +32,29 @@ class NgramModelBuilder(
     val languageTag: String,
     private val pruning: NgramPruning = NgramPruning(),
     private val predictable: (String) -> Boolean = { true },
+    private val confusionSets: List<List<String>> = emptyList(),
 ) {
 
     init {
         require(NgramFormat.isValidTag(languageTag)) { "Étiquette de langue invalide : « $languageTag »." }
+        require(confusionSets.size <= MAX_CONFUSION_SETS) { "Au plus $MAX_CONFUSION_SETS ensembles de confusion (${confusionSets.size})." }
+        val seen = HashSet<String>()
+        for (set in confusionSets) {
+            require(set.size in 2..NgramFormat.MAX_CONFUSION_FORMS) {
+                "Un ensemble de confusion a de 2 à ${NgramFormat.MAX_CONFUSION_FORMS} formes (${set.size})."
+            }
+            for (form in set) {
+                require(form.isNotEmpty() && form == form.lowercase(Locale.ROOT) && form.toByteArray(Charsets.UTF_8).size <= MAX_FORM_BYTES) {
+                    "Une forme de confusion est en minuscules, non vide et d'au plus $MAX_FORM_BYTES octets (« $form »)."
+                }
+                require(seen.add(form)) { "La forme « $form » est dans deux ensembles de confusion." }
+            }
+        }
     }
+
+    private val confusionForms: Map<String, Pair<Int, Int>> =
+        confusionSets.withIndex().flatMap { (set, forms) -> forms.withIndex().map { (index, form) -> form to (set to index) } }.toMap()
+    private val confusions = HashMap<Long, LongArray>()
 
     private val formIds = HashMap<String, Int>()
     private val forms = ArrayList<String>()
@@ -72,13 +96,32 @@ class NgramModelBuilder(
         sentenceCount += times
     }
 
+    /**
+     * Compte, dans les [tokens] d'un même groupe de mots consécutifs (sans signe de ponctuation entre eux), les
+     * formes des ensembles de confusion et le mot qui les précède ([times] fois). Un mot précédent inconnu, ou une
+     * forme en tête du groupe, n'est pas compté. Indépendant de [addSentence].
+     *
+     * @throws IllegalArgumentException si [times] n'est pas strictement positif.
+     */
+    fun addConfusionContext(tokens: List<String>, times: Int = 1) {
+        require(times >= 1) { "Le nombre de répétitions doit être strictement positif ($times)." }
+        if (confusionForms.isEmpty()) return
+        for (i in 1 until tokens.size) {
+            val (set, form) = confusionForms[tokens[i].lowercase(Locale.ROOT)] ?: continue
+            val previous = formId(tokens[i - 1])
+            if (previous == UNKNOWN) continue
+            val counts = confusions.getOrPut((set.toLong() shl 32) or previous.toLong()) { LongArray(confusionSets[set].size) }
+            counts[form] += times.toLong()
+        }
+    }
+
     /** Sérialise le modèle. Peut être appelé plusieurs fois ; les ajouts suivants sont pris en compte. */
     fun build(): ByteArray {
         val vocabulary = selectVocabulary()
         val pairs = aggregateBigrams(vocabulary)
         val bigramLists = (0..vocabulary.size).map { selectBigrams(it, vocabulary, pairs) }
         val trigramEntries = selectTrigrams(vocabulary, pairs)
-        return serialize(vocabulary, bigramLists, trigramEntries)
+        return serialize(vocabulary, bigramLists, trigramEntries, confusionZone(vocabulary))
     }
 
     // ----- Formes -----
@@ -275,9 +318,42 @@ class NgramModelBuilder(
         return count.toDouble() / total >= pruning.minTrigramGain * bigram
     }
 
+    // ----- Confusions -----
+
+    /** Zone des confusions (format : [NgramFormat]) : comptes par mot précédent du vocabulaire, au moins [NgramPruning.minConfusionCount]. */
+    private fun confusionZone(vocabulary: Vocabulary): ByteArray {
+        val zone = ByteSink()
+        zone.writeByte(confusionSets.size)
+        for ((set, forms) in confusionSets.withIndex()) {
+            zone.writeByte(forms.size)
+            for (form in forms) {
+                val bytes = form.toByteArray(Charsets.UTF_8)
+                zone.writeByte(bytes.size)
+                zone.writeBytes(bytes)
+            }
+            val merged = TreeMap<Int, LongArray>()
+            for ((key, counts) in confusions) {
+                if ((key ushr 32).toInt() != set) continue
+                val id = vocabulary.finalOf[(key and 0xFFFFFFFFL).toInt()]
+                if (id == NONE) continue
+                val into = merged.getOrPut(id) { LongArray(forms.size) }
+                for (i in counts.indices) into[i] += counts[i]
+            }
+            val kept = merged.filterValues { it.sum() >= pruning.minConfusionCount }
+            val largest = kept.values.maxOfOrNull { it.max() } ?: 0L
+            val divisor = if (largest > NgramFormat.MAX_CONFUSION_COUNT) (largest + NgramFormat.MAX_CONFUSION_COUNT - 1) / NgramFormat.MAX_CONFUSION_COUNT else 1L
+            zone.writeInt(kept.size)
+            for ((id, counts) in kept) {
+                zone.writeShort(id)
+                for (count in counts) zone.writeShort((count / divisor).toInt())
+            }
+        }
+        return zone.toByteArray()
+    }
+
     // ----- Sérialisation -----
 
-    private fun serialize(vocabulary: Vocabulary, bigramLists: List<List<Follower>>, trigramEntries: List<TrigramEntry>): ByteArray {
+    private fun serialize(vocabulary: Vocabulary, bigramLists: List<List<Follower>>, trigramEntries: List<TrigramEntry>, confusionZone: ByteArray): ByteArray {
         val blob = ByteSink()
         val wordOffsets = IntArray(vocabulary.size + 1)
         for (index in 0 until vocabulary.size) {
@@ -309,6 +385,7 @@ class NgramModelBuilder(
         out.writeInt(bigramRecords)
         out.writeInt(trigramEntries.size)
         out.writeInt(trigramRecords)
+        out.writeInt(confusionZone.size)
 
         wordOffsets.forEach(out::writeInt)
         out.writeBytes(blob.toByteArray())
@@ -331,6 +408,7 @@ class NgramModelBuilder(
         }
         out.writeInt(position)
         trigramEntries.forEach { writeFollowers(out, it.followers) }
+        out.writeBytes(confusionZone)
         return out.toByteArray()
     }
 
@@ -360,6 +438,8 @@ class NgramModelBuilder(
         /** Nombre maximal de formes distinctes : les identifiants tiennent sur 21 bits. */
         const val MAX_FORMS: Int = (1 shl 21) - 4
 
+        private const val MAX_CONFUSION_SETS = 255
+        private const val MAX_FORM_BYTES = 255
         private const val INITIAL_FORMS = 1024
         private const val INITIAL_OCCURRENCES = 1 shl 12
 

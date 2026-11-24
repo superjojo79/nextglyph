@@ -7,16 +7,19 @@ package nextglyph.engine.predict
  *
  * @property minProb probabilité minimale du premier candidat.
  * @property minRatio rapport minimal `p1 / p2` (au moins 1).
+ * @property confusionShare part minimale de la forme proposée parmi les formes confondues après le mot précédent
+ *   pour qu'une confusion (`a`/`à`, `ces`/`ses`, issue #55) soit corrigée sans demander à l'utilisateur.
+ * @property confusionCount nombre minimal d'occurrences du mot précédent suivi d'une des formes confondues.
  */
-enum class Prudence(val minProb: Double, val minRatio: Double) {
-    /** Prudente : 0,80 et 3,0. */
-    CAUTIOUS(0.80, 3.0),
+enum class Prudence(val minProb: Double, val minRatio: Double, val confusionShare: Double, val confusionCount: Int) {
+    /** Prudente : 0,80 et 3,0 ; confusions : part 0,99 sur au moins 50 occurrences. */
+    CAUTIOUS(0.80, 3.0, 0.99, 50),
 
-    /** Normale (défaut) : 0,70 et 2,0. */
-    NORMAL(0.70, 2.0),
+    /** Normale (défaut) : 0,70 et 2,0 ; confusions : part 0,98 sur au moins 30 occurrences. */
+    NORMAL(0.70, 2.0, 0.98, 30),
 
-    /** Audacieuse : 0,60 et 1,5. */
-    BOLD(0.60, 1.5),
+    /** Audacieuse : 0,60 et 1,5 ; confusions : part 0,97 sur au moins 20 occurrences. */
+    BOLD(0.60, 1.5, 0.97, 20),
 }
 
 /**
@@ -114,11 +117,68 @@ data class SpaceEditConfig(
 }
 
 /**
+ * Formes que le clavier peut confondre (issue #55, §5.5) : `à`/`a`, `ou`/`où`, `ces`/`ses`. Le mot tapé est l'une
+ * des [forms] ; la forme à garder dépend du mot qui précède.
+ *
+ * @property forms formes en minuscules, avec leurs accents (au moins deux, au plus huit).
+ * @property auto la correction peut être appliquée à la validation ; sinon l'autre forme n'est que proposée dans la barre.
+ */
+data class ConfusionSet(val forms: List<String>, val auto: Boolean = true) {
+    init {
+        require(forms.size in 2..MAX_FORMS) { "Un ensemble de confusion a de 2 à $MAX_FORMS formes (${forms.size})." }
+        require(forms.all { it.isNotEmpty() && it == it.lowercase(java.util.Locale.ROOT) }) { "Les formes de confusion sont non vides et en minuscules ($forms)." }
+        require(forms.toSet().size == forms.size) { "Les formes de confusion sont distinctes ($forms)." }
+    }
+
+    /** Rang de [typed] (mis en minuscules) parmi les formes, ou −1. */
+    fun indexOf(typed: String): Int = forms.indexOf(typed.lowercase(java.util.Locale.ROOT))
+
+    companion object {
+        const val MAX_FORMS: Int = 8
+    }
+}
+
+/**
+ * Contexte de la correction (issue #55, §5.5, §10.3) : confusions décidées par le mot précédent et mots techniques.
+ *
+ * @property sets ensembles de confusion par code de langue ; les comptes viennent du modèle de mot suivant de la
+ *   langue (`NgramModel.confusionCounts`, construit avec les mêmes formes).
+ * @property offerShare part minimale d'une autre forme pour être placée en premier dans la barre.
+ * @property minOfferCount nombre minimal d'occurrences du mot précédent pour proposer cette forme.
+ * @property protectTechnical aucun remplacement automatique d'un sigle (au moins deux lettres, toutes majuscules)
+ *   ni d'un mot collé à `@`, `/`, `_` ou à un point intérieur (chiffres : jamais un mot en cours).
+ */
+data class ConfusionConfig(
+    val sets: Map<String, List<ConfusionSet>> = mapOf("fr" to FRENCH_SETS),
+    val offerShare: Double = 0.5,
+    val minOfferCount: Int = 5,
+    val protectTechnical: Boolean = true,
+) {
+    init {
+        require(offerShare > 0.0 && offerShare <= 1.0) { "offerShare doit être dans ]0 ; 1] ($offerShare)." }
+        require(minOfferCount >= 1) { "minOfferCount doit être au moins 1 ($minOfferCount)." }
+    }
+
+    companion object {
+        /** Confusions françaises (mesure : `docs/analysis/M55-context.md`). */
+        val FRENCH_SETS: List<ConfusionSet> = listOf(
+            ConfusionSet(listOf("a", "à")),
+            ConfusionSet(listOf("ou", "où")),
+            ConfusionSet(listOf("la", "là")),
+            ConfusionSet(listOf("du", "dû")),
+            ConfusionSet(listOf("ces", "ses")),
+            ConfusionSet(listOf("et", "est")),
+        )
+    }
+}
+
+/**
  * Constantes de la prédiction, de la validation par espace et du bilinguisme. Immuable : une
  * recalibration ne touche que cette classe.
  *
  * @property correction poids des éditions (§10.4).
  * @property spaceEdits corrections des erreurs d'espace (issue #52).
+ * @property confusion contexte de la correction (issue #55).
  * @property neighborDistance distance maximale entre les centres au repos de deux touches voisines,
  *   en unités de touche (1,5 u, comme l'analyse M0).
  * @property formsPerPrefix nombre de formes lues par préfixe candidat et de candidats conservés par
@@ -142,6 +202,7 @@ data class SpaceEditConfig(
 data class PredictionConfig(
     val correction: CorrectionWeights = CorrectionWeights(),
     val spaceEdits: SpaceEditConfig = SpaceEditConfig(),
+    val confusion: ConfusionConfig = ConfusionConfig(),
     val neighborDistance: Double = 1.5,
     val formsPerPrefix: Int = 6,
     val spatialSigma: Double = 0.35,

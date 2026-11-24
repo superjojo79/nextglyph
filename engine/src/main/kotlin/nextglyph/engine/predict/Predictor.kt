@@ -60,6 +60,8 @@ class Predictor(
     private val sources: List<CandidateSource> = sets.map { CandidateSource(it, adjacency, config, substitution) }
     private val display = DisplayForms(config.accentDominance)
     private val spaceEdits = SpaceEdits(sets, languages, config.spaceEdits)
+    private val confusions = Confusions(config.confusion)
+    private val elisionWords: Set<String> = config.elisions.values.flatten().toSet()
     private val frenchIndex = languages.indexOfFirst { it in config.elisions.keys }
     private val caches: List<LruCache>? =
         if (cacheSize > 0) sets.map { LruCache(cacheSize) } else null
@@ -74,10 +76,12 @@ class Predictor(
 
     /**
      * Modèles de mot suivant par code de langue (issue #51) qui départagent les coupures des erreurs d'espace
-     * (issue #52, §5.5) par `P(droite | gauche)`. Vide : unigrammes. Rien n'en est retenu d'autre.
+     * (issue #52, §5.5) par `P(droite | gauche)` et choisissent entre les formes confondues d'après le mot précédent
+     * (issue #55, §5.5). Vide : unigrammes, aucune confusion corrigée. Rien n'en est retenu d'autre.
      */
     fun useNgrams(models: Map<String, NgramModel>) {
         spaceEdits.models = LinkedHashMap(models)
+        confusions.models = LinkedHashMap(models)
     }
 
     /** État de langue de départ, [preferred] étant la langue préférée (§10.6, §14). */
@@ -100,7 +104,8 @@ class Predictor(
         val raw = WordPrefix.currentWord(textBeforeCursor, 0, elisionLanguage(language)).orEmpty()
         if (raw.isEmpty()) return Prediction("", "", SpaceCase.NO_WORD, "", emptyList(), SuggestionBar.EMPTY, sentence)
         val key = keyOf(raw) ?: return Prediction(raw, "", SpaceCase.LITERAL, raw, emptyList(), SuggestionBar.EMPTY, sentence)
-        return decide(raw, key, language, settings, taps, previousWord(textBeforeCursor, raw))
+        val technical = Confusions.isTechnical(textBeforeCursor, raw)
+        return decide(raw, key, language, settings, taps, previousWord(textBeforeCursor, raw), contextWord(textBeforeCursor, raw), technical)
     }
 
     /**
@@ -108,7 +113,10 @@ class Predictor(
      * Les candidats ne passent pas par le cache quand [taps] s'aligne sur [key].
      *
      * [previous] : le mot écrit juste avant une seule espace, elle-même juste avant [raw] (`null` sinon) : il permet
-     * de supprimer une espace en trop (§5.5, issue #52).
+     * de supprimer une espace en trop (§5.5, issue #52). [context] : le mot qui précède [raw] une seule espace,
+     * même après une élision (`qu'il a`), qui décide entre les formes confondues (issue #55) ; `null` si inconnu
+     * (début de phrase, ponctuation, trait d'union). [technical] : le mot en cours est collé à `@`, `/`, `_` ou à un
+     * point intérieur ; il n'est alors jamais remplacé, pas plus qu'un sigle (§5.5, issue #55).
      */
     fun decide(
         raw: String,
@@ -117,8 +125,11 @@ class Predictor(
         settings: PredictionSettings,
         taps: WordTaps? = null,
         previous: String? = null,
+        context: String? = null,
+        technical: Boolean = false,
     ): Prediction {
         requireLanguages(language)
+        val literal = config.confusion.protectTechnical && (technical || Confusions.isAcronym(raw))
         val weights = languageWeights(language)
         val active = sets.filterIndexed { i, _ -> weights[i] > 0.0 }
         val activeWeights = weights.filter { it > 0.0 }
@@ -144,7 +155,7 @@ class Predictor(
         }
         // Erreurs d'espace (issue #52) : coupures du texte tapé, espace en trop avec le mot précédent. Elles
         // concourent avec les autres candidats, sous la même règle de dominance.
-        val edits = if (settings.autocommitEnabled) spaceEditsFor(raw, key, previous, spatialTaps, isWord, weights) else emptyList()
+        val edits = if (settings.autocommitEnabled && !literal) spaceEditsFor(raw, key, previous, spatialTaps, isWord, weights) else emptyList()
         val editsByKey = HashMap<String, SpaceEdit>()
         for (edit in edits) {
             editsByKey[edit.key] = edit
@@ -164,19 +175,28 @@ class Predictor(
         val p2 = ranked.getOrNull(1)?.probability ?: 0.0
         val top = ranked.firstOrNull()
         val topEdit = top?.let { editsByKey[it.key] }
-        val dominant = settings.autocommitEnabled && top != null && p1 >= settings.prudence.minProb &&
+        val dominant = settings.autocommitEnabled && !literal && top != null && p1 >= settings.prudence.minProb &&
             p1 >= settings.prudence.minRatio * p2 && !isRejected(top.replaces ?: raw, top.text) &&
             !(topEdit?.parts ?: listOf(top.key)).any(blockedAutocommit)
         // Un mot très rare, absorbé par l'espace en trop qui le sépare de son début, n'est pas un mot (§5.5, cas 3).
         val absorbed = isWord && dominant && topEdit?.replaces != null
+        // Formes confondues (`a`/`à`, `ces`/`ses`) : le mot précédent choisit, sinon l'autre forme est seulement proposée.
+        val alternatives = if (isWord && !literal && !absorbed && context != null) confusions.alternatives(language.sentenceLanguage, raw, context) else emptyList()
+        val offered = alternatives.filter { it.share >= config.confusion.offerShare && it.total >= config.confusion.minOfferCount }.map { it.text }
         val case: SpaceCase
         val inserted: String
         var span = raw
         when {
+            literal -> {
+                case = SpaceCase.LITERAL
+                inserted = raw
+            }
             isWord && !absorbed -> {
                 case = SpaceCase.WORD
                 val restored = if (settings.autocommitEnabled) display.forTypedWord(raw, key, active, sentenceSet, activeWeights) else raw
-                inserted = if (restored != raw && isRejected(raw, restored)) raw else restored
+                val kept = if (restored != raw && isRejected(raw, restored)) raw else restored
+                val swap = alternatives.firstOrNull()?.takeIf { isConfident(it, settings) && !isRejected(raw, it.text) }
+                inserted = if (kept == raw && swap != null) swap.text else kept
             }
             dominant -> {
                 case = SpaceCase.DOMINANT
@@ -188,14 +208,19 @@ class Predictor(
                 inserted = raw
             }
         }
-        val bar = bar(raw, span, key, case, inserted, ranked, active, activeWeights)
+        val bar = bar(raw, span, key, case, inserted, ranked, active, activeWeights, offered)
         return Prediction(raw, key, case, inserted, ranked, bar, language.sentenceLanguage, span)
     }
+
+    /** La forme [alternative] remplace le mot tapé sans demander (§5.5, issue #55) : part et occurrences selon la prudence. */
+    private fun isConfident(alternative: Alternative, settings: PredictionSettings): Boolean =
+        alternative.auto && settings.autocommitEnabled &&
+            alternative.share >= settings.prudence.confusionShare && alternative.total >= settings.prudence.confusionCount
 
     private fun spaceEditsFor(raw: String, key: String, previous: String?, taps: WordTaps?, isWord: Boolean, weights: DoubleArray): List<SpaceEdit> {
         val result = ArrayList<SpaceEdit>()
         if (!isWord) result += spaceEdits.splits(raw, key, taps, weights)
-        val previousKey = previous?.let(::keyOf)
+        val previousKey = previous?.takeIf { !Confusions.isAcronym(it) }?.let(::keyOf)
         if (previous != null && previousKey != null) {
             spaceEdits.join(previous, previousKey, raw, key, isWord, weights)?.let(result::add)
         }
@@ -221,6 +246,35 @@ class Predictor(
         if (start == 0 && text.length >= WordPrefix.LOOKBACK) return null
         if (start > 0 && (text[start - 1].isDigit() || text[start - 1] in JOINERS)) return null
         return text.substring(start, space)
+    }
+
+    /**
+     * Le mot écrit juste avant [raw], séparé de lui par une seule espace ordinaire, comme [previousWord] mais aussi
+     * après une élision (`qu'il a`) ; `null` si ce mot est collé à un trait d'union, à un chiffre, à `@`, `/`, `_`, ou à
+     * une apostrophe qui ne suit pas une élision (`aujourd'hui`), ou si la fenêtre lue le coupe.
+     */
+    private fun contextWord(text: CharSequence?, raw: String): String? {
+        if (text == null || raw.isEmpty() || !text.endsWith(raw)) return null
+        val space = text.length - raw.length - 1
+        if (space < 1 || text[space] != ' ') return null
+        var start = space
+        while (start > 0 && text[start - 1].isLetter()) start--
+        if (start == space) return null
+        if (start == 0 && text.length >= WordPrefix.LOOKBACK) return null
+        val word = text.substring(start, space)
+        if (start > 0) {
+            val joiner = text[start - 1]
+            if (joiner.isDigit() || joiner == '-' || joiner == '‑') return null
+            if (joiner in APOSTROPHES && !endsWithElision(text, start - 1)) return null
+        }
+        return word.takeUnless { Confusions.isTechnical(text.subSequence(0, space), it) }
+    }
+
+    /** Vrai si les lettres qui précèdent l'apostrophe en [apostrophe] sont une élision (`qu'`, `l'`). */
+    private fun endsWithElision(text: CharSequence, apostrophe: Int): Boolean {
+        var start = apostrophe
+        while (start > 0 && text[start - 1].isLetter()) start--
+        return start < apostrophe && text.substring(start, apostrophe).lowercase(Locale.ROOT) in elisionWords
     }
 
     /**
@@ -364,7 +418,17 @@ class Predictor(
 
     private fun isRejected(raw: String, inserted: String): Boolean = rejections.rejections(raw, inserted) >= config.rejectLimit
 
-    private fun bar(raw: String, typed: String, key: String, case: SpaceCase, inserted: String, ranked: List<Candidate>, active: List<LexiconSet>, activeWeights: List<Double>): SuggestionBar {
+    private fun bar(
+        raw: String,
+        typed: String,
+        key: String,
+        case: SpaceCase,
+        inserted: String,
+        ranked: List<Candidate>,
+        active: List<LexiconSet>,
+        activeWeights: List<Double>,
+        offered: List<String>,
+    ): SuggestionBar {
         val list = ArrayList<Suggestion>(BAR_SIZE + 2)
         val seen = HashSet<String>()
         fun add(suggestion: Suggestion) {
@@ -375,6 +439,7 @@ class Predictor(
             SpaceCase.WORD -> {
                 add(Suggestion(inserted, highlighted = replaces))
                 if (replaces) add(Suggestion(raw, isTyped = true))
+                for (text in offered) add(Suggestion(text))
                 for (variant in variants(raw, key, active, activeWeights)) add(Suggestion(variant))
             }
             SpaceCase.DOMINANT -> {
@@ -464,6 +529,7 @@ class Predictor(
         const val BAR_SIZE = 3
         val SEPARATORS = charArrayOf('\'', '-')
         const val JOINERS = "'’ʼ-‑"
+        const val APOSTROPHES = "'’ʼ"
 
         /** Opérations qui remplacent [old] (juste avant le curseur) par [new], en gardant leur début commun. */
         fun replace(old: String, new: String): List<EditOperation> {

@@ -85,4 +85,9 @@ data class InputProfile(
     val numberDecimal: Boolean,
     /** Pavé date / heure : variation. `null` hors profil date / heure. */
     val dateTimeVariant: DateTimeVariant?,
+    /**
+     * Validation par espace permise (§4, §5.5) : faux pour les champs dont le contenu n'est pas de la prose
+     * (filtre, adresse postale) ; les suggestions restent affichées, mais rien n'est remplacé automatiquement.
+     */
+    val autocommit: Boolean = true,
 )
