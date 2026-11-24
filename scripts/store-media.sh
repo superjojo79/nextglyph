@@ -61,18 +61,23 @@ demo -e command network -e wifi show -e level 4 -e fully true
 demo -e command network -e mobile hide
 demo -e command notifications -e visible false
 demo -e command status -e volume hide
-trap 'demo -e command exit || true' EXIT
+# En sortie, même en échec : barre d'état normale et récupération de ce qui a été produit (diagnostic).
+finish() {
+  demo -e command exit || true
+  adb pull "${remote_media}/." "$dest/" > /dev/null 2>&1 || true
+}
+trap finish EXIT
 
 adb shell rm -rf "$remote_media" "$remote_video"
 
 # --- Captures (tout sauf la vidéo) ---------------------------------------------------------------------------
 echo "Captures d'écran"
 instrument_log="$(mktemp)"
-adb shell am instrument -w -r \
+timeout 900 adb shell am instrument -w -r \
   -e storeMedia true \
   -e class "$test_class" \
   -e notClass "$video_test" \
-  "$runner" | tee "$instrument_log"
+  "$runner" | tee "$instrument_log" || { echo "Tests de captures interrompus (délai dépassé ?)" >&2; exit 1; }
 if grep -q -E 'INSTRUMENTATION_RESULT: shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]\s*$' "$instrument_log"; then
   echo "Échec des tests de captures (voir le journal ci-dessus)." >&2
   exit 1
@@ -84,7 +89,7 @@ adb shell screenrecord --bit-rate 8000000 --time-limit 60 "$remote_video" &
 record_pid=$!
 sleep 3
 video_status=0
-adb shell am instrument -w -r \
+timeout 300 adb shell am instrument -w -r \
   -e storeMedia true \
   -e class "$video_test" \
   "$runner" | tee "$instrument_log" || video_status=$?

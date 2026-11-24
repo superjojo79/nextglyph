@@ -74,6 +74,7 @@ jobs:
             -k "system-images;android-34;google_apis;x86_64" -d pixel_6
 
       - name: Captures et vidéo sur émulateur
+        timeout-minutes: 25
         env:
           LOCALE: ${{ matrix.locale }}
         run: |
@@ -83,8 +84,15 @@ jobs:
           adb wait-for-device
           timeout 600 adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
           sleep 20
+          adb logcat -v time > logcat.txt 2>&1 &
           bash scripts/store-media.sh out
           adb emu kill || true
+
+      - name: Journaux de l'émulateur
+        if: failure()
+        run: |
+          tail -n 60 emulator.log || true
+          grep -E "StoreMedia|AndroidRuntime|FATAL|TestRunner" logcat.txt | tail -n 200 || true
 
       - name: Publier les visuels bruts
         if: always()
@@ -98,12 +106,15 @@ jobs:
   publish:
     name: Branche store-media-raw
     needs: capture
+    # Même en échec : les captures partielles servent au diagnostic (artefacts illisibles hors de GitHub).
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
       - name: Télécharger les visuels
+        continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: store-media-*
@@ -118,6 +129,7 @@ jobs:
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
+          [ -n "$(ls -A out 2>/dev/null)" ] || { echo "Aucun visuel à publier"; exit 0; }
           cp -R out/. "$work/"
           cd "$work"
           git init --quiet --initial-branch=store-media-raw
