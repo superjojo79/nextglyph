@@ -1,6 +1,7 @@
 package nextglyph.ime
 
 import android.content.Context
+import android.graphics.Point
 import android.util.Log
 import android.widget.EditText
 import androidx.test.core.app.ActivityScenario
@@ -72,14 +73,18 @@ class StoreMediaTest {
 
             // 04 : panneau des émojis (appui long sur ↵).
             clearField()
-            openEmojiPanel()
-            capture("04-emojis.png")
-            tap(Pattern.quote(string(R.string.a11y_letters)), "la touche « ${string(R.string.a11y_letters)} » du panneau émojis")
-            waitForKeyboard()
+            val emoji = runCatching {
+                openEmojiPanel()
+                capture("04-emojis.png")
+                tap(Pattern.quote(string(R.string.a11y_letters)), "la touche « ${string(R.string.a11y_letters)} » du panneau émojis")
+                waitForKeyboard()
+            }
 
             // 05 et 06 : écrans de l'application, par-dessus le décor.
             captureActivity(SettingsActivity::class.java, "05-reglages.png")
             captureActivity(HeatmapActivity::class.java, "06-carte-de-frappe.png")
+            // L'échec des émojis n'empêche pas les captures 05 et 06, mais fait échouer le test.
+            emoji.getOrThrow()
         }
 
         @Test
@@ -263,7 +268,14 @@ class StoreMediaTest {
             ).map { Pattern.quote(string(it)) }.joinToString("|")
             val node = device.wait(Until.findObject(By.desc(Pattern.compile(enter))), TIMEOUT_MS)
                 ?: throw IllegalStateException("Touche introuvable : la touche Entrée (description « $enter »).")
-            node.click(LONG_PRESS_MS)
+            // Le menu de l'appui long s'ouvre au-dessus de la première rangée, à gauche (KeyboardView.showPopup) :
+            // on garde le doigt sur ↵, puis on glisse jusqu'à l'entrée « émojis » avant de relâcher.
+            val start = node.visibleCenter
+            val topLeft = if (context.resources.configuration.locales.get(0)?.language == "fr") "a" else "q"
+            val firstKey = device.findObject(By.desc(Pattern.compile("(?i)$topLeft")))
+                ?: throw IllegalStateException("Touche introuvable : première touche de la rangée du haut (a ou q).")
+            val target = Point(firstKey.visibleBounds.left + firstKey.visibleBounds.width() / 2, firstKey.visibleCenter.y)
+            check(device.swipe(arrayOf(start, Point(start.x, start.y), target, target), HOLD_STEPS)) { "Appui long sur ↵ refusé." }
             val letters = string(R.string.a11y_letters)
             checkNotNull(device.wait(Until.findObject(By.desc(letters)), TIMEOUT_MS)) {
                 "Le panneau émojis ne s'est pas ouvert (touche « $letters » introuvable)."
@@ -314,7 +326,8 @@ class StoreMediaTest {
         const val KEY_PAUSE_MS = 120L
         const val ERASE_PAUSE_MS = 60L
         const val VIDEO_KEY_PAUSE_MS = 250L
-        const val LONG_PRESS_MS = 900L
+        /** Pas de 5 ms environ : 200 pas ≈ 1 s de maintien par segment du geste. */
+        const val HOLD_STEPS = 200
         const val MAX_ERASE = 40
     }
 }

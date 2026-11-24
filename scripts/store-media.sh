@@ -77,10 +77,12 @@ timeout 900 adb shell am instrument -w -r \
   -e storeMedia true \
   -e class "$test_class" \
   -e notClass "$video_test" \
-  "$runner" | tee "$instrument_log" || { echo "Tests de captures interrompus (délai dépassé ?)" >&2; exit 1; }
+  "$runner" | tee "$instrument_log" || echo "Tests de captures interrompus (délai dépassé ?)" >&2
+captures_failed=0
 if grep -q -E 'INSTRUMENTATION_RESULT: shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]\s*$' "$instrument_log"; then
+  # On filme quand même : l'échec est signalé à la fin.
   echo "Échec des tests de captures (voir le journal ci-dessus)." >&2
-  exit 1
+  captures_failed=1
 fi
 
 # --- Vidéo ---------------------------------------------------------------------------------------------------
@@ -99,7 +101,7 @@ wait "$record_pid" || true
 sleep 2
 if [ "$video_status" -ne 0 ] || grep -q -E 'INSTRUMENTATION_RESULT: shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]\s*$' "$instrument_log"; then
   echo "Échec du scénario vidéo (voir le journal ci-dessus)." >&2
-  exit 1
+  captures_failed=1
 fi
 
 # --- Récupération --------------------------------------------------------------------------------------------
@@ -118,3 +120,4 @@ if [ ! -s "$dest/promo.mp4" ]; then
 fi
 echo "${#captures[@]} capture(s) et une vidéo dans $dest"
 ls -l "$dest"
+exit "$captures_failed"
