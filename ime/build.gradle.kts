@@ -18,7 +18,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
-        // Tests instrumentés (AndroidX Test, Apache-2.0) : `./gradlew :ime:connectedDebugAndroidTest`, voir docs/FIELD-TESTS.md.
+        // Tests instrumentés (AndroidX Test, Apache-2.0) : `./gradlew :ime:connectedFdroidDebugAndroidTest`, voir docs/FIELD-TESTS.md.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -43,6 +43,15 @@ android {
                 enableV3Signing = true
             }
         }
+    }
+
+    // Deux variantes d'un même code (§18.1) : même applicationId, même versionCode, même clé. `fdroid` n'a aucune
+    // permission réseau ; `play` déclare INTERNET (src/play/AndroidManifest.xml) pour la seule mise à jour des
+    // dictionnaires, à la demande et sur opt-in (§2.7, §10.7). Seul le code de src/play/ diffère.
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("fdroid") { dimension = "distribution" }
+        create("play") { dimension = "distribution" }
     }
 
     buildTypes {
@@ -121,10 +130,10 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Fournit le manifeste fusionné de chaque variante aux tests unitaires : ManifestTest échoue
-// si une dépendance ou le manifeste source introduit la permission INTERNET (spec §2.7, §12).
-// Chaque tâche de test reçoit aussi les manifestes de toutes les variantes
-// (`nextglyph.mergedManifest.<variante>`) : le panel de test (§15.3) doit être absent de la release.
+// Fournit le manifeste fusionné de chaque variante aux tests unitaires : ManifestTest échoue si une dépendance ou
+// le manifeste source introduit une permission réseau dans `fdroid*`, ou autre chose qu'INTERNET dans `play*` (spec §2.7, §12).
+// Chaque tâche de test reçoit aussi les manifestes de toutes les variantes (`nextglyph.mergedManifest.<variante>`,
+// ex. `fdroidDebug`, `playRelease`) : le panel de test (§15.3) doit être absent des releases.
 abstract class MergedManifestArgs : CommandLineArgumentProvider {
     @get:Input
     abstract val property: Property<String>

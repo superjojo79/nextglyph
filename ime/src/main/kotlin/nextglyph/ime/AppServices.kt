@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.ContactsContract
+import nextglyph.engine.pack.PackStore
 import nextglyph.engine.stats.KeyHeatmap
 import nextglyph.engine.stats.TypingStats
 import nextglyph.ime.contacts.ContactsRepository
@@ -34,6 +35,12 @@ class AppServices private constructor(context: Context) {
 
     /** État appris, dans le stockage privé non sauvegardé. */
     val learned = LearnedStore(File(app.noBackupFilesDir, LEARNED_FILE), io, main)
+
+    /**
+     * Paquet de dictionnaires installé (issue #62, §10.7), dans le stockage privé non sauvegardé. Les lectures et
+     * installations sont bloquantes : jamais sur le fil principal.
+     */
+    val packs = PackStore(File(app.noBackupFilesDir, PACKS_DIRECTORY))
 
     /** Noms des contacts (en mémoire seulement). */
     val contacts = ContactsRepository({ ContactsSource.read(app.contentResolver) }, io, main)
@@ -76,6 +83,18 @@ class AppServices private constructor(context: Context) {
         heatmap.markSaved()
     }
 
+    /**
+     * À appeler après une installation ou un retour à l'origine d'un paquet : incrémente
+     * [KeyboardSettings.KEY_DICTIONARIES_GENERATION], que le service écoute pour recharger ses dictionnaires.
+     * Utilisable depuis n'importe quel fil.
+     */
+    fun notifyDictionariesChanged() {
+        synchronized(this) {
+            val generation = preferences.getInt(KeyboardSettings.KEY_DICTIONARIES_GENERATION, 0)
+            preferences.edit().putInt(KeyboardSettings.KEY_DICTIONARIES_GENERATION, generation + 1).apply()
+        }
+    }
+
     val settings: KeyboardSettings get() = KeyboardSettings.read { preferences.all[it] }
 
     /**
@@ -97,6 +116,7 @@ class AppServices private constructor(context: Context) {
     companion object {
         const val PREFERENCES = "nextglyph_settings"
         const val LEARNED_FILE = "learned.ngls"
+        const val PACKS_DIRECTORY = "packs"
         const val STATS_PREFERENCES = "nextglyph_stats"
         private const val KEY_STATS = "typing_stats"
         private const val KEY_HEATMAP = "key_heatmap"

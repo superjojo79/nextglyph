@@ -590,3 +590,24 @@ Le format `.ngrm` passe en version 2 avec une zone des confusions (compte de cha
 - **Trigrammes pour les confusions** : plus de précision pour `et`/`est`, mais fichier plus gros ; à mesurer si le terrain montre trop de propositions manquées.
 - **`on`/`ont`, `son`/`sont`, `ce`/`se`** : non mesurés, non inscrits.
 
+## 2026-11-24 — Mise à jour des dictionnaires : deux variantes, paquet signé ECDSA (issue #62)
+
+### Contexte
+
+Les dictionnaires sont embarqués dans l'APK : les corriger ou les enrichir demandait une nouvelle version de l'application. L'invariant « local uniquement » (§2.7) interdit la permission `INTERNET`, condition de confiance et d'entrée sur F-Droid.
+
+### Décision
+
+- **Deux variantes d'un même code** (`fdroid`, `play`, dimension `distribution`), même `applicationId`, même `versionCode`, même clé : on passe de l'une à l'autre sans désinstaller. Seule `play` déclare `INTERNET` (`src/play/AndroidManifest.xml`), pour la seule recherche de mise à jour des dictionnaires, sur opt-in (désactivé par défaut) et à la demande. La variante `fdroid`, celle du build reproductible, garde le §2.7 intact : le paquet s'y obtient dans le navigateur puis s'importe depuis un fichier.
+- **Paquet `.ngpk` signé** : ZIP à plat, manifeste (version `yyyyMMddHHmm`, formats binaires, tailles et SHA-256), signature ECDSA P-256 / SHA-256, vérifié puis chargé à l'essai avant toute bascule atomique (`PackStore`). Le clavier retombe sur les dictionnaires de l'APK à la moindre défaillance, par langue.
+- **ECDSA P-256 plutôt qu'Ed25519** : Ed25519 n'est disponible dans `java.security` qu'à partir d'Android 13, alors que le `minSdk` est 26 (Android 8) ; P-256 l'est partout, sur la JVM comme sur Android, sans dépendance. Deux clés de confiance embarquées permettent la rotation.
+- **Aucune planification** : le paquet est publié par un workflow manuel. Les sources étant figées par leurs empreintes, un nouveau paquet suit une mise à jour de ces empreintes ou des outils ; une vérification périodique côté appareil n'apporterait rien et irait contre le §2.7 (le réseau reste à la demande).
+- **Réseau minimal** (`play`) : `HttpsURLConnection`, deux GET HTTPS vers la release fixe `dictionnaires`, `User-Agent: Nextglyph`, ni cookie ni cache, délais de 15 s et 30 s, réponses plafonnées. Le bouton ne s'affiche qu'après l'opt-in.
+
+### Alternatives écartées
+
+- **Une seule application avec `INTERNET`** : casse le §2.7 pour F-Droid et ses utilisateurs.
+- **Une seconde application ou un module séparé** : deux signatures, deux listes de réglages, aucune mise à jour croisée.
+- **`WorkManager` / vérification périodique** : dépendance, réveils en arrière-plan, réseau sans action de l'utilisateur.
+- **Ed25519** : exclu par Android 8 à 12 ; **RSA** : signatures et clés plus grosses sans avantage.
+- **Dictionnaires dans l'APK seulement** : chaque correction passe par une version complète, donc par la publication sur F-Droid.

@@ -62,7 +62,7 @@ Les champs sans `imeOptions` explicite reçoivent du système `actionNext` (ou `
 Lancement local, émulateur ou appareil connecté (le clavier courant est rétabli à la fin) :
 
 ```sh
-./gradlew :ime:connectedDebugAndroidTest
+./gradlew :ime:connectedFdroidDebugAndroidTest
 ```
 
 Résultat sur l'émulateur Android 16 le 2026-11-19 : 4 tests, 0 échec (environ 1 min, compilation comprise). Rapport : `ime/build/reports/androidTests/connected/debug/index.html`.

@@ -86,6 +86,12 @@ class KeyboardSettingsTest {
             assertThat(KeyboardSettings.storedName(AdaptationMode.CALM_REINFORCED)).isEqualTo("calm_reinforced")
             assertThat(KeyboardSettings.KEYS).hasSize(14).doesNotHaveDuplicates()
         }
+
+        @Test
+        fun `les clés des dictionnaires ne sont pas des réglages du clavier`() {
+            assertThat(KeyboardSettings.KEYS).doesNotContain(KeyboardSettings.KEY_ONLINE_UPDATES, KeyboardSettings.KEY_DICTIONARIES_GENERATION)
+            assertThat(KeyboardSettings.KEY_ONLINE_UPDATES).isNotEqualTo(KeyboardSettings.KEY_DICTIONARIES_GENERATION)
+        }
     }
 
     @Nested

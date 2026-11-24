@@ -124,7 +124,11 @@ class NextglyphInputMethodService : InputMethodService() {
 
     private val save = Runnable { services.learned.saveIfChanged() }
 
-    private val preferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> applySettings() }
+    private val preferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        // Paquet de dictionnaires installé ou retiré depuis les réglages (§10.7) : lexiques et modèles repartent.
+        if (key == KeyboardSettings.KEY_DICTIONARIES_GENERATION) reloadDictionaries()
+        applySettings()
+    }
     private val learnedListener = LearnedStore.Listener { data -> onLearnedChanged(data) }
     private val contactsListener = ContactsRepository.Listener { _ -> rebuildPredictors() }
 
@@ -153,26 +157,19 @@ class NextglyphInputMethodService : InputMethodService() {
         session.heatmap = services.heatmap
         val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nextglyph-lexicon").apply { isDaemon = true } }
         worker = executor
-        val assets = AssetLexicons(assets)
-        val open = { key: String -> assets.openAll(key.split(LANGUAGE_SEPARATOR)) }
-        loader = LexiconLoader(open, executor) { handler.post(it) }.also { loader ->
-            loader.load(LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)) { _, sets ->
-                lexicons = sets
-                rebuildPredictors()
-            }
-        }
+        // Les deux chargeurs lisent le paquet de dictionnaires installé (§10.7) sur le fil d'arrière-plan, au moment
+        // de chaque chargement : un paquet installé ensuite est pris en compte par reloadDictionaries().
+        loader = LexiconLoader({ key: String -> dictionarySource().openAll(key.split(LANGUAGE_SEPARATOR)) }, executor) { handler.post(it) }
         // Modèles du mot suivant (#51) : chargés à part ; un modèle illisible désactive cette fonction pour sa langue seule.
-        val openNextWords = { key: String ->
-            assets.openNextWords(key.split(LANGUAGE_SEPARATOR)) { language, error ->
-                Log.w(LOG_TAG, "Modèle du mot suivant illisible ($language) : prédiction du mot suivant désactivée", error)
-            }
-        }
-        nextWordLoader = LexiconLoader(openNextWords, executor) { handler.post(it) }.also { created ->
-            created.load(LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)) { _, models ->
-                nextWordModels = models ?: emptyMap()
-                session.setNextWordModels(nextWordModels)
-            }
-        }
+        nextWordLoader = LexiconLoader(
+            { key: String ->
+                dictionarySource().openNextWords(key.split(LANGUAGE_SEPARATOR)) { language, error ->
+                    Log.w(LOG_TAG, "Modèle du mot suivant illisible ($language) : prédiction du mot suivant désactivée", error)
+                }
+            },
+            executor,
+        ) { handler.post(it) }
+        loadDictionaries()
         services.preferences.registerOnSharedPreferenceChangeListener(preferencesListener)
         services.learned.addListener(learnedListener)
         services.contacts.addListener(contactsListener)
@@ -180,6 +177,31 @@ class NextglyphInputMethodService : InputMethodService() {
         services.syncContacts()
         emojiRecents = EmojiRecents.parse(services.preferences.getString(KEY_EMOJI_RECENTS, null))
         clipboard = getSystemService(ClipboardManager::class.java)?.also { it.addPrimaryClipChangedListener(clipListener) }
+    }
+
+    /** Dictionnaires du paquet installé s'il y en a un, sinon de l'APK ; un fichier de paquet illisible est journalisé. À appeler hors du fil principal. */
+    private fun dictionarySource() = AssetLexicons(assets, services.packs.current()) { language, error ->
+        Log.w(LOG_TAG, "Paquet de dictionnaires illisible ($language) : dictionnaires de l'application utilisés", error)
+    }
+
+    /** Demande les lexiques et les modèles du mot suivant de toutes les langues, en arrière-plan. */
+    private fun loadDictionaries() {
+        val key = LexiconLanguage.SUPPORTED.joinToString(LANGUAGE_SEPARATOR)
+        loader?.load(key) { _, sets ->
+            lexicons = sets
+            rebuildPredictors()
+        }
+        nextWordLoader?.load(key) { _, models ->
+            nextWordModels = models ?: emptyMap()
+            session.setNextWordModels(nextWordModels)
+        }
+    }
+
+    /** Paquet de dictionnaires installé ou retiré : abandonne les chargements en cours et repart de la source à jour. */
+    private fun reloadDictionaries() {
+        loader?.cancel()
+        nextWordLoader?.cancel()
+        loadDictionaries()
     }
 
     override fun onDestroy() {
