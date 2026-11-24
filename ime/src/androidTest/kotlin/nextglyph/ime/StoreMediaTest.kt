@@ -19,6 +19,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
 import org.junit.Before
+import org.junit.Rule
+import org.junit.rules.TestName
 import org.junit.Test
 import org.junit.experimental.runners.Enclosed
 import org.junit.runner.RunWith
@@ -47,7 +49,7 @@ import java.util.regex.Pattern
  * dépendantes de l'état du champ sont enchaînées dans un seul test séquentiel. Noms de tests sans espaces (DEX < API 30).
  *
  * Lancement : `bash scripts/store-media.sh <dossier>` (émulateur ou appareil), ou seule la vidéo :
- * `-e class 'nextglyph.ime.StoreMediaTest$HappyPath#video_scenario'`.
+ * `-e storeMedia true -e storeVideo true` (le lanceur Enclosed ignore les filtres par méthode).
  */
 @RunWith(Enclosed::class)
 class StoreMediaTest {
@@ -153,6 +155,8 @@ class StoreMediaTest {
         private var scenario: ActivityScenario<ShowcaseActivity>? = null
         private var previousIme: String? = null
 
+        @get:Rule
+        val testName = TestName()
 
         internal val texts: StoreTexts = when (context.resources.configuration.locales.get(0)?.language) {
             "fr" -> StoreTexts("Bonj", "Bonjour", "bonjoir", "Bonjour Camille je passe vers sept heures et on se retrouve devant le cinema", 3)
@@ -165,6 +169,10 @@ class StoreMediaTest {
                 "Visuels des stores : lancer avec -e storeMedia true.",
                 InstrumentationRegistry.getArguments().getString("storeMedia") == "true",
             )
+            // Le lanceur Enclosed ignore les filtres par méthode : `-e storeVideo true` ne garde que la vidéo
+            // (filmée par le script), sinon la vidéo est sautée.
+            val videoRun = InstrumentationRegistry.getArguments().getString("storeVideo") == "true"
+            assumeTrue("Vidéo et captures sont lancées séparément.", videoRun == (testName.methodName == VIDEO_TEST))
             previousIme = shell("settings get secure default_input_method").trim().takeIf { it.isNotEmpty() && it != "null" }
             shell("ime enable $IME_ID")
             shell("ime set $IME_ID")
@@ -275,7 +283,16 @@ class StoreMediaTest {
             val firstKey = device.findObject(By.desc(Pattern.compile("(?i)$topLeft")))
                 ?: throw IllegalStateException("Touche introuvable : première touche de la rangée du haut (a ou q).")
             val target = Point(firstKey.visibleBounds.left + firstKey.visibleBounds.width() / 2, firstKey.visibleCenter.y)
-            check(device.swipe(arrayOf(start, Point(start.x, start.y), target, target), HOLD_STEPS)) { "Appui long sur ↵ refusé." }
+            // `input motionevent` (API 30+) : appui, maintien réel, glissement puis relâchement, comme un doigt.
+            shell("input motionevent DOWN ${start.x} ${start.y}")
+            Thread.sleep(HOLD_MS)
+            for (step in 1..MOVE_STEPS) {
+                val x = start.x + (target.x - start.x) * step / MOVE_STEPS
+                val y = start.y + (target.y - start.y) * step / MOVE_STEPS
+                shell("input motionevent MOVE $x $y")
+            }
+            Thread.sleep(MOVE_PAUSE_MS)
+            shell("input motionevent UP ${target.x} ${target.y}")
             val letters = string(R.string.a11y_letters)
             checkNotNull(device.wait(Until.findObject(By.desc(letters)), TIMEOUT_MS)) {
                 "Le panneau émojis ne s'est pas ouvert (touche « $letters » introuvable)."
@@ -320,14 +337,16 @@ class StoreMediaTest {
     private companion object {
         const val IME_ID = "io.github.superjojo79.nextglyph/nextglyph.ime.NextglyphInputMethodService"
         const val TAG = "StoreMediaTest"
+        const val VIDEO_TEST = "video_scenario"
         const val OUTPUT_DIR = "/data/local/tmp/store-media"
         const val TIMEOUT_MS = 10_000L
         const val SETTLE_MS = 1_000L
         const val KEY_PAUSE_MS = 120L
         const val ERASE_PAUSE_MS = 60L
         const val VIDEO_KEY_PAUSE_MS = 250L
-        /** Pas de 5 ms environ : 200 pas ≈ 1 s de maintien par segment du geste. */
-        const val HOLD_STEPS = 200
+        const val HOLD_MS = 1_200L
+        const val MOVE_STEPS = 8
+        const val MOVE_PAUSE_MS = 300L
         const val MAX_ERASE = 40
     }
 }

@@ -19,7 +19,6 @@ runner="${test_id}/androidx.test.runner.AndroidJUnitRunner"
 remote_media="/data/local/tmp/store-media"
 remote_video="/sdcard/promo.mp4"
 test_class='nextglyph.ime.StoreMediaTest'
-video_test='nextglyph.ime.StoreMediaTest$HappyPath#video_scenario'
 
 cd "$(dirname "$0")/.."
 
@@ -76,7 +75,6 @@ instrument_log="$(mktemp)"
 timeout 900 adb shell am instrument -w -r \
   -e storeMedia true \
   -e class "$test_class" \
-  -e notClass "$video_test" \
   "$runner" | tee "$instrument_log" || echo "Tests de captures interrompus (délai dépassé ?)" >&2
 captures_failed=0
 if grep -q -E 'INSTRUMENTATION_RESULT: shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]\s*$' "$instrument_log"; then
@@ -93,7 +91,8 @@ sleep 3
 video_status=0
 timeout 300 adb shell am instrument -w -r \
   -e storeMedia true \
-  -e class "$video_test" \
+  -e storeVideo true \
+  -e class "$test_class" \
   "$runner" | tee "$instrument_log" || video_status=$?
 # Arrêt propre : SIGINT laisse screenrecord finaliser le fichier MP4.
 adb shell 'kill -2 $(pidof screenrecord)' || true
