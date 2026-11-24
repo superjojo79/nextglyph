@@ -135,13 +135,11 @@ class PackStore(
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     if (seen.size >= limits.maxEntries) throw tooLarge("plus de ${limits.maxEntries} entrées")
-                    if (entry.isDirectory || entry.name !in allowed) {
-                        throw corrupt("entrée inattendue « ${entry.name} »")
-                    }
-                    if (!seen.add(entry.name)) throw corrupt("entrée « ${entry.name} » en double")
-                    // Noms admis seulement, à plat : la cible reste dans le dossier de préparation (« Zip Slip »).
-                    val target = File(staging, entry.name)
-                    if (target.canonicalFile.parentFile != staging.canonicalFile) throw corrupt("entrée hors du paquet « ${entry.name} »")
+                    // Le fichier prend le nom de la liste fermée, jamais celui de l'archive (« Zip Slip ») : à plat, sans « .. ».
+                    val name = allowed.firstOrNull { it == entry.name }
+                    if (entry.isDirectory || name == null) throw corrupt("entrée inattendue « ${entry.name} »")
+                    if (!seen.add(name)) throw corrupt("entrée « $name » en double")
+                    val target = File(staging, name)
                     var size = 0L
                     FileOutputStream(target).use { out ->
                         while (true) {
@@ -149,7 +147,7 @@ class PackStore(
                             if (read < 0) break
                             size += read
                             total += read
-                            if (size > limits.maxEntryBytes) throw tooLarge("« ${entry.name} » dépasse ${limits.maxEntryBytes} octets")
+                            if (size > limits.maxEntryBytes) throw tooLarge("« $name » dépasse ${limits.maxEntryBytes} octets")
                             if (total > limits.maxTotalBytes) throw tooLarge("le paquet dépasse ${limits.maxTotalBytes} octets")
                             out.write(buffer, 0, read)
                         }
