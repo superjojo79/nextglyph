@@ -9,7 +9,20 @@
       "05": "Rien ne quitte votre téléphone",
       "06": "Il apprend votre façon de taper"
     },
-    "subtitle": "Français et anglais, sans changer de clavier"
+    "subtitle": "Français et anglais, sans changer de clavier",
+    "video": {
+      "intro": "Votre clavier next gen",
+      "steps": [
+        "Les lettres probables passent devant",
+        "Une suggestion, et le mot est fini",
+        "Français et anglais, sans changer de clavier"
+      ],
+      "outro": [
+        "Libre et open source",
+        "Aucun accès au réseau",
+        "F-Droid · Google Play"
+      ]
+    }
   },
   "en-US": {
     "tagline": "NextGlyph, your next-gen keyboard",
@@ -21,6 +34,19 @@
       "05": "Nothing leaves your phone",
       "06": "It learns how you type"
     },
-    "subtitle": "English and French, no switching"
+    "subtitle": "English and French, no switching",
+    "video": {
+      "intro": "Your next-gen keyboard",
+      "steps": [
+        "Likely letters stand out",
+        "Tap a suggestion to finish the word",
+        "English and French, no switching"
+      ],
+      "outro": [
+        "Free and open source",
+        "No network access",
+        "F-Droid · Google Play"
+      ]
+    }
   }
 }
