@@ -15,5 +15,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Décor des visuels des stores (StoreMediaTest) : lancé par le test, jamais depuis le lanceur. -->
+        <activity
+            android:name=".debug.ShowcaseActivity"
+            android:exported="true"
+            android:label="@string/showcase_label"
+            android:taskAffinity="io.github.superjojo79.nextglyph.showcase"
+            android:theme="@style/Theme.Showcase"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

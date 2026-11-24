@@ -139,6 +139,16 @@ Points à confirmer avec les relecteurs de F-Droid :
 8. **Autres déclarations** : pas de publicité ; classification du contenu (questionnaire IARC, aucune catégorie sensible) ; public cible 13 ans et plus ; pas d'application gouvernementale ni financière.
 9. **API cible** : `targetSdk = 37` dépasse l'exigence actuelle de Play ; à revérifier avant chaque publication (§18.4).
 
+## Visuels des stores
+
+Les captures et la vidéo des stores sont produites automatiquement, en français (AZERTY) et en anglais (QWERTY), sur un émulateur Android 14 de GitHub Actions. Le test instrumenté `StoreMediaTest` (variante debug) tape des scénarios touche par touche dans `ShowcaseActivity`, une fausse messagerie ; `scripts/store-media.sh` règle la barre d'état (09:41, batterie pleine), lance les tests, filme l'écran et récupère les fichiers.
+
+1. Onglet **Actions** → **Visuels des stores** → **Run workflow** (le workflow se lance aussi à chaque push sur une branche `claude/**` qui touche ces fichiers).
+2. Images brutes : artefacts `store-media-fr-FR` et `store-media-en-US` (14 jours), ou, sans passer par GitHub Actions, la branche orpheline **`store-media-raw`** (jamais fusionnée, réécrite à chaque exécution) : dossiers `fr-FR/` et `en-US/` avec `00-repos.png` … `06-carte-de-frappe.png` et `promo.mp4`.
+3. Les images **finales** (annotées, recadrées, avec accroche) vont dans `fastlane/metadata/android/<locale>/images/` (`phoneScreenshots/`, `featureGraphic.png`, `icon.png`).
+
+Pour lancer à la main sur un appareil dans la bonne langue : `./gradlew :ime:assembleDebug :ime:assembleDebugAndroidTest && bash scripts/store-media.sh sortie`.
+
 ## Avant la première publication
 
 Points ouverts repris de [PROGRESS.md](PROGRESS.md) :

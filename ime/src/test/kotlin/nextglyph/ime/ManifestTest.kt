@@ -95,7 +95,7 @@ class ManifestTest {
 
         @Test
         fun `le panel des champs de test est dans la variante debug`() {
-            assertThat(activitiesOf(mergedManifest("debug"))).contains(fieldTests, "nextglyph.ime.settings.SettingsActivity", "nextglyph.ime.settings.HeatmapActivity")
+            assertThat(activitiesOf(mergedManifest("debug"))).contains(fieldTests, "nextglyph.ime.debug.ShowcaseActivity", "nextglyph.ime.settings.SettingsActivity", "nextglyph.ime.settings.HeatmapActivity")
         }
 
         @Test

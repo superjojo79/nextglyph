@@ -1,0 +1,107 @@
+# Visuels bruts des stores (captures + vidéo, fr-FR et en-US) : poussés sur la branche orpheline `store-media-raw`, jamais fusionnée, pour les récupérer hors de GitHub Actions.
+name: Visuels des stores
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - "ime/src/debug/**"
+      - "ime/src/androidTest/**"
+      - "scripts/store-media.sh"
+      - ".github/workflows/store-media.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-media-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Captures (${{ matrix.locale }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        locale: [fr-FR, en-US]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      # L'APK embarque les lexiques, construits à partir des données linguistiques (cache de la CI).
+      - uses: ./.github/actions/lexicon-data
+
+      - uses: ./.github/actions/android-sdk
+
+      - name: Activer KVM (émulateur accéléré)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Construire les APK debug et de test
+        run: ./gradlew :ime:assembleDebug :ime:assembleDebugAndroidTest --console=plain
+
+      # Le `script` de l'action exécute chaque ligne séparément : une seule ligne, qui appelle le script du dépôt.
+      - name: Captures et vidéo sur émulateur
+        uses: reactivecircus/android-emulator-runner@e93c997dcab69054e999e3924af3d21c4a736e13 # v2.9.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -change-locale ${{ matrix.locale }}
+          disable-animations: true
+          script: bash scripts/store-media.sh out
+
+      - name: Publier les visuels bruts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: store-media-${{ matrix.locale }}
+          path: out
+          retention-days: 14
+          if-no-files-found: warn
+
+  publish:
+    name: Branche store-media-raw
+    needs: capture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Télécharger les visuels
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: store-media-*
+          merge-multiple: true
+          path: out
+
+      - name: Pousser sur la branche orpheline store-media-raw
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cp -R out/. "$work/"
+          cd "$work"
+          git init --quiet --initial-branch=store-media-raw
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit --quiet -m "Visuels bruts ${COMMIT_SHA::7} ($(date -u +%Y-%m-%d))"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY}.git" store-media-raw
