@@ -13,6 +13,7 @@ converti en tracés : aucune police n'est nécessaire pour afficher les SVG.
 | `nextglyph-horizontal-{fr,en}-dark.svg` | Logo horizontal avec accroche, fond bleu nuit (bannière, captures, vidéo) |
 | `nextglyph-horizontal-{fr,en}-mono-{white,black}.svg` | Logo horizontal monochrome |
 | `nextglyph-logo-{fr,en}*.svg` | Logo vertical (monogramme au-dessus du nom et de l'accroche) |
+| `nextglyph-banner-suggestions-{fr,en}.svg` | Bannière Play 1024 × 500 (`images/featureGraphic.png` de fastlane) |
 
 L'icône du lanceur (`ic_launcher_foreground.xml`, `ic_launcher_monochrome.xml`) reprend les tracés de
 `nextglyph-icon.svg`, réduits pour tenir dans la zone sûre de 66 dp de l'icône adaptative.
