@@ -47,7 +47,7 @@
     <string name="pref_section_contacts">Contacts</string>
     <string name="pref_contacts">Contact names</string>
     <string name="pref_contacts_summary">Suggests your contacts\' names, kept in memory only.</string>
-    <string name="contacts_rationale">To suggest your contacts\' names, Nextglyph needs to read your address book. Only names are read; they never leave the device (Nextglyph has no network access) and are not saved. You can turn this off at any time.</string>
+    <string name="contacts_rationale">To suggest your contacts\' names, NextGlyph needs to read your address book. Only names are read; they never leave the device (NextGlyph has no network access) and are not saved. You can turn this off at any time.</string>
     <string name="contacts_continue">Continue</string>
     <string name="contacts_denied">Permission denied: contact names are not suggested.</string>
 

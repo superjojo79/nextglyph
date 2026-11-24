@@ -1,4 +1,4 @@
-Nextglyph est un clavier Android adaptatif, libre et open source. Il garde une disposition AZERTY ou QWERTY que vous reconnaissez tout de suite, et, à chaque lettre tapée, met en avant les lettres qui peuvent encore former un mot. Les lettres improbables s'atténuent et cèdent un peu de place aux autres, sans jamais changer de rangée.
+NextGlyph est un clavier Android adaptatif, libre et open source. Il garde une disposition AZERTY ou QWERTY que vous reconnaissez tout de suite, et, à chaque lettre tapée, met en avant les lettres qui peuvent encore former un mot. Les lettres improbables s'atténuent et cèdent un peu de place aux autres, sans jamais changer de rangée.
 
 <b>Plus rapide, plus compact</b>
 <ul>

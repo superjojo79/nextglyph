@@ -133,4 +133,4 @@ jobs:
             "dist/nextglyph-$VERSION.apk" "dist/nextglyph-$VERSION.apk.sha256" \
             "dist/nextglyph-$VERSION.apk.sigstore.json" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "Nextglyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+            --title "NextGlyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

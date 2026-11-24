@@ -1,4 +1,4 @@
-# Nextglyph
+# NextGlyph
 
 Clavier Android adaptatif open source (Apache-2.0). La spécification de référence est `docs/SPEC.md` ; toute évolution de comportement s'y reflète.
 

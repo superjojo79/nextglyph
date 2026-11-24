@@ -32,7 +32,7 @@ Sur un poste de confiance, hors du dépôt :
 ```sh
 keytool -genkeypair -v -keystore nextglyph-release.jks -alias nextglyph \
   -keyalg RSA -keysize 4096 -validity 36500 \
-  -dname "CN=Nextglyph"
+  -dname "CN=NextGlyph"
 ```
 
 - Garder deux copies hors ligne du fichier `.jks` et des mots de passe (ex. clé USB chiffrée et gestionnaire de mots de passe). **Une clé perdue empêche toute mise à jour** sur F-Droid (APK reproductible) comme sur GitHub.
@@ -68,7 +68,7 @@ Pour signer en local : exporter `NEXTGLYPH_KEYSTORE` (chemin du `.jks`) et les t
 ## 5. Publier sur GitHub
 
 ```sh
-git tag -a v0.1.0 -m "Nextglyph 0.1.0" && git push origin v0.1.0
+git tag -a v0.1.0 -m "NextGlyph 0.1.0" && git push origin v0.1.0
 ```
 
 Le workflow **Release** vérifie que le tag égale `versionName`, attend votre accord (environnement `release`), construit l'APK et l'app bundle signés, vérifie la signature (`apksigner`), atteste sa provenance (SLSA, signée via Sigstore), puis crée la release avec `nextglyph-0.1.0.apk`, son `.sha256`, son attestation `.sigstore.json` et les notes de version dans les deux langues. L'app bundle est dans les artefacts du workflow (90 jours).
@@ -95,7 +95,7 @@ SourceCode: https://github.com/superjojo79/nextglyph
 IssueTracker: https://github.com/superjojo79/nextglyph/issues
 Changelog: https://github.com/superjojo79/nextglyph/releases
 
-AutoName: Nextglyph
+AutoName: NextGlyph
 
 RepoType: git
 Repo: https://github.com/superjojo79/nextglyph.git
@@ -130,7 +130,7 @@ Points à confirmer avec les relecteurs de F-Droid :
 ## 7. Publier sur Google Play
 
 1. Compte développeur Play Console (frais uniques de 25 $). **Un compte personnel récent doit faire un test fermé avec au moins 12 testeurs pendant 14 jours** avant de pouvoir publier en production (règle à revérifier au moment de l'inscription).
-2. Créer l'application (nom « Nextglyph », gratuite, application et non jeu).
+2. Créer l'application (nom « NextGlyph », gratuite, application et non jeu).
 3. **Signature** : à l'envoi du premier bundle, choisir de **fournir votre propre clé de signature d'application** (outil PEPK proposé par la console) avec `nextglyph-release.jks`, et non une clé générée par Google (§18.1). La même clé peut servir de clé d'importation.
 4. Envoyer `ime-release.aab` (artefact du workflow Release) dans la piste de test fermé.
 5. **Fiche du store** : textes de `fastlane/metadata/android/fr-FR` et `en-US` (titre ≤ 30, description courte ≤ 80, description complète ≤ 4 000 caractères), captures, icône et bannière.
