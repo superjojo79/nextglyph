@@ -1,0 +1,27 @@
+name: Wrapper Gradle
+
+# Workflow dédié et rapide : OpenSSF Scorecard (Binary-Artifacts) n'ignore gradle-wrapper.jar que si
+# le premier workflow (ordre alphabétique) contenant cette action a réussi sur le dernier commit.
+# Ne pas ajouter de filtre de chemins ni déplacer cette étape dans ci.yml (le nom de fichier ci.yml
+# passerait avant celui-ci et la course avec un CI long ferait échouer le contrôle).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    name: Vérifier l'intégrité du wrapper Gradle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1

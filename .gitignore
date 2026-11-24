@@ -26,3 +26,7 @@ signing.properties
 # Données générées pour le prototype (CC BY-SA / MPL, volumineuses) : voir prototype/README.md
 /prototype/data/fr.json
 /prototype/data/en.json
+
+# Fuzzing (Jazzer) : corpus généré et plantages locaux
+.cifuzz-corpus/
+crash-*

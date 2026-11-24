@@ -2,7 +2,11 @@ name: OpenSSF Scorecard
 
 on:
   branch_protection_rule:
-  push:
+  # Après la validation du wrapper Gradle plutôt qu'au push : le contrôle Binary-Artifacts n'ignore
+  # gradle-wrapper.jar que si le workflow qui le valide a déjà réussi sur le dernier commit de main.
+  workflow_run:
+    workflows: ["Wrapper Gradle"]
+    types: [completed]
     branches: [main]
   schedule:
     - cron: "41 4 * * 1"
