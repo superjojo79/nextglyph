@@ -23,6 +23,9 @@ jobs:
     name: Captures (${{ matrix.locale }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # avdmanager et l'émulateur doivent lire le même dossier d'AVD (sinon l'émulateur ne démarre jamais).
+      ANDROID_AVD_HOME: /home/runner/.android/avd
     strategy:
       fail-fast: false
       matrix:
@@ -70,6 +73,7 @@ jobs:
           "$sdkmanager" --install "platform-tools" "emulator" "system-images;android-34;google_apis;x86_64" > /dev/null
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force -n store \
             -k "system-images;android-34;google_apis;x86_64" -d pixel_6
 
@@ -80,8 +84,10 @@ jobs:
         run: |
           set -euo pipefail
           emulator -avd store -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim \
-            -change-locale "$LOCALE" > emulator.log 2>&1 &
-          adb wait-for-device
+            -accel on -change-locale "$LOCALE" > emulator.log 2>&1 &
+          if ! timeout 300 adb wait-for-device; then
+            echo "L'émulateur n'a pas démarré :" >&2; tail -n 80 emulator.log >&2; exit 1
+          fi
           timeout 600 adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
           sleep 20
           adb logcat -v time > logcat.txt 2>&1 &
