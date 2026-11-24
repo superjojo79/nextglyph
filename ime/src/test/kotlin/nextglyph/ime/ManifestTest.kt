@@ -76,14 +76,14 @@ class ManifestTest {
     @Nested
     inner class HappyPath {
         @Test
-        fun `les variantes fdroid ne déclarent aucune permission réseau (§2.7)`() {
+        fun `les variantes fdroid ne déclarent aucune permission réseau`() {
             for (variant in fdroidVariants) {
                 assertThat(permissionsOf(mergedManifest(variant))).`as`(variant).doesNotContainAnyElementsOf(network)
             }
         }
 
         @Test
-        fun `les variantes play déclarent INTERNET et aucune autre permission réseau (§2.7, §10.7)`() {
+        fun `les variantes play déclarent INTERNET et aucune autre permission réseau`() {
             for (variant in playVariants) {
                 val permissions = permissionsOf(mergedManifest(variant))
 
