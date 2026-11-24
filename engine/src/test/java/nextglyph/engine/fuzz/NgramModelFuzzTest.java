@@ -22,12 +22,18 @@ class NgramModelFuzzTest {
     private static final int MAX_LIMIT = 20;
 
     private static byte[] validFile() {
-        NgramPruning keepAll = new NgramPruning(1, 1, 8, 4, 1000, 0.0);
-        NgramModelBuilder builder = new NgramModelBuilder("fr", keepAll, word -> true);
+        NgramPruning keepAll = new NgramPruning(1, 1, 8, 4, 1000, 0.0, 1);
+        // Une zone de confusions (format version 2) pour que le fuzzer en atteigne aussi le décodage.
+        List<List<String>> confusions = List.of(List.of("a", "à"), List.of("ou", "où"));
+        NgramModelBuilder builder = new NgramModelBuilder("fr", keepAll, word -> true, confusions);
         builder.addSentence(List.of("je", "suis", "content"), 5);
         builder.addSentence(List.of("je", "suis", "fatigué"), 3);
         builder.addSentence(List.of("tu", "es", "là"), 4);
         builder.addSentence(List.of("j'", "ai", "faim"), 3);
+        builder.addSentence(List.of("il", "a", "faim"), 3);
+        builder.addConfusionContext(List.of("il", "a", "faim"), 3);
+        builder.addConfusionContext(List.of("je", "suis", "à", "la", "maison"), 2);
+        builder.addConfusionContext(List.of("tu", "es", "où"), 2);
         return builder.build();
     }
 
@@ -45,6 +51,7 @@ class NgramModelFuzzTest {
                 String word = data.consumeString(10);
                 model.contains(word);
                 model.bigramProbability(previous, word);
+                model.confusionCounts(previous, List.of(word, data.consumeString(10)));
             }
         } catch (NgramFormatException expected) {
             // Fichier corrompu : seule exception documentée.
