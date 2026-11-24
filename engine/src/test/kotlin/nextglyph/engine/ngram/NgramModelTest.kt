@@ -185,11 +185,11 @@ class NgramModelTest {
         @Test
         fun `une version inconnue est refusée`() {
             val bytes = NgramFixtures.bytes()
-            bytes[5] = 2
+            bytes[5] = 3
 
             assertThatThrownBy { load(bytes) }
                 .isInstanceOf(NgramFormatException::class.java)
-                .hasMessageContaining("version 2")
+                .hasMessageContaining("version 3")
         }
 
         @Test

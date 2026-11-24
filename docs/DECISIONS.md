@@ -573,3 +573,20 @@ Une espace ratée est une faute fréquente sur un clavier compact : la barre d'e
 - **Coupure sur toute lettre voisine sans preuve spatiale** : écartée ci-dessus.
 - **Seuil de score relatif au lieu d'un plancher absolu** : une coupure sans autre candidat aurait une probabilité 1 même pour un mot rare ; le plancher `minScore` borne la plausibilité en valeur absolue.
 
+## 2026-11-24 — Contexte de la correction : confusions décidées par le mot précédent (issue #55)
+
+### Contexte
+
+`a`/`à`, `ou`/`où`, `la`/`là`, `du`/`dû` ont la même clé de lexique ; `ces`/`ses` et `et`/`est` sont deux mots valides. Les modèles de l'issue #51 fusionnent les formes de même clé et n'élaguent pas à l'identique : ils ne peuvent pas dire `va à` contre `va a`.
+
+### Décision
+
+Le format `.ngrm` passe en version 2 avec une zone des confusions (compte de chaque forme après chaque mot du vocabulaire, groupes de mots sans signe). Remplacement automatique seulement sur une part très nette (0,99 / 0,98 / 0,97 sur 50 / 30 / 20 occurrences selon la prudence), sinon proposition en premier dans la barre. Pas de remplacement d'un accent tapé ni d'une majuscule en milieu de phrase. Sigles, mots collés à `@ / _` ou à un point intérieur : aucun remplacement. Filtre et adresse postale : suggestions sans validation par espace.
+
+### Alternatives écartées
+
+- **Lire le bigramme du modèle existant** : impossible pour les paires à même clé, et `ses` est élagué après la plupart des mots.
+- **Fichier de confusions séparé** : demandait de charger un troisième fichier dans l'IME.
+- **Trigrammes pour les confusions** : plus de précision pour `et`/`est`, mais fichier plus gros ; à mesurer si le terrain montre trop de propositions manquées.
+- **`on`/`ont`, `son`/`sont`, `ce`/`se`** : non mesurés, non inscrits.
+

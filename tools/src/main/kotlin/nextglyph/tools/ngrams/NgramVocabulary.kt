@@ -49,3 +49,15 @@ object SentenceSplitter {
 
     fun split(text: String): List<String> = text.split(BOUNDARY).filter { it.isNotBlank() }
 }
+
+/**
+ * Découpe une phrase en groupes de mots consécutifs : une virgule, un point-virgule, deux-points, une parenthèse, un
+ * guillemet ou un tiret entouré d'espaces sépare deux groupes. Le clavier ne lit pas le mot précédent à travers
+ * un tel signe (§5.5, issue #55) ; les comptes de confusion s'apprennent donc groupe par groupe.
+ */
+object ClauseSplitter {
+
+    private val BREAK = Regex("[,;:()\\[\\]«»\"“”‘—–…]|\\s[-–]\\s")
+
+    fun split(sentence: String): List<String> = sentence.split(BREAK).filter { it.isNotBlank() }
+}

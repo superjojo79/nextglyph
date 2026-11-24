@@ -237,6 +237,21 @@ class InputProfileResolverTest {
             assertThat(resolve(TEXT).autoCapitalize).isFalse()
             assertThat(resolve(TEXT or C.TYPE_TEXT_VARIATION_PERSON_NAME or C.TYPE_TEXT_FLAG_CAP_WORDS).autoCapitalize).isTrue()
         }
+
+        @Test
+        fun `le filtre et l'adresse postale gardent les suggestions mais pas la validation automatique`() {
+            for (variation in listOf(C.TYPE_TEXT_VARIATION_FILTER, C.TYPE_TEXT_VARIATION_POSTAL_ADDRESS)) {
+                val profile = resolve(TEXT or variation)
+
+                assertThat(profile.type).isEqualTo(ProfileType.TEXT)
+                assertThat(profile.suggestions).isTrue()
+                assertThat(profile.autocommit).isFalse()
+            }
+            assertThat(resolve(TEXT).autocommit).isTrue()
+            assertThat(resolve(TEXT or C.TYPE_TEXT_VARIATION_PERSON_NAME).autocommit).isTrue()
+            assertThat(resolve(TEXT or C.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT).autocommit).isTrue()
+            assertThat(resolve(TEXT or C.TYPE_TEXT_VARIATION_EMAIL_SUBJECT).autocommit).isTrue()
+        }
     }
 
     @Nested
@@ -298,6 +313,15 @@ class InputProfileResolverTest {
             val others = 0x02000000 or 0x10000000 or 0x40000000 or C.IME_MASK_ACTION
 
             assertThat(resolve(TEXT, others)).isEqualTo(resolve(TEXT))
+        }
+
+        @Test
+        fun `les profils sans prose n'ont jamais de validation automatique`() {
+            val inputs = listOf(
+                TEXT or C.TYPE_TEXT_VARIATION_PASSWORD, TEXT or C.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, TEXT or C.TYPE_TEXT_VARIATION_URI,
+                NUMBER, PHONE, DATETIME, NUMBER or C.TYPE_NUMBER_VARIATION_PASSWORD,
+            )
+            for (input in inputs) assertThat(resolve(input).autocommit).`as`("%x", input).isFalse()
         }
     }
 
@@ -391,6 +415,14 @@ class InputProfileResolverTest {
                 }
                 if (expectedClass != null) assertThat(profile.type).isEqualTo(expectedClass)
             }
+        }
+
+        @Test
+        fun `les variations voisines du filtre et de l'adresse postale gardent la validation automatique`() {
+            assertThat(resolve(TEXT or (C.TYPE_TEXT_VARIATION_FILTER - 0x10)).autocommit).isTrue()
+            assertThat(resolve(TEXT or (C.TYPE_TEXT_VARIATION_FILTER + 0x10)).autocommit).isTrue()
+            assertThat(resolve(TEXT or (C.TYPE_TEXT_VARIATION_POSTAL_ADDRESS - 0x10)).autocommit).isTrue()
+            assertThat(resolve(TEXT or C.TYPE_TEXT_VARIATION_FILTER or C.TYPE_TEXT_FLAG_NO_SUGGESTIONS).suggestions).isFalse()
         }
     }
 }

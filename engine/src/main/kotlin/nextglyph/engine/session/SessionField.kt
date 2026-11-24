@@ -33,7 +33,7 @@ class SessionField(
         profile = fieldProfile(profile.type),
         noSuggestions = !profile.suggestions,
         incognito = profile.incognito || !profile.learning,
-        autocommit = autocommit,
+        autocommit = autocommit && profile.autocommit,
         prudence = prudence,
         nextWord = nextWord,
     )

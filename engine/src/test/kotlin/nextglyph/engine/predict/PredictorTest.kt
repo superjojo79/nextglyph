@@ -67,7 +67,7 @@ class PredictorTest {
             "peutetre, peut-être, DOMINANT",
             "ecole, école, WORD",
             "Ecole, École, WORD",
-            "ECOLE, ÉCOLE, WORD",
+            "ECOLE, ECOLE, LITERAL",
             "a, a, WORD",
             "ou, ou, WORD",
             "paris, paris, WORD",
