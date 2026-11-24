@@ -47,7 +47,7 @@ Si une unité n'a vraiment aucun cas d'erreur possible (fonction totale), le gro
    - moins de **85 %** des mutants sont tués ;
    - moins de **90 %** des lignes sont couvertes.
 
-   Le rapport HTML est dans `engine/build/reports/pitest/index.html`, et en CI dans l'artefact `rapport-pitest`.
+   Le rapport HTML est dans `engine/build/reports/pitest/index.html`, et en CI dans les artefacts `rapport-pitest-engine` et `rapport-pitest-tools` (un job par module).
 
 ## Bonnes pratiques
 
