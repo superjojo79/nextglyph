@@ -10,6 +10,8 @@ package nextglyph.engine.ngram
  * @property maxVocabulary nombre maximal de mots du vocabulaire (les plus fréquents).
  * @property minTrigramGain un suivant de trigramme n'est gardé que si `P(c | a b) ≥ gain × P(c | b)` : un
  *   trigramme qui n'apprend rien de plus que le bigramme est retrouvé par repli.
+ * @property minConfusionCount nombre minimal d'occurrences, toutes formes confondues, d'un mot précédent pour que
+ *   ses comptes de confusion soient gardés (issue #55).
  */
 data class NgramPruning(
     val minBigramCount: Int = 2,
@@ -18,6 +20,7 @@ data class NgramPruning(
     val maxTrigramFollowers: Int = 4,
     val maxVocabulary: Int = 30_000,
     val minTrigramGain: Double = 1.0,
+    val minConfusionCount: Int = 3,
 ) {
     init {
         require(minBigramCount >= 1) { "Le seuil des bigrammes doit être au moins 1 ($minBigramCount)." }
@@ -31,6 +34,7 @@ data class NgramPruning(
         require(maxVocabulary in 1..NgramFormat.MAX_VOCABULARY) {
             "Le vocabulaire doit contenir de 1 à ${NgramFormat.MAX_VOCABULARY} mots ($maxVocabulary)."
         }
+        require(minConfusionCount >= 1) { "Le seuil des confusions doit être au moins 1 ($minConfusionCount)." }
         require(minTrigramGain >= 0.0 && minTrigramGain.isFinite()) {
             "Le gain minimal des trigrammes doit être positif ou nul ($minTrigramGain)."
         }

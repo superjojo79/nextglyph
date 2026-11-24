@@ -231,8 +231,30 @@ tasks.register<JavaExec>("analyzeSpaces") {
     outputs.upToDateWhen { false }
 }
 
+// Analyse M55 : contexte de la correction (issue #55), formes confondues décidées par le mot précédent ; écrit
+// build/analysis/M55-context-results.md. Phrases par langue (défaut 20 000) : -PcontextSentences=<N>.
+tasks.register<JavaExec>("analyzeContext") {
+    group = "data"
+    description = "Analyse M55 : fausses corrections et taux de correction des confusions a/à, ou/où, ces/ses..."
+    dependsOn("buildLexicons")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.analysis.AnalyzeContextMainKt")
+    maxHeapSize = "4g"
+    args(
+        listOfNotNull(
+            layout.buildDirectory.dir("wordlists").get().asFile.path,
+            layout.buildDirectory.dir("corpus").get().asFile.path,
+            layout.buildDirectory.dir("lexicons").get().asFile.path,
+            layout.buildDirectory.file("analysis/M55-context-results.md").get().asFile.path,
+            providers.gradleProperty("contextSentences").orNull,
+        ),
+    )
+    outputs.upToDateWhen { false }
+}
+
 pitest {
     excludedClasses.add("nextglyph.tools.analysis.AnalyzeSpacesMainKt")
+    excludedClasses.add("nextglyph.tools.analysis.AnalyzeContextMainKt")
 }
 
 // ---------------------------------------------------------------------------

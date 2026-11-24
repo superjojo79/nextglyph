@@ -58,7 +58,7 @@ object AnalyzeSpacesCli {
         }
     }
 
-    private fun spaceInput(language: Language, layout: KeyboardLayout, wordLists: Path, corpus: Path, lexicons: Path, out: PrintStream): SpaceInput {
+    internal fun spaceInput(language: Language, layout: KeyboardLayout, wordLists: Path, corpus: Path, lexicons: Path, out: PrintStream): SpaceInput {
         val input = AnalyzeCorpusCli.input(language, layout, wordLists, corpus, out, split = true)
         val file = lexicons.resolve("${language.code}.ngrm")
         val model = if (Files.isRegularFile(file)) NgramModel.load(ByteBuffer.wrap(Files.readAllBytes(file))) else null

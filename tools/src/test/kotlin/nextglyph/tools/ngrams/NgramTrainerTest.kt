@@ -68,6 +68,19 @@ class NgramTrainerTest {
             assertThat(model.next(listOf("je"), 5)).isEmpty()
             assertThat(model.next(listOf("suis"), 5).map { it.text }).containsExactly("là")
         }
+
+        @Test
+        fun `les formes confondues sont comptées après le mot précédent du même groupe`() {
+            val vocabulary = vocabulary(Language.FR, "il", "va", "a", "à", "paris", "ses", "ces", "avec")
+            val trainer = NgramTrainer(Language.FR, vocabulary, keepAll.copy(minConfusionCount = 1))
+
+            trainer.add("Il va à Paris. Il va à Paris. Il a Paris. Avec ses amis")
+            val model = NgramModel.load(ByteBuffer.wrap(trainer.build()))
+
+            assertThat(model.confusionCounts("va", listOf("a", "à"))).containsExactly(0, 2)
+            assertThat(model.confusionCounts("il", listOf("a", "à"))).containsExactly(1, 0)
+            assertThat(model.confusionCounts("avec", listOf("ces", "ses"))).containsExactly(0, 1)
+        }
     }
 
     @Nested
@@ -90,6 +103,28 @@ class NgramTrainerTest {
             val model = trained(Language.FR, vocabulary, NgramTrainer.DEFAULT_PRUNING, "Je suis")
 
             assertThat(model.next(listOf("je"), 5)).isEmpty()
+        }
+ 
+        @Test
+        fun `une virgule coupe le contexte des confusions`() {
+            val vocabulary = vocabulary(Language.FR, "il", "va", "à", "a")
+            val trainer = NgramTrainer(Language.FR, vocabulary, keepAll.copy(minConfusionCount = 1))
+
+            trainer.add("Il va, à")
+            val model = NgramModel.load(ByteBuffer.wrap(trainer.build()))
+
+            assertThat(model.confusionCounts("va", listOf("a", "à"))).isNull()
+        }
+
+        @Test
+        fun `l'anglais n'a pas d'ensemble de confusion`() {
+            val vocabulary = vocabulary(Language.EN, "it", "is", "a")
+            val trainer = NgramTrainer(Language.EN, vocabulary, keepAll)
+
+            trainer.add("It is a")
+            val model = NgramModel.load(ByteBuffer.wrap(trainer.build()))
+
+            assertThat(model.confusionCounts("is", listOf("a", "à"))).isNull()
         }
     }
 
@@ -116,6 +151,28 @@ class NgramTrainerTest {
             val model = trained(Language.FR, vocabulary, keepAll, "Oui !")
 
             assertThat(model.next(emptyList(), 5).map { it.text }).containsExactly("oui")
+        }
+
+        @Test
+        fun `les ensembles de confusion peuvent être donnés`() {
+            val vocabulary = vocabulary(Language.FR, "il", "oui", "non")
+            val trainer = NgramTrainer(Language.FR, vocabulary, keepAll.copy(minConfusionCount = 1), listOf(listOf("oui", "non")))
+
+            trainer.add("Il non")
+            val model = NgramModel.load(ByteBuffer.wrap(trainer.build()))
+
+            assertThat(model.confusionCounts("il", listOf("oui", "non"))).containsExactly(0, 1)
+        }
+
+        @Test
+        fun `un mot de groupe seul ou un premier mot confondu n'a pas de contexte`() {
+            val vocabulary = vocabulary(Language.FR, "à", "a")
+            val trainer = NgramTrainer(Language.FR, vocabulary, keepAll.copy(minConfusionCount = 1))
+
+            trainer.add("À")
+            val model = NgramModel.load(ByteBuffer.wrap(trainer.build()))
+
+            assertThat(model.confusionCounts("à", listOf("a", "à"))).isNull()
         }
     }
 }

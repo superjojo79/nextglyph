@@ -29,6 +29,7 @@ class NgramModel private constructor(
     /** Nombre de suivants de trigrammes. */
     val trigramCount: Int,
     private val blobLength: Int,
+    private val confusionLength: Int,
 ) {
     private val wordOffsets = NgramFormat.FIXED_HEADER_SIZE + languageTag.length
     private val blob = wordOffsets + 4 * (vocabularySize + 1)
@@ -37,6 +38,13 @@ class NgramModel private constructor(
     private val trigramContexts = bigramRecords + NgramFormat.RECORD_SIZE * bigramCount
     private val trigramOffsets = trigramContexts + 4 * trigramContextCount
     private val trigramRecords = trigramOffsets + 4 * (trigramContextCount + 1)
+    private val confusionStart = trigramRecords + NgramFormat.RECORD_SIZE * trigramCount
+    private val confusionTables: List<ConfusionTable> = readConfusionTables()
+
+    /** Un ensemble de formes confondues : ses formes (minuscules) et la zone de ses entrées. */
+    private class ConfusionTable(val forms: List<String>, val entries: Int, val entryCount: Int) {
+        val entrySize: Int get() = 2 + 2 * forms.size
+    }
 
     /** Taille du fichier en octets. */
     val sizeInBytes: Int get() = size
@@ -96,6 +104,60 @@ class NgramModel private constructor(
         val scores = HashMap<Int, Double>()
         readFollowers(bigramOffsets, bigramRecords, last, bigramCount, 1.0, scores)
         return scores[id] ?: 0.0
+    }
+
+    /**
+     * Nombre d'occurrences de chaque forme de [forms] (minuscules, dans cet ordre) juste après le mot [previous] dans
+     * le corpus d'entraînement (issue #55), ou `null` si le modèle n'a pas d'ensemble de ces formes, si [previous] est
+     * inconnu du vocabulaire ou si aucune de ces formes ne l'a suivi assez souvent pour être gardée. Les comptes
+     * sont ceux de toutes les occurrences du couple, sans élagage des suivants.
+     *
+     * @throws NgramFormatException si le fichier est corrompu à l'endroit lu.
+     */
+    fun confusionCounts(previous: String, forms: List<String>): IntArray? {
+        val table = confusionTables.firstOrNull { it.forms == forms } ?: return null
+        val id = idOf(previous)
+        if (id <= 0) return null
+        var low = 0
+        var high = table.entryCount - 1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            val at = table.entries + table.entrySize * mid
+            val found = u16(at)
+            when {
+                found < id -> low = mid + 1
+                found > id -> high = mid - 1
+                else -> return IntArray(forms.size) { u16(at + 2 + 2 * it) }
+            }
+        }
+        return null
+    }
+
+    private fun readConfusionTables(): List<ConfusionTable> {
+        val end = confusionStart + confusionLength
+        if (end > size) throw corrupt("zone des confusions hors du fichier")
+        var at = confusionStart
+        val count = u8(at++)
+        val tables = ArrayList<ConfusionTable>(count)
+        repeat(count) {
+            val formCount = u8(at++)
+            if (formCount !in 2..NgramFormat.MAX_CONFUSION_FORMS) throw corrupt("ensemble de $formCount formes confondues")
+            val forms = ArrayList<String>(formCount)
+            repeat(formCount) {
+                val length = u8(at++)
+                forms += String(bytes(at, length), Charsets.UTF_8)
+                at += length
+            }
+            val entryCount = u32(at)
+            at += 4
+            val table = ConfusionTable(forms, at, entryCount)
+            val entryBytes = table.entrySize.toLong() * entryCount
+            if (entryBytes > end - at) throw corrupt("entrées des confusions hors de leur zone")
+            at += entryBytes.toInt()
+            tables += table
+        }
+        if (at != end) throw corrupt("zone des confusions de ${end - confusionStart} octets, ${at - confusionStart} lus")
+        return tables
     }
 
     private fun readFollowers(offsets: Int, records: Int, context: Int, total: Int, factor: Double, out: MutableMap<Int, Double>) {
@@ -247,14 +309,15 @@ class NgramModel private constructor(
             val bigrams = reader.i32()
             val trigramContexts = reader.i32()
             val trigrams = reader.i32()
+            val confusionBytes = reader.i32()
             if (vocabulary !in 0..NgramFormat.MAX_VOCABULARY) throw invalid("vocabulaire invalide ($vocabulary mots)")
-            if (blobLength < 0 || bigrams < 0 || trigramContexts < 0 || trigrams < 0) throw invalid("compteurs négatifs")
+            if (blobLength < 0 || bigrams < 0 || trigramContexts < 0 || trigrams < 0 || confusionBytes < 1) throw invalid("compteurs négatifs")
             val expected = NgramFormat.FIXED_HEADER_SIZE.toLong() + tagLength +
                 4L * (vocabulary + 1) + blobLength +
                 4L * (vocabulary + 2) + NgramFormat.RECORD_SIZE.toLong() * bigrams +
-                4L * trigramContexts + 4L * (trigramContexts + 1) + NgramFormat.RECORD_SIZE.toLong() * trigrams
+                4L * trigramContexts + 4L * (trigramContexts + 1) + NgramFormat.RECORD_SIZE.toLong() * trigrams + confusionBytes
             if (size.toLong() != expected) throw invalid("taille incohérente : $size octets au lieu de $expected")
-            return NgramModel(view, base, size, tag, vocabulary, bigrams, trigramContexts, trigrams, blobLength)
+            return NgramModel(view, base, size, tag, vocabulary, bigrams, trigramContexts, trigrams, blobLength, confusionBytes)
         }
 
         private fun invalid(message: String) = NgramFormatException("Modèle de mot suivant invalide : $message.")
