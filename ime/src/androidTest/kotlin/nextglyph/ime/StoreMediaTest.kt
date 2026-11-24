@@ -3,6 +3,7 @@ package nextglyph.ime
 import android.content.Context
 import android.graphics.Point
 import android.util.Log
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -191,7 +192,17 @@ class StoreMediaTest {
         protected fun string(id: Int): String = context.getString(id)
 
         protected fun waitForKeyboard() {
-            val keyboard = device.wait(Until.findObject(By.desc(string(R.string.keyboard_content_description))), TIMEOUT_MS)
+            val selector = By.desc(string(R.string.keyboard_content_description))
+            var keyboard = device.wait(Until.findObject(selector), TIMEOUT_MS)
+            if (keyboard == null) {
+                // Juste après le changement de clavier, l'émulateur ne l'affiche pas toujours : on le redemande.
+                scenario?.onActivity {
+                    val input = it.findViewById<EditText>(R.id.showcase_input)
+                    input.requestFocus()
+                    it.getSystemService(InputMethodManager::class.java)?.showSoftInput(input, 0)
+                }
+                keyboard = device.wait(Until.findObject(selector), TIMEOUT_MS)
+            }
             checkNotNull(keyboard) { "Le clavier NextGlyph ne s'est pas affiché." }
         }
 
@@ -243,21 +254,27 @@ class StoreMediaTest {
         protected fun tapSpace(pauseMs: Long = KEY_PAUSE_MS) =
             tap(Pattern.quote(string(R.string.a11y_space)) + ".*", "la barre d'espace", pauseMs)
 
-        /** Frappe le début d'un mot, accepte la première suggestion de la barre si elle existe, sinon finit le mot. */
+        /**
+         * Frappe le début d'un mot puis une lettre de plus tant que la barre ne propose pas exactement ce mot ;
+         * touche la suggestion dès qu'elle apparaît, sinon finit le mot à la main.
+         */
         protected fun typeWordAcceptingSuggestion(word: String) {
-            val prefix = word.take(word.length / 2 + 1)
-            typeText(prefix, VIDEO_KEY_PAUSE_MS)
-            Thread.sleep(600)
-            // La case qui propose exactement le mot voulu (sinon on finit le mot à la main).
-            val suggestion = find(Pattern.quote(string(R.string.a11y_suggestion).substringBefore("%")) + "(?i)" + Pattern.quote(word))
-            if (suggestion != null) {
-                suggestion.click()
-                device.waitForIdle()
-                Thread.sleep(800)
-            } else {
-                Log.w(TAG, "Aucune suggestion pour « $prefix » : le mot est tapé en entier.")
-                typeText(word.drop(prefix.length), VIDEO_KEY_PAUSE_MS)
+            val start = word.length / 2
+            typeText(word.take(start), VIDEO_KEY_PAUSE_MS)
+            val selector = Pattern.quote(string(R.string.a11y_suggestion).substringBefore("%")) + "(?i)" + Pattern.quote(word)
+            for (typed in start until word.length) {
+                tapChar(word[typed], VIDEO_KEY_PAUSE_MS)
+                if (typed == word.lastIndex) break
+                Thread.sleep(600)
+                val suggestion = find(selector)
+                if (suggestion != null) {
+                    suggestion.click()
+                    device.waitForIdle()
+                    Thread.sleep(800)
+                    return
+                }
             }
+            Log.w(TAG, "Aucune suggestion pour « $word » : le mot est tapé en entier.")
         }
 
         /** Vide le champ avec `⌫` (au plus [MAX_ERASE] appuis). */
