@@ -49,6 +49,16 @@ Si une unité n'a vraiment aucun cas d'erreur possible (fonction totale), le gro
 
    Le rapport HTML est dans `engine/build/reports/pitest/index.html`, et en CI dans les artefacts `rapport-pitest-engine` et `rapport-pitest-tools` (un job par module).
 
+## Tests de fuzzing
+
+Les décodeurs qui lisent des octets ou des chaînes potentiellement corrompus (lexiques `.nglx`, modèle de mot suivant, fichier d'état appris, primitives de `ByteCodec`, carte de chaleur et compteurs de saisie) sont éprouvés par du **fuzzing** avec [Jazzer](https://github.com/CodeIntelligence/jazzer) (Apache-2.0). Un fuzzer génère des entrées en boucle, guidé par la couverture du code, et signale celles qui violent une propriété : seule l'exception documentée de l'API est permise (`LexiconFormatException`, `NgramFormatException`, `IllegalArgumentException`) ; la lecture tolérante de `LearnedDataFile` et des états texte ne doit jamais lever d'exception ; jamais de `OutOfMemoryError`, de boucle infinie ni d'accès hors bornes non maîtrisé.
+
+- Les tests sont en Java (`engine/src/test/java/nextglyph/engine/fuzz/`, `*FuzzTest`), car Jazzer s'appuie sur `FuzzedDataProvider`. Ils suivent la convention : `HappyPath`, `ErrorCases` (qui porte les `@FuzzTest`) et `BoundaryValues` contiennent aussi des `@Test` ordinaires.
+- Les entrées sont soit des octets bruts, soit un fichier valide altéré (`FuzzInputs`) : les contrôles profonds sont ainsi atteints vite.
+- Dans `./gradlew build` (mode régression), Jazzer ne rejoue que les entrées de départ et celles sauvegardées dans les dossiers `…Inputs` des ressources de test : c'est rapide et déterministe. PIT ignore ces classes.
+- Pour chercher vraiment, `scripts/fuzz.sh` lance chaque cible dans sa propre JVM (Jazzer n'en exécute qu'une à la fois) pendant le `maxDuration` de son `@FuzzTest` (30 à 60 s). Un fragment suffit : `scripts/fuzz.sh Lexicon`. Équivalent manuel : `JAZZER_FUZZ=1 ./gradlew :engine:test --tests 'nextglyph.engine.fuzz.LexiconFuzzTest*.arbitraryBytesOnlyRaiseFormatException'`.
+- La CI exécute le même script dans le job « Fuzzing ». Une entrée fautive est écrite dans un fichier `crash-…` : la corriger dans le code, puis copier l'entrée dans `src/test/resources/nextglyph/engine/fuzz/<Classe>$<Groupe>Inputs/<méthode>/` et ajouter un test unitaire de régression.
+
 ## Bonnes pratiques
 
 - Noms de tests en français, entre backticks, décrivant le comportement attendu.
