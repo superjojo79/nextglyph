@@ -51,7 +51,14 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Construire les APK debug et de test
-        run: ./gradlew :ime:assembleDebug :ime:assembleDebugAndroidTest --console=plain
+        # Maven Central répond parfois 429 (trop de requêtes) : jusqu'à 3 essais espacés.
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew :ime:assembleDebug :ime:assembleDebugAndroidTest --console=plain && exit 0
+            echo "Essai $attempt échoué, nouvel essai dans $((attempt * 30)) s"
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       # Le `script` de l'action exécute chaque ligne séparément : une seule ligne, qui appelle le script du dépôt.
       - name: Captures et vidéo sur émulateur

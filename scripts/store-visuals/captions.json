@@ -1,0 +1,26 @@
+{
+  "fr-FR": {
+    "tagline": "NextGlyph, votre clavier next gen",
+    "shots": {
+      "01": "Les lettres probables passent devant",
+      "02": "Le mot suivant, déjà proposé",
+      "03": "Vos fautes corrigées, annulées d'un appui",
+      "04": "Les émojis à portée de pouce",
+      "05": "Rien ne quitte votre téléphone",
+      "06": "Il apprend votre façon de taper"
+    },
+    "subtitle": "Français et anglais, sans changer de clavier"
+  },
+  "en-US": {
+    "tagline": "NextGlyph, your next-gen keyboard",
+    "shots": {
+      "01": "Likely letters stand out",
+      "02": "Your next word, already there",
+      "03": "Typos fixed, undone with one tap",
+      "04": "Emoji at your fingertips",
+      "05": "Nothing leaves your phone",
+      "06": "It learns how you type"
+    },
+    "subtitle": "English and French, no switching"
+  }
+}
