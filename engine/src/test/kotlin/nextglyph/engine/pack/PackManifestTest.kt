@@ -65,8 +65,8 @@ class PackManifestTest {
         }
 
         @Test
-        fun `décrit un fichier par sa taille et son empreinte`() {
-            val file = java.io.File.createTempFile("pack", ".bin").apply { writeText("abc"); deleteOnExit() }
+        fun `décrit un fichier par sa taille et son empreinte`(@org.junit.jupiter.api.io.TempDir directory: java.io.File) {
+            val file = java.io.File(directory, "pack.bin").apply { writeText("abc") }
 
             assertThat(PackEntry.of("x", file))
                 .isEqualTo(PackEntry("x", 3, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"))

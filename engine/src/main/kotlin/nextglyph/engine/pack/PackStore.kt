@@ -139,8 +139,11 @@ class PackStore(
                         throw corrupt("entrée inattendue « ${entry.name} »")
                     }
                     if (!seen.add(entry.name)) throw corrupt("entrée « ${entry.name} » en double")
+                    // Noms admis seulement, à plat : la cible reste dans le dossier de préparation (« Zip Slip »).
+                    val target = File(staging, entry.name)
+                    if (target.canonicalFile.parentFile != staging.canonicalFile) throw corrupt("entrée hors du paquet « ${entry.name} »")
                     var size = 0L
-                    FileOutputStream(File(staging, entry.name)).use { out ->
+                    FileOutputStream(target).use { out ->
                         while (true) {
                             val read = zip.read(buffer)
                             if (read < 0) break
