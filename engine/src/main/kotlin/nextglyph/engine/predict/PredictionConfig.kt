@@ -55,10 +55,70 @@ data class CorrectionWeights(
 }
 
 /**
+ * Corrections des erreurs d'espace (issue #52, spec §5.5) : espace tapée sur une touche voisine
+ * (`bonjournmonsieur`), mots collés (`jesuis`), espace en trop (`ordina teur`). Valeurs mesurées
+ * (`docs/analysis/M52-spaces.md`), à recalibrer ici et nulle part ailleurs.
+ *
+ * Un candidat « gauche droite » a pour score `poids × P(gauche) × P(droite | gauche)`, dans l'échelle
+ * des autres candidats (fréquence rapportée à la masse du lexique) : `P(droite | gauche)` vient du
+ * bigramme du modèle de mot suivant (§10.3) quand il l'a conservé, sinon `unigramBackoff × P(droite)`
+ * (`P(droite)` sans modèle).
+ *
+ * @property spaceBarWeight poids d'une espace tapée sur une touche voisine, frappe dans le bas de la touche.
+ * @property gluedWeight poids de deux mots collés.
+ * @property joinWeight poids de deux fragments d'un même mot séparés par une espace.
+ * @property spaceBarLetters lettres voisines de la barre d'espace (AZERTY et QWERTY) pouvant en être une frappe ratée.
+ * @property minTapDy descente minimale de la frappe sous le centre de sa touche, en hauteurs de rangée,
+ *   pour qu'elle puisse être une espace tapée trop haut ; sans position de frappe, aucune correction de ce type.
+ * @property minPartProbability probabilité minimale de chaque mot d'une coupure.
+ * @property minSingleLetterProbability probabilité minimale d'une coupure à une seule lettre (`a`, `y`, `I`).
+ * @property minScore score minimal d'une coupure : en dessous, la coupure est trop improbable pour être proposée.
+ * @property unigramBackoff part de `P(droite)` retenue quand le bigramme n'est pas dans le modèle.
+ * @property rareWordProbability probabilité en dessous de laquelle un mot est assimilé à une faute pour la
+ *   correction d'une espace en trop (§5.5, cas 3).
+ * @property minJoinProbability probabilité minimale du mot obtenu en supprimant une espace en trop.
+ */
+data class SpaceEditConfig(
+    val spaceBarWeight: Double = 1.0,
+    val gluedWeight: Double = 0.5,
+    val joinWeight: Double = 1.0,
+    val spaceBarLetters: String = "nbvc",
+    val minTapDy: Double = 0.25,
+    val minPartProbability: Double = 1e-6,
+    val minSingleLetterProbability: Double = 2e-3,
+    val minScore: Double = 1e-9,
+    val unigramBackoff: Double = 0.5,
+    val rareWordProbability: Double = 2e-5,
+    val minJoinProbability: Double = 1e-7,
+) {
+    init {
+        for ((name, value) in listOf(
+            "spaceBarWeight" to spaceBarWeight,
+            "gluedWeight" to gluedWeight,
+            "joinWeight" to joinWeight,
+            "unigramBackoff" to unigramBackoff,
+        )) {
+            require(value in 0.0..1.0) { "Le poids $name doit être dans [0, 1] ($value)." }
+        }
+        require(minTapDy >= 0.0) { "minTapDy doit être positif ou nul ($minTapDy)." }
+        for ((name, value) in listOf(
+            "minPartProbability" to minPartProbability,
+            "minSingleLetterProbability" to minSingleLetterProbability,
+            "minScore" to minScore,
+            "rareWordProbability" to rareWordProbability,
+            "minJoinProbability" to minJoinProbability,
+        )) {
+            require(value in 0.0..1.0) { "$name doit être dans [0, 1] ($value)." }
+        }
+    }
+}
+
+/**
  * Constantes de la prédiction, de la validation par espace et du bilinguisme. Immuable : une
  * recalibration ne touche que cette classe.
  *
  * @property correction poids des éditions (§10.4).
+ * @property spaceEdits corrections des erreurs d'espace (issue #52).
  * @property neighborDistance distance maximale entre les centres au repos de deux touches voisines,
  *   en unités de touche (1,5 u, comme l'analyse M0).
  * @property formsPerPrefix nombre de formes lues par préfixe candidat et de candidats conservés par
@@ -81,6 +141,7 @@ data class CorrectionWeights(
  */
 data class PredictionConfig(
     val correction: CorrectionWeights = CorrectionWeights(),
+    val spaceEdits: SpaceEditConfig = SpaceEditConfig(),
     val neighborDistance: Double = 1.5,
     val formsPerPrefix: Int = 6,
     val spatialSigma: Double = 0.35,

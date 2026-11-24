@@ -120,10 +120,30 @@ class NgramModelTest {
             assertThat(texts(model.next(listOf("je"), 1))).containsExactly("suis")
             assertThat(shifted.position()).isEqualTo(5)
         }
+
+        @Test
+        fun `la probabilité d'un bigramme est celle du fichier`() {
+            val model = NgramFixtures.model()
+
+            assertThat(model.bigramProbability("je", "suis")).isCloseTo(0.8, within(0.04))
+            assertThat(model.bigramProbability("Je", "VEUX")).isCloseTo(0.2, within(0.02))
+            assertThat(model.bigramProbability("tu", "suis")).isCloseTo(0.33, within(0.03))
+        }
     }
 
     @Nested
     inner class ErrorCases {
+        @Test
+        fun `un bigramme inconnu a une probabilité nulle`() {
+            val model = NgramFixtures.model()
+
+            assertThat(model.bigramProbability("je", "ça")).isEqualTo(0.0)
+            assertThat(model.bigramProbability("zzz", "suis")).isEqualTo(0.0)
+            assertThat(model.bigramProbability("je", "zzz")).isEqualTo(0.0)
+            assertThat(model.bigramProbability("je", "")).isEqualTo(0.0)
+            assertThat(model.bigramProbability("je", NgramModel.START)).isEqualTo(0.0)
+        }
+
         @Test
         fun `un mot précédent inconnu ne donne aucune proposition`() {
             val model = NgramFixtures.model()

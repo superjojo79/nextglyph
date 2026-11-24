@@ -74,6 +74,7 @@ Constats sur Android 16 : un `EditText` `numberDecimal` refuse la virgule en `fr
 | Carte de frappe : densité, décalages appris et erreurs par touche, compteurs seuls (issue #46, §15.5) | Moteur fait et testé ; écran IME écrit sans compilation locale (à vérifier par la CI) | — |
 | Classement des corrections : score spatial des substitutions (position réelle des frappes), accents (`ca` → `ça`, bilinguisme pondéré), écart avec le 2ᵉ candidat dans « Prudence » (issue #53) | Fait (moteur testé, mesures `docs/analysis/M2-engine.md` §9) ; à valider sur le terrain (taux d'annulation, §15.4) | — |
 | Prédiction du mot suivant (issue #51) : modèles de bigrammes et trigrammes appris sur Tatoeba (`fr.ngrm`, `en.ngrm`), trois mots dans la barre après une validation, réglage « Prédiction du mot suivant » | Fait (moteur et outils testés, mesures `docs/analysis/M51-ngrams.md`) ; IME écrit sans compilation locale (à vérifier par la CI) ; à valider sur le terrain | — |
+| Erreurs d'espace (issue #52) : espace tapée sur `n`/`b`/`v`/`c` près de la barre d'espace, mots collés (`jesuis`), espace en trop (`ordina teur`), départagés par les bigrammes ; annulation par ⌫, refus appris | Fait (moteur et outils testés, mesures `docs/analysis/M52-spaces.md`) ; aucun changement de l'IME ; à valider sur le terrain (taux d'annulation, §15.4) | — |
 
 ## Problèmes ouverts
 

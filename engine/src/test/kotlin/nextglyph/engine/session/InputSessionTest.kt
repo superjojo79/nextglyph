@@ -629,11 +629,10 @@ class InputSessionTest {
             val data = nextglyph.engine.learn.LearnedData()
             s.session.learning = SessionLearning(data)
 
+            s.type("ecole ")
             repeat(3) {
-                s.type("ecole ")
                 s.backspace()
                 s.type(" ")
-                s.backspace()
             }
 
             assertThat(data.personal.size).isZero()

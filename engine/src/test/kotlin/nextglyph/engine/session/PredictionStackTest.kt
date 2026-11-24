@@ -8,7 +8,11 @@ import nextglyph.engine.layout.KeyboardLayouts
 import nextglyph.engine.learn.PersonalDictionary
 import nextglyph.engine.lexicon.LexiconFixtures
 import nextglyph.engine.lexicon.LexiconSet
+import nextglyph.engine.ngram.NgramFixtures
+import nextglyph.engine.predict.PredictionConfig
 import nextglyph.engine.predict.PredictionSettings
+import nextglyph.engine.predict.SpaceCase
+import nextglyph.engine.predict.SpaceEditConfig
 import nextglyph.engine.predict.Predictor
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -61,6 +65,21 @@ class PredictionStackTest {
             val stack = PredictionStack.build(base, layout, personal)
 
             assertThat(stack.base.decision("zorgl").inserted).isEqualTo("zorglub")
+        }
+
+        @Test
+        fun `les modèles de mot suivant sont donnés à tous les niveaux`() {
+            val lexicons = linkedMapOf("fr" to LexiconSet(LexiconFixtures.lexicon(listOf("zz" to 100_000_000L, "ab" to 1000L, "cde" to 1000L, "abc" to 1000L, "de" to 1000L), "fr")))
+            val stack = PredictionStack.build(lexicons, layout, contacts = gwen, config = PredictionConfig(spaceEdits = SpaceEditConfig(minScore = 1e-12)))
+            val model = NgramFixtures.model(listOf("abc de" to 5, "abc zz" to 5, "ab cde" to 1, "ab zz" to 9))
+            val state = stack.base.initialLanguageState("fr")
+            assertThat(stack.base.predict("abcde", state, PredictionSettings()).case).isEqualTo(SpaceCase.LITERAL)
+
+            stack.useNgrams(mapOf("fr" to model))
+
+            for (context in listOf(ContactContext(), ContactContext(atMessageStart = true), ContactContext(atMessageStart = true, typedCapital = true))) {
+                assertThat(stack.forContext(context).predict("abcde", state, PredictionSettings()).inserted).isEqualTo("abc de")
+            }
         }
 
         @Test

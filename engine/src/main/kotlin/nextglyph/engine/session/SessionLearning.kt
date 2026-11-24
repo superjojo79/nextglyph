@@ -104,6 +104,8 @@ class SessionLearning(val data: LearnedData) {
      */
     fun onValidated(prediction: Prediction, language: LanguageState, settings: PredictionSettings, atSentenceStart: Boolean): LearnOutcome {
         settle()
+        // Espace en trop supprimée (issue #52) : le premier fragment, mis en attente comme mot inconnu à sa validation, n'était pas un mot.
+        if (prediction.span != prediction.word) data.personal.discard(prediction.span.substringBefore(' '), language.dominant)
         val outcome = data.personal.onValidated(prediction, language, settings, atSentenceStart)
         validate(prediction.word, language.dominant, atSentenceStart)
         return outcome

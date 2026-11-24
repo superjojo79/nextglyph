@@ -547,3 +547,29 @@ La validation par espace classait les corrections par `poids(édition) × fréqu
 - **Rapport sans facteur (0,6 → 1)** : bayésien au sens strict, mais il double le poids d'une frappe centrée par rapport à M0 et déplacerait tous les seuils calibrés.
 - **Un second réglage « seuil de confiance »** : redondant avec `minProb`, il aurait ajouté un choix sans effet mesurable.
 - **Restituer `à`, `où`, `là` ou les participes (`demandé`/`demande`)** : ambigus sans contexte ; relèvent de la prédiction par bigrammes (#51).
+
+## 2026-11-23 — Erreurs d'espace : coupures et espace en trop (issue #52)
+
+### Contexte
+
+Une espace ratée est une faute fréquente sur un clavier compact : la barre d'espace est étroite et les touches `n`, `b`, `v`, `c` sont juste au-dessus ; une espace oubliée colle deux mots ; une espace tapée au milieu d'un mot le coupe. Le texte résultant n'est pas un mot, et la validation par espace (§5.5, cas 2) le « corrigeait » en un mot sans rapport (15 % des mots collés d'après la mesure de référence). Les bigrammes de #51 et les frappes de #53 donnent de quoi décider.
+
+### Décision
+
+**Candidats dans le classement existant.** Les coupures (`gauche droite`) et l'espace en trop supprimée sont des candidats de `Predictor.decide`, de score `poids × P(gauche) × P(droite | gauche)` dans l'échelle des autres, et ajoutés au dénominateur : la règle de dominance et `Prudence` s'appliquent sans second réglage. Ils ne sont jamais tentés quand le texte tapé est un mot (sauf second fragment très rare d'une espace en trop).
+
+**Preuve spatiale pour la touche voisine.** Une lettre `n`, `b`, `v` ou `c` n'est une espace que si sa frappe est dans le bas de la touche (`minTapDy` = 0,25) : sans cela, les mots qui contiennent ces lettres seraient coupés dès que deux mots les expliquent. Sans position de frappe, ce cas n'existe pas.
+
+**Bigrammes optionnels.** `Predictor.useNgrams` (appelé par `InputSession.setNextWordModels` et à l'installation des prédicteurs, donc sans changement de l'IME) donne `P(droite | gauche)` ; sans modèle ou pour un bigramme élagué, repli sur `0,5 × P(droite)` (unigramme seul sans modèle). Le score se calcule langue par langue : les deux mots d'une coupure sont de la même langue.
+
+**Annulation sans état supplémentaire.** `Prediction.span` (texte remplacé : le mot en cours, ou le mot précédent, l'espace et le mot en cours) et `Candidate.replaces` suffisent à `commitSpace`, `undo` et `pickSuggestion` ; `UndoToken.typed` porte le texte tapé exact (`ordina teur`), le compteur de refus garde la paire. Une espace en trop supprimée n'adopte rien dans le dictionnaire personnel (le texte tapé contient une espace) et fait oublier le premier fragment, mis en attente à sa validation.
+
+**Réglages** (`SpaceEditConfig`, mesures `docs/analysis/M52-spaces.md`) : choisis pour garder les fausses corrections très en dessous de 1 % (mesuré : au plus 0,013 % des mots justes, 20 000 phrases par langue) avant d'accroître le rappel.
+
+### Alternatives écartées
+
+- **Joindre tout couple de mots dont la concaténation est un mot** (`bon jour`) : trop de faux positifs ; seuls les fragments inconnus ou très rares sont joints, comme demandé.
+- **Un fragment « trop court » pour la jonction connu de l'utilisateur** : la validation du premier fragment (`ordina`) a déjà eu lieu ; la complétion ou la correction qu'elle applique (`toujo` → `toujours`) limite le rappel de l'espace en trop (mesuré : 22 à 28 % corrigées ; environ 11 % des premiers fragments sont déjà complétés ou corrigés). Retarder la validation du premier fragment changerait l'ensemble de la validation par espace.
+- **Coupure sur toute lettre voisine sans preuve spatiale** : écartée ci-dessus.
+- **Seuil de score relatif au lieu d'un plancher absolu** : une coupure sans autre candidat aurait une probabilité 1 même pour un mot rare ; le plancher `minScore` borne la plausibilité en valeur absolue.
+

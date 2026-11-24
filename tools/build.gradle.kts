@@ -209,6 +209,32 @@ tasks.register<JavaExec>("analyzeEngine") {
     outputs.upToDateWhen { false }
 }
 
+// Analyse M52 : corrections des erreurs d'espace (issue #52) rejouées avec le moteur sur le corpus de test, avec les
+// modèles de bigrammes de buildLexicons ; écrit build/analysis/M52-spaces-results.md.
+// Phrases par langue (défaut 20 000) : -PspaceSentences=<N>.
+tasks.register<JavaExec>("analyzeSpaces") {
+    group = "data"
+    description = "Analyse M52 : fausses corrections et taux de correction des erreurs d'espace."
+    dependsOn("buildLexicons")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.analysis.AnalyzeSpacesMainKt")
+    maxHeapSize = "4g"
+    args(
+        listOfNotNull(
+            layout.buildDirectory.dir("wordlists").get().asFile.path,
+            layout.buildDirectory.dir("corpus").get().asFile.path,
+            layout.buildDirectory.dir("lexicons").get().asFile.path,
+            layout.buildDirectory.file("analysis/M52-spaces-results.md").get().asFile.path,
+            providers.gradleProperty("spaceSentences").orNull,
+        ),
+    )
+    outputs.upToDateWhen { false }
+}
+
+pitest {
+    excludedClasses.add("nextglyph.tools.analysis.AnalyzeSpacesMainKt")
+}
+
 // ---------------------------------------------------------------------------
 // Émojis (issue #26, package nextglyph.tools.emoji, testé).
 // ---------------------------------------------------------------------------
