@@ -74,7 +74,7 @@ object AnalyzeCorpusCli {
         }
     }
 
-    private fun input(language: Language, layout: KeyboardLayout, wordLists: Path, corpus: Path, out: PrintStream, split: Boolean): LanguageInput {
+    internal fun input(language: Language, layout: KeyboardLayout, wordLists: Path, corpus: Path, out: PrintStream, split: Boolean): LanguageInput {
         out.println("Lexique ${language.code} : construction en mémoire")
         val lexicon = load(wordLists.resolve("${language.code}.tsv"), language.code)
         val test = lines(corpus.resolve("${language.code}-test.txt"))
@@ -87,7 +87,7 @@ object AnalyzeCorpusCli {
 
     private fun load(path: Path, tag: String) = Files.newBufferedReader(path).useLines { WordListLoader.load(it, tag) }
 
-    private fun lines(path: Path): List<String> = Files.readAllLines(path)
+    internal fun lines(path: Path): List<String> = Files.readAllLines(path)
 
     private const val NANOS_PER_SECOND = 1_000_000_000L
 

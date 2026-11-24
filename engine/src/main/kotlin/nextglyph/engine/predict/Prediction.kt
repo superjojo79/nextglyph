@@ -26,8 +26,10 @@ enum class SpaceCase {
  * @property key clé normalisée (`l'ecole` pour une élision reconstituée).
  * @property text forme qui serait insérée (accents, casse, apostrophe).
  * @property probability `P(w)` mélangée entre langues (§5.5, §10.6).
+ * @property replaces texte qui précède le curseur et que ce candidat remplace quand il déborde le mot en cours
+ *   (espace en trop supprimée : `ordina teur`, issue #52) ; `null` : il remplace le mot en cours.
  */
-data class Candidate(val key: String, val text: String, val probability: Double)
+data class Candidate(val key: String, val text: String, val probability: Double, val replaces: String? = null)
 
 /**
  * Une case de la barre de suggestions.
@@ -62,6 +64,8 @@ data class SuggestionBar(val left: Suggestion?, val center: Suggestion?, val rig
  * @property inserted texte qui remplacera [word] à l'appui sur espace (égal à [word] s'il est gardé).
  * @property candidates candidats classés (pour la barre et les mesures).
  * @property sentenceLanguage langue de la phrase en cours au moment de la prédiction.
+ * @property span texte qui précède le curseur et que la validation remplace : [word], ou le mot précédent, l'espace
+ *   et [word] quand une espace en trop est supprimée (issue #52).
  */
 class Prediction(
     val word: String,
@@ -71,6 +75,7 @@ class Prediction(
     val candidates: List<Candidate>,
     val bar: SuggestionBar,
     val sentenceLanguage: String,
+    val span: String = word,
 ) {
     /**
      * Libellé de la touche espace (§2.5, §5.5) : le mot qui sera inséré s'il diffère du texte tapé
@@ -85,7 +90,7 @@ class Prediction(
  * Jeton d'annulation d'une validation automatique (§5.5, « Annulation ») : à conserver par l'IME
  * tant que le curseur ne bouge pas et qu'aucune autre touche n'est tapée ; à oublier sinon.
  *
- * @property typed texte tapé à l'origine, restitué par l'annulation.
+ * @property typed texte tapé à l'origine, restitué par l'annulation (avec l'espace en trop supprimée, issue #52).
  * @property inserted texte inséré à sa place (sans l'espace automatique qui le suit).
  * @property case [SpaceCase.DOMINANT] pour une correction, [SpaceCase.WORD] pour une restitution d'accent ou de casse.
  */

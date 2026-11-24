@@ -82,6 +82,8 @@ class InputSession(
     var nextWords: NextWordPredictor? = null
         private set
 
+    private var ngramModels: Map<String, NgramModel> = emptyMap()
+
     // La barre affichée propose les mots suivants (et non les suggestions du mot en cours) : un tap les insère.
     private var nextWordBar = false
 
@@ -161,6 +163,7 @@ class InputSession(
      */
     fun setPredictors(stack: PredictionStack?, preferred: String = LexiconLanguage.FRENCH) {
         val predictor = stack?.base
+        stack?.useNgrams(ngramModels)
         this.predictors = stack
         this.predictor = predictor
         val current = language
@@ -179,7 +182,10 @@ class InputSession(
      * se règle à chaque champ par [SessionField].
      */
     fun setNextWordModels(models: Map<String, NgramModel>) {
+        ngramModels = LinkedHashMap(models)
         nextWords = if (models.isEmpty()) null else NextWordPredictor(models)
+        // Les mêmes modèles départagent les coupures des erreurs d'espace (issue #52).
+        predictors?.useNgrams(ngramModels)
         refresh()
     }
 

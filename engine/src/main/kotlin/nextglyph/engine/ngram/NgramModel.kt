@@ -82,6 +82,22 @@ class NgramModel private constructor(
     /** Vrai si [word] (clé normalisée) est dans le vocabulaire. */
     fun contains(word: String): Boolean = idOf(word) > 0
 
+    /**
+     * Probabilité de [word] juste après [previous] d'après les bigrammes (0 si l'un des deux est inconnu du
+     * vocabulaire ou si le bigramme a été élagué). Sans repli ni trigramme : c'est la probabilité conservée dans
+     * le fichier, utilisée pour comparer deux mots consécutifs (erreurs d'espace, issue #52).
+     *
+     * @throws NgramFormatException si le fichier est corrompu à l'endroit lu.
+     */
+    fun bigramProbability(previous: String, word: String): Double {
+        val last = idOf(previous)
+        val id = idOf(word)
+        if (last < 0 || id <= 0) return 0.0
+        val scores = HashMap<Int, Double>()
+        readFollowers(bigramOffsets, bigramRecords, last, bigramCount, 1.0, scores)
+        return scores[id] ?: 0.0
+    }
+
     private fun readFollowers(offsets: Int, records: Int, context: Int, total: Int, factor: Double, out: MutableMap<Int, Double>) {
         val from = u32(offsets + 4 * context)
         val to = u32(offsets + 4 * (context + 1))

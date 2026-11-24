@@ -7,6 +7,7 @@ import nextglyph.engine.contacts.ContactsConfig
 import nextglyph.engine.layout.KeyboardLayout
 import nextglyph.engine.learn.PersonalDictionary
 import nextglyph.engine.lexicon.LexiconSet
+import nextglyph.engine.ngram.NgramModel
 import nextglyph.engine.predict.InMemoryRejectionStore
 import nextglyph.engine.predict.PredictionConfig
 import nextglyph.engine.predict.Predictor
@@ -36,6 +37,11 @@ class PredictionStack(private val levels: List<Predictor>, val directory: Contac
 
     /** Codes des langues actives. */
     val languages: List<String> get() = base.languages
+
+    /** Donne les modèles de mot suivant à tous les prédicteurs (coupures des erreurs d'espace, issue #52). */
+    fun useNgrams(models: Map<String, NgramModel>) {
+        for (level in levels) level.useNgrams(models)
+    }
 
     /** Prédicteur à utiliser dans le contexte [context] (niveau des contacts, §6.3). */
     fun forContext(context: ContactContext): Predictor {
