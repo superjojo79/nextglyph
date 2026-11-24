@@ -21,7 +21,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.experimental.runners.Enclosed
 import org.junit.runner.RunWith
-import java.io.File
 import java.io.FileInputStream
 import java.util.regex.Pattern
 
@@ -38,9 +37,9 @@ import java.util.regex.Pattern
  * **Ne s'exécute que si l'argument d'instrumentation `storeMedia` vaut `true`** (`-e storeMedia true`) : sinon tous
  * les tests sont ignorés (`Assume`) pour ne pas gêner les autres lancements (`connectedDebugAndroidTest`).
  *
- * Les captures sont écrites dans `getExternalFilesDir("store-media")` du contexte du **test** (APK `….test`), soit
- * `/sdcard/Android/data/<applicationId>.test/files/store-media/` : seul dossier où l'application de test peut
- * écrire sans permission (stockage cloisonné) et que `adb pull` sait lire. Fichiers nommés `NN-description.png`.
+ * Les captures sont prises par `screencap` (shell, via `UiAutomation`) dans [OUTPUT_DIR] (`/data/local/tmp`) :
+ * le stockage externe de l'APK de test n'est pas monté sur l'émulateur, et le shell écrit et relit ce dossier
+ * sans permission (`adb pull`). Fichiers nommés `NN-description.png`.
  *
  * JUnit 4 (AndroidJUnitRunner) n'a pas de `@Nested` : la convention HappyPath / ErrorCases / BoundaryValues est
  * tenue par des classes imbriquées et le lanceur `Enclosed`. L'ordre des méthodes n'étant pas garanti, les captures
@@ -114,12 +113,13 @@ class StoreMediaTest {
 
         @Test
         fun la_capture_dans_un_dossier_impossible_echoue() {
-            val blocked = File(outputDir, "fichier-ordinaire").apply { writeText("x") }
+            val blocked = "$OUTPUT_DIR/fichier-ordinaire"
+            shell("touch $blocked")
             try {
-                val error = runCatching { screenshot(File(blocked, "inaccessible.png")) }.exceptionOrNull()
+                val error = runCatching { screenshot("$blocked/inaccessible.png") }.exceptionOrNull()
                 assertTrue("Une capture sous un fichier ordinaire doit échouer.", error != null)
             } finally {
-                blocked.delete()
+                shell("rm -f $blocked")
             }
         }
     }
@@ -130,7 +130,7 @@ class StoreMediaTest {
         fun capture_du_clavier_au_repos_avec_le_champ_vide() {
             assertEquals("", fieldText())
             capture("00-repos.png")
-            assertTrue(File(outputDir, "00-repos.png").length() > 0)
+            assertTrue(sizeOf("$OUTPUT_DIR/00-repos.png") > 0)
         }
 
         @Test
@@ -148,11 +148,10 @@ class StoreMediaTest {
         private var scenario: ActivityScenario<ShowcaseActivity>? = null
         private var previousIme: String? = null
 
-        protected val outputDir: File = File(instrumentation.context.getExternalFilesDir(null), "store-media").apply { mkdirs() }
 
         internal val texts: StoreTexts = when (context.resources.configuration.locales.get(0)?.language) {
-            "fr" -> StoreTexts("Bonj", "Bonjour", "bonjoir", "Bonjour Camille, je passe vers 19 h, on se retrouve au café ?", 3)
-            else -> StoreTexts("Hel", "Hello", "helli", "Hi Camille, I'll come around 7, shall we meet at the café?", 3)
+            "fr" -> StoreTexts("Bonj", "Bonjour", "bonjoir", "Bonjour Camille je passe vers sept heures et on se retrouve devant le cinema", 3)
+            else -> StoreTexts("Hel", "Hello", "helli", "Hi Camille I will come around seven and we can meet in front of the cinema", 3)
         }
 
         @Before
@@ -285,17 +284,22 @@ class StoreMediaTest {
         protected fun capture(name: String) {
             device.waitForIdle()
             Thread.sleep(SETTLE_MS / 2)
-            val file = File(outputDir, name)
+            val file = "$OUTPUT_DIR/$name"
             screenshot(file)
-            check(file.length() > 0) { "Capture vide : $file" }
             Log.i(TAG, "Capture : $file")
         }
 
-        protected fun screenshot(file: File) {
-            check(device.takeScreenshot(file)) { "UiDevice.takeScreenshot a échoué pour $file." }
+        /** Capture d'écran par le shell ; échoue si le fichier n'existe pas ou est vide. */
+        protected fun screenshot(path: String) {
+            shell("mkdir -p $OUTPUT_DIR")
+            shell("screencap -p $path")
+            check(sizeOf(path) > 0) { "La capture d'écran a échoué pour $path." }
         }
 
-        private fun shell(command: String): String {
+        /** Taille du fichier [path] lue par le shell, 0 s'il n'existe pas. */
+        protected fun sizeOf(path: String): Long = shell("stat -c %s $path").trim().toLongOrNull() ?: 0L
+
+        protected fun shell(command: String): String {
             val descriptor = instrumentation.uiAutomation.executeShellCommand(command)
             return FileInputStream(descriptor.fileDescriptor).use { it.readBytes().decodeToString() }.also { descriptor.close() }
         }
@@ -304,6 +308,7 @@ class StoreMediaTest {
     private companion object {
         const val IME_ID = "io.github.superjojo79.nextglyph/nextglyph.ime.NextglyphInputMethodService"
         const val TAG = "StoreMediaTest"
+        const val OUTPUT_DIR = "/data/local/tmp/store-media"
         const val TIMEOUT_MS = 10_000L
         const val SETTLE_MS = 1_000L
         const val KEY_PAUSE_MS = 120L
