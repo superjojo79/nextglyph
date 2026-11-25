@@ -2,6 +2,9 @@
 # Construction ClusterFuzzLite : compile le moteur et ses tests, puis crée un lanceur Jazzer par cible
 # de nextglyph.engine.fuzz.ClusterFuzzTargets (mêmes propriétés que les @FuzzTest, docs/TESTING.md).
 
+# Noms de tests accentués (fichiers .class) : l'image n'a pas de locale UTF-8 par défaut.
+export LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 # Le module ime exige le SDK Android, absent de l'image : on le retire de cette copie des sources.
 sed -i '/include(":ime")/d' settings.gradle.kts
 sed -i '/libs.plugins.android.application/d' build.gradle.kts
