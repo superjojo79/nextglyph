@@ -137,7 +137,7 @@ class ManifestTest {
         fun `le panel des champs de test est dans les variantes debug`() {
             for (variant in listOf("fdroidDebug", "playDebug")) {
                 assertThat(activitiesOf(mergedManifest(variant))).`as`(variant)
-                    .contains(fieldTests, "nextglyph.ime.settings.SettingsActivity", "nextglyph.ime.settings.HeatmapActivity")
+                    .contains(fieldTests, "nextglyph.ime.debug.ShowcaseActivity", "nextglyph.ime.settings.SettingsActivity", "nextglyph.ime.settings.HeatmapActivity")
             }
         }
 

@@ -35,7 +35,7 @@ Sur un poste de confiance, hors du dépôt :
 ```sh
 keytool -genkeypair -v -keystore nextglyph-release.jks -alias nextglyph \
   -keyalg RSA -keysize 4096 -validity 36500 \
-  -dname "CN=Nextglyph"
+  -dname "CN=NextGlyph"
 ```
 
 - Garder deux copies hors ligne du fichier `.jks` et des mots de passe (ex. clé USB chiffrée et gestionnaire de mots de passe). **Une clé perdue empêche toute mise à jour** sur F-Droid (APK reproductible) comme sur GitHub.
@@ -71,7 +71,7 @@ Pour signer en local : exporter `NEXTGLYPH_KEYSTORE` (chemin du `.jks`) et les t
 ## 5. Publier sur GitHub
 
 ```sh
-git tag -a v0.1.0 -m "Nextglyph 0.1.0" && git push origin v0.1.0
+git tag -a v0.1.0 -m "NextGlyph 0.1.0" && git push origin v0.1.0
 ```
 
 Le workflow **Release** vérifie que le tag égale `versionName`, attend votre accord (environnement `release`), construit les APK `fdroid` et `play` et l'app bundle `play`, signés, vérifie la signature (`apksigner`), atteste la provenance des APK (SLSA, signée via Sigstore), puis crée la release avec `nextglyph-0.1.0.apk` (variante `fdroid`, celle du build reproductible), `nextglyph-0.1.0-play.apk`, leurs `.sha256`, leurs attestations `.sigstore.json` et les notes de version dans les deux langues. L'app bundle `play` est dans les artefacts du workflow (90 jours).
@@ -103,7 +103,7 @@ Points à confirmer avec les relecteurs de F-Droid :
 ## 7. Publier sur Google Play
 
 1. Compte développeur Play Console (frais uniques de 25 $). **Un compte personnel récent doit faire un test fermé avec au moins 12 testeurs pendant 14 jours** avant de pouvoir publier en production (règle vérifiée le 25 novembre 2026).
-2. Créer l'application (nom « Nextglyph », gratuite, application et non jeu).
+2. Créer l'application (nom « NextGlyph », gratuite, application et non jeu).
 3. **Signature** : à l'envoi du premier bundle, choisir de **fournir votre propre clé de signature d'application** (outil PEPK proposé par la console) avec `nextglyph-release.jks`, et non une clé générée par Google (§18.1). La même clé peut servir de clé d'importation.
 4. Envoyer `ime-play-release.aab` (artefact `nextglyph-<version>-google-play` du workflow Release, variante `play`) dans la piste de test fermé, avec `mapping.txt` du même artefact comme fichier de désobfuscation.
 5. Remplir la fiche et la section « Contenu de l'application » : toutes les réponses (fiche, sécurité des données, classification IARC, public cible, annonces, identifiant publicitaire, accès à l'application) sont dans [PLAY-CONSOLE.md](PLAY-CONSOLE.md).
@@ -149,15 +149,26 @@ Vérifier la provenance d'un paquet : `gh attestation verify nextglyph-dictionna
 
 `PackKeys.TRUSTED` accepte deux clés. Pour changer de clé sans casser les applications installées : générer la nouvelle clé, ajouter sa clé publique **à côté** de l'ancienne, publier une version de l'application, attendre qu'elle soit largement installée, puis remplacer le secret `NEXTGLYPH_PACK_KEY` par la nouvelle clé. Retirer l'ancienne clé publique à la version suivante. En cas de compromission, retirer la clé de `TRUSTED` immédiatement, publier une version de l'application et révoquer le secret.
 
+## 9. Visuels des stores
+
+Les captures et la vidéo des stores sont produites automatiquement, en français (AZERTY) et en anglais (QWERTY), sur un émulateur Android 14 de GitHub Actions. Le test instrumenté `StoreMediaTest` (variante debug) tape des scénarios touche par touche dans `ShowcaseActivity`, une fausse messagerie ; `scripts/store-media.sh` règle la barre d'état (09:41, batterie pleine), lance les tests, filme l'écran et récupère les fichiers.
+
+1. Onglet **Actions** → **Visuels des stores** → **Run workflow** (le workflow se lance aussi à chaque push sur une branche `claude/**` qui touche ces fichiers).
+2. Images brutes : artefacts `store-media-fr-FR` et `store-media-en-US` (14 jours), ou, sans passer par GitHub Actions, la branche orpheline **`store-media-raw`** (jamais fusionnée, réécrite à chaque exécution) : dossiers `fr-FR/` et `en-US/` avec `00-repos.png` … `06-carte-de-frappe.png` et `promo.mp4`.
+3. Les images **finales** (annotées, recadrées, avec accroche) vont dans `fastlane/metadata/android/<locale>/images/` (`phoneScreenshots/`, `featureGraphic.png`, `icon.png`). Captures : `node scripts/store-visuals/compose.js <brut> <locale> fastlane/metadata/android/<locale>/images/phoneScreenshots` (Playwright ; légendes dans `scripts/store-visuals/captions.json`, logo dans `docs/brand`).
+4. Vidéo promo (30 s environ, 1080 × 1920, sans musique) : `scripts/store-visuals/make-video.sh <brut> <locale> sortie.mp4 [début-s] [vitesse]` (ffmpeg et Playwright). Elle n'est pas versionnée : Google Play demande une URL YouTube, F-Droid n'affiche pas de vidéo.
+
+Pour lancer à la main sur un appareil dans la bonne langue : `./gradlew :ime:assembleFdroidDebug :ime:assembleFdroidDebugAndroidTest && bash scripts/store-media.sh sortie`.
+
 ## Avant la première publication
 
 Ce qui reste, dans l'ordre. Seul le mainteneur peut faire ces étapes (compte, clé, secrets, paiement) :
 
-1. [ ] Fusionner la PR des visuels (captures, icône, bannière) et relire les attributions des lexiques (licences françaises, mention COCA dans le README de SCOWL), points ouverts de [PROGRESS.md](PROGRESS.md).
+1. [ ] Relire les attributions des lexiques (licences françaises, mention COCA dans le README de SCOWL), points ouverts de [PROGRESS.md](PROGRESS.md).
 2. [ ] Créer la clé de signature et en garder deux copies hors ligne (§2) ; noter l'empreinte SHA-256 du certificat.
 3. [ ] Créer l'environnement GitHub `release` et ses quatre secrets (§3).
 4. [ ] Pousser le tag `v0.1.0` et approuver le déploiement (§5) ; vérifier la release (deux APK, empreintes, attestations).
 5. [ ] F-Droid : compte gitlab.com, fork de fdroiddata, recette avec l'empreinte, merge request (§6). Délai habituel : quelques semaines de relecture.
 6. [ ] Google Play : compte développeur (25 $, vérification d'identité), adresse e-mail publique de contact, création de l'application, clé importée via PEPK, bundle en test fermé, fiche et formulaires selon [PLAY-CONSOLE.md](PLAY-CONSOLE.md) (§7).
-7. [ ] Recruter 12 testeurs pour le test fermé, 14 jours sans interruption, puis demander l'accès à la production.
+7. [ ] Recruter 12 testeurs (15 à 20 pour garder de la marge, utilisation réelle conseillée : Google interroge sur le déroulement du test) pour le test fermé, 14 jours sans interruption, puis demander l'accès à la production.
 8. [ ] Facultatif : mettre la vidéo promo sur YouTube pour la fiche Play.

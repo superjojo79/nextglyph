@@ -1,8 +1,8 @@
-# Nextglyph — Spécification
+# NextGlyph — Spécification
 
 | | |
 |---|---|
-| Projet | Nextglyph, clavier adaptatif open source |
+| Projet | NextGlyph, clavier adaptatif open source |
 | Statut | Brouillon v0.2 |
 | Date | 2026-11-19 |
 | Licence | Apache-2.0 |
@@ -372,7 +372,7 @@ ABC  Début  Fin  | Suppr  ⌫
 
 ### 5.13 Historique du presse-papiers
 
-Issue #35. Tant qu'il est le clavier actif, Nextglyph écoute les changements du presse-papiers (`OnPrimaryClipChangedListener`) et garde les 10 derniers textes copiés (le plus récent d'abord, sans doublon, 5 000 caractères au plus chacun).
+Issue #35. Tant qu'il est le clavier actif, NextGlyph écoute les changements du presse-papiers (`OnPrimaryClipChangedListener`) et garde les 10 derniers textes copiés (le plus récent d'abord, sans doublon, 5 000 caractères au plus chacun).
 
 - **En mémoire seulement** : jamais écrit sur disque ni journalisé ; perdu quand le clavier s'arrête.
 - Non alimenté en incognito, dans un champ qui ne lit pas le texte (mot de passe, pavés) ni pour un contenu marqué sensible (`ClipDescription.EXTRA_IS_SENSITIVE`).
@@ -520,7 +520,7 @@ Défini par `IME_FLAG_NO_PERSONALIZED_LEARNING` ou forcé par l'utilisateur. Le 
 | FR | Fréquences de sous-titres (Lexique 4.10) ; EN : aucune source conversationnelle claire, repli sur Tatoeba | Fréquences | Voir `DATA.md` |
 | FR, EN | Dictionnaires AOSP / HeliBoard | Comparaison, bigrammes | **À vérifier** |
 
-Le code de Nextglyph est sous Apache-2.0. Règles pour les données :
+Le code de NextGlyph est sous Apache-2.0. Règles pour les données :
 - une donnée sous licence permissive (Apache, MIT, BSD, domaine public) peut être intégrée librement, avec attribution ;
 - une donnée sous CC BY ou CC BY-SA peut être distribuée **à côté** du code, dans un fichier distinct qui garde sa propre licence, avec attribution dans `NOTICE` et dans l'écran « À propos » ;
 - une donnée sous GPL ou LGPL n'est pas intégrée, car elle imposerait sa licence à l'ensemble.
@@ -558,7 +558,7 @@ La licence de chaque source doit être confirmée, ainsi que la compatibilité a
 
 ### 10.6 Bilinguisme français-anglais
 
-Beaucoup d'utilisateurs alternent les deux langues, parfois dans une même phrase. Nextglyph ne demande donc pas de « changer de langue » : les deux lexiques sont actifs en même temps.
+Beaucoup d'utilisateurs alternent les deux langues, parfois dans une même phrase. NextGlyph ne demande donc pas de « changer de langue » : les deux lexiques sont actifs en même temps.
 
 - **Score de langue.** Une estimation `π_FR` / `π_EN` est tenue à jour à partir des derniers mots validés (fenêtre glissante, défaut : 4 mots), en partant de la langue préférée de l'utilisateur.
 - **Mélange.** `P(c | p) = π_FR · P_FR(c | p) + π_EN · P_EN(c | p)`, les poids étant renormalisés sur les langues où `p` est un préfixe connu. Le même mélange s'applique à `P(fin | p)`. Pour les candidats de la validation, `P(w) = Σ_L π_L · score_L(w) / Σ_L π_L · total_L`, les scores étant rapportés à la masse de chaque lexique. Le score évolue progressivement : pas de bascule brutale de l'adaptation visuelle.
@@ -747,7 +747,7 @@ Ensuite (V2) : bigrammes et prédiction du mot suivant, saisie par glissement, d
 
 | Sujet | Décision |
 |---|---|
-| Nom | Nextglyph |
+| Nom | NextGlyph |
 | Licence | Apache-2.0 (règles pour les données au §10.2) |
 | Langues V1 | Français et anglais, actifs simultanément (§10.6) |
 | minSdk | 26 (Android 8.0) |

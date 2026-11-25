@@ -151,4 +151,4 @@ jobs:
             "dist/nextglyph-$VERSION-play.apk" "dist/nextglyph-$VERSION-play.apk.sha256" \
             "dist/nextglyph-$VERSION-play.apk.sigstore.json" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "Nextglyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+            --title "NextGlyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

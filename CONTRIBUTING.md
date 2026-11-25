@@ -1,4 +1,4 @@
-# Contribuer à Nextglyph
+# Contribuer à NextGlyph
 
 Merci de votre intérêt pour le projet.
 
