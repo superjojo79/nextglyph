@@ -7,15 +7,15 @@ set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
 out="${RUNNER_TEMP:-$(mktemp -d)}/reproductible"
-apk="ime/build/outputs/apk/release/ime-release-unsigned.apk"
+apk="ime/build/outputs/apk/fdroid/release/ime-fdroid-release-unsigned.apk"
 rm -rf "$out"
 mkdir -p "$out"
 
-# Sans clé : l'APK de release n'est pas signé, c'est lui que F-Droid compare.
+# Sans clé : l'APK de release n'est pas signé, c'est lui que F-Droid compare (variante fdroid, §18.1).
 unset NEXTGLYPH_KEYSTORE NEXTGLYPH_KEYSTORE_PASSWORD NEXTGLYPH_KEY_ALIAS NEXTGLYPH_KEY_PASSWORD
 
 build() {
-    (cd "$1" && ./gradlew :ime:assembleRelease --no-build-cache --no-configuration-cache --console=plain)
+    (cd "$1" && ./gradlew :ime:assembleFdroidRelease --no-build-cache --no-configuration-cache --console=plain)
 }
 
 # Second dossier, préparé avant le premier build : fichiers suivis par git, SDK et données téléchargées.

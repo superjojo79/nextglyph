@@ -23,9 +23,10 @@ NextGlyph est un clavier Android adaptatif, libre et open source. Il garde une d
 
 <b>Votre vie privée</b>
 <ul>
-<li>Aucune permission réseau : rien ne quitte votre téléphone.</li>
+<li>Rien de ce que vous tapez ne quitte votre téléphone : aucune permission réseau dans la version F-Droid ; la version Google Play ne l'utilise que pour une recherche facultative, à la demande, de nouveaux dictionnaires.</li>
 <li>Le clavier apprend vos mots et votre façon de taper, sur l'appareil seulement ; tout s'efface en un geste.</li>
 <li>Les noms de vos contacts peuvent être proposés si vous l'autorisez (permission facultative).</li>
+<li>Les dictionnaires peuvent être mis à jour sans réinstaller l'application, par un fichier signé vérifié avant usage.</li>
 <li>Ni publicité, ni statistiques, ni bibliothèque propriétaire.</li>
 </ul>
 

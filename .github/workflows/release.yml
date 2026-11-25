@@ -1,7 +1,9 @@
 name: Release
 
 # Publie une release GitHub à chaque tag vX.Y.Z (spec §18.2) : APK de release signé avec la clé du
-# projet, son empreinte SHA-256 et son attestation de provenance (SLSA, signée via Sigstore). L'app bundle signé (Google Play) reste un artefact du workflow.
+# projet pour chaque variante (fdroid, référence du build reproductible ; play, avec la permission réseau des
+# dictionnaires, §10.7), leur empreinte SHA-256 et leur attestation de provenance (SLSA, signée via Sigstore).
+# L'app bundle signé de la variante play (Google Play) reste un artefact du workflow.
 # La clé n'est jamais dans le dépôt : elle vient des secrets de l'environnement « release »
 # (procédure dans docs/PUBLISHING.md).
 
@@ -75,8 +77,8 @@ jobs:
           [ -n "$KEYSTORE_BASE64" ] || { echo "::error::Secret NEXTGLYPH_KEYSTORE_BASE64 absent de l'environnement release"; exit 1; }
           export NEXTGLYPH_KEYSTORE="$RUNNER_TEMP/release.jks"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$NEXTGLYPH_KEYSTORE"
-          # APK pour GitHub et F-Droid ; app bundle pour Google Play (envoi manuel, docs/PUBLISHING.md).
-          ./gradlew :ime:assembleRelease :ime:bundleRelease --no-build-cache --console=plain
+          # APK fdroid pour GitHub et F-Droid ; APK et app bundle play pour GitHub et Google Play (envoi manuel, docs/PUBLISHING.md).
+          ./gradlew :ime:assembleFdroidRelease :ime:assemblePlayRelease :ime:bundlePlayRelease --no-build-cache --console=plain
           rm -f "$NEXTGLYPH_KEYSTORE"
 
       - name: Vérifier la signature et calculer l'empreinte
@@ -86,28 +88,37 @@ jobs:
           set -euo pipefail
           apksigner="$(ls -d "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"/build-tools/37.0.0)/apksigner"
           mkdir -p dist
-          cp ime/build/outputs/apk/release/ime-release.apk "dist/nextglyph-$VERSION.apk"
-          "$apksigner" verify --verbose --print-certs "dist/nextglyph-$VERSION.apk"
-          (cd dist && sha256sum "nextglyph-$VERSION.apk" > "nextglyph-$VERSION.apk.sha256" && cat ./*.sha256)
+          cp ime/build/outputs/apk/fdroid/release/ime-fdroid-release.apk "dist/nextglyph-$VERSION.apk"
+          cp ime/build/outputs/apk/play/release/ime-play-release.apk "dist/nextglyph-$VERSION-play.apk"
+          for apk in "dist/nextglyph-$VERSION.apk" "dist/nextglyph-$VERSION-play.apk"; do
+            "$apksigner" verify --verbose --print-certs "$apk"
+            (cd dist && sha256sum "$(basename "$apk")" > "$(basename "$apk").sha256")
+          done
+          cat dist/*.sha256
 
-      # Prouve que l'APK sort de ce workflow, à ce commit. Vérification : docs/PUBLISHING.md §5.
-      - name: Attester la provenance de l'APK
+      # Prouve que les APK sortent de ce workflow, à ce commit. Vérification : docs/PUBLISHING.md §5.
+      - name: Attester la provenance des APK
         id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: dist/nextglyph-${{ steps.version.outputs.name }}.apk
+          subject-path: |
+            dist/nextglyph-${{ steps.version.outputs.name }}.apk
+            dist/nextglyph-${{ steps.version.outputs.name }}-play.apk
 
+      # Un seul fichier d'attestation couvre les deux APK ; il est joint sous le nom de chacun.
       - name: Joindre l'attestation à la release
         env:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
           VERSION: ${{ steps.version.outputs.name }}
-        run: cp "$BUNDLE" "dist/nextglyph-$VERSION.apk.sigstore.json"
+        run: |
+          cp "$BUNDLE" "dist/nextglyph-$VERSION.apk.sigstore.json"
+          cp "$BUNDLE" "dist/nextglyph-$VERSION-play.apk.sigstore.json"
 
       - name: Conserver l'app bundle pour Google Play
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nextglyph-${{ steps.version.outputs.name }}-google-play
-          path: ime/build/outputs/bundle/release/ime-release.aab
+          path: ime/build/outputs/bundle/playRelease/ime-play-release.aab
           if-no-files-found: error
           retention-days: 90
 
@@ -127,10 +138,14 @@ jobs:
             echo
             cat "fastlane/metadata/android/en-US/changelogs/$CODE.txt"
             echo
-            echo "SHA-256 : \`$(cut -d' ' -f1 "dist/nextglyph-$VERSION.apk.sha256")\`"
+            echo "SHA-256 (F-Droid, build reproductible) : \`$(cut -d' ' -f1 "dist/nextglyph-$VERSION.apk.sha256")\`"
+            echo
+            echo "SHA-256 (Google Play, \`-play\`) : \`$(cut -d' ' -f1 "dist/nextglyph-$VERSION-play.apk.sha256")\`"
           } > "$RUNNER_TEMP/notes.md"
           gh release create "$GITHUB_REF_NAME" \
             "dist/nextglyph-$VERSION.apk" "dist/nextglyph-$VERSION.apk.sha256" \
             "dist/nextglyph-$VERSION.apk.sigstore.json" \
+            "dist/nextglyph-$VERSION-play.apk" "dist/nextglyph-$VERSION-play.apk.sha256" \
+            "dist/nextglyph-$VERSION-play.apk.sigstore.json" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "NextGlyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

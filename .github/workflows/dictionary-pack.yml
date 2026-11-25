@@ -1,0 +1,115 @@
+name: Paquet de dictionnaires
+
+# Publie un paquet de dictionnaires signé (spec §10, docs/PUBLISHING.md « Paquets de dictionnaires ») que le
+# clavier importe sans réinstallation : lexiques et modèles de mot suivant reconstruits depuis les sources
+# figées de tools/data/sources.json, manifeste signé (ECDSA P-256) et attestation de provenance (SLSA, via Sigstore).
+# À lancer à la main après une PR qui change sources.json ou les outils. La clé privée vient du secret
+# NEXTGLYPH_PACK_KEY de l'environnement « dictionnaires », jamais du dépôt.
+# Deux releases : « dictionnaires-<version> » (archive, non marquée « dernière version ») et la release fixe
+# « dictionnaires », dont les fichiers sont remplacés, qui donne l'URL stable lue par le clavier.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dictionary-pack
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    name: Paquet signé et releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: dictionnaires
+    permissions:
+      contents: write
+      # Attestation de provenance : jeton OIDC pour Sigstore, écriture dans l'API des attestations.
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      # Pas de cache Gradle : tout est reconstruit depuis les sources.
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-disabled: true
+
+      - uses: ./.github/actions/lexicon-data
+
+      - name: Construire et signer le paquet
+        env:
+          NEXTGLYPH_PACK_KEY: ${{ secrets.NEXTGLYPH_PACK_KEY }}
+        run: |
+          set -euo pipefail
+          [ -n "$NEXTGLYPH_PACK_KEY" ] || { echo "::error::Secret NEXTGLYPH_PACK_KEY absent de l'environnement dictionnaires"; exit 1; }
+          ./gradlew :tools:buildDictionaryPack --no-build-cache --console=plain
+
+      - name: Calculer l'empreinte et relever la version
+        id: pack
+        run: |
+          set -euo pipefail
+          cd tools/build/dictionary-pack
+          sha256sum nextglyph-dictionnaires.ngpk > nextglyph-dictionnaires.ngpk.sha256
+          cat nextglyph-dictionnaires.ngpk.sha256
+          version="$(sed -n 's/^version=\([0-9]\{12\}\)$/\1/p' manifest.txt)"
+          [ -n "$version" ] || { echo "::error::Version absente du manifeste"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # Prouve que le paquet sort de ce workflow, à ce commit. Vérification : docs/PUBLISHING.md.
+      - name: Attester la provenance du paquet
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: tools/build/dictionary-pack/nextglyph-dictionnaires.ngpk
+
+      - name: Joindre l'attestation
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" tools/build/dictionary-pack/nextglyph-dictionnaires.ngpk.sigstore.json
+
+      - name: Publier la release de la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pack.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd tools/build/dictionary-pack
+          {
+            echo "Paquet de dictionnaires $VERSION (lexiques et modèles de mot suivant), importable depuis les réglages du clavier."
+            echo
+            echo "SHA-256 : \`$(cut -d' ' -f1 nextglyph-dictionnaires.ngpk.sha256)\`"
+            echo
+            echo "Sources, licences et attributions : \`NOTICE.txt\` dans le paquet, [docs/DATA.md](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/DATA.md)."
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "dictionnaires-$VERSION" \
+            nextglyph-dictionnaires.ngpk nextglyph-dictionnaires.ngpk.sha256 \
+            nextglyph-dictionnaires.ngpk.sigstore.json manifest.txt manifest.sig \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+            --title "Dictionnaires $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+
+      # URL stable : releases/download/dictionnaires/nextglyph-dictionnaires.ngpk (lue par le clavier).
+      - name: Mettre à jour la release fixe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pack.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd tools/build/dictionary-pack
+          if ! gh release view dictionnaires --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create dictionnaires --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+              --title "Dictionnaires (dernier paquet)" \
+              --notes "Dernier paquet de dictionnaires, à l'URL stable lue par le clavier. Les versions : releases « dictionnaires-<version> »."
+          fi
+          gh release upload dictionnaires nextglyph-dictionnaires.ngpk manifest.txt manifest.sig \
+            --repo "$GITHUB_REPOSITORY" --clobber
+          echo "Paquet $VERSION publié."

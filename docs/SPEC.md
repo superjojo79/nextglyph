@@ -29,7 +29,7 @@ Un clavier mobile **compact** qui garde une disposition AZERTY ou QWERTY immédi
 
 - Saisie par glissement (glide typing) : prévue après la V1 (cf. §16).
 - iOS (le moteur est toutefois écrit pour rester portable, cf. §11).
-- Toute fonctionnalité nécessitant le réseau.
+- Toute fonctionnalité nécessitant le réseau (seule exception : la recherche à la demande d'une mise à jour des dictionnaires dans la variante Google Play, §2.7 et §10.7).
 - Langues autres que le français et l'anglais (l'architecture doit cependant les permettre, cf. §10).
 - GIF, presse-papiers avancé (épinglage, synchronisation) ; les émojis (§5.11) et un historique simple du presse-papiers (§5.13) sont couverts.
 
@@ -45,7 +45,7 @@ Ces règles priment sur toute autre considération. Toute fonctionnalité qui le
 4. **Atténuer, jamais désactiver.** Toute lettre reste tapable dans tous les modes du profil texte.
 5. **Prévisibilité.** Le clavier montre toujours ce qu'il va faire avant de le faire (ex. : la touche espace affiche le mot qu'elle insérera).
 6. **Tout est annulable.** Toute insertion automatique s'annule par un appui sur ⌫ immédiatement après.
-7. **Local uniquement.** Pas de permission `INTERNET`. Aucune donnée ne quitte l'appareil.
+7. **Local uniquement.** Aucune donnée ne quitte l'appareil. La variante F-Droid n'a aucune permission `INTERNET`. La variante Google Play la déclare pour la seule mise à jour des dictionnaires (§10.7) : opt-in (réglage désactivé par défaut), à la demande (aucune tâche de fond), sans envoyer autre chose que la requête HTTPS des fichiers publics.
 8. **Le champ commande.** Le type du champ (`EditorInfo`) détermine le profil ; ses contraintes (chiffres uniquement, pas de suggestions, incognito) sont strictement respectées.
 
 ---
@@ -568,6 +568,17 @@ Beaucoup d'utilisateurs alternent les deux langues, parfois dans une même phras
 - **Indicateur.** La touche espace affiche discrètement la langue dominante (`FR`, `EN`). Un appui long sur l'espace ouvre le menu des langues : verrouiller le français, verrouiller l'anglais, ou mode automatique (par défaut).
 - **Réglages.** Langues actives : français, anglais, ou les deux (défaut : les deux) ; langue préférée de départ ; variante anglaise US ou UK.
 
+### 10.7 Mise à jour des dictionnaires
+
+Issue #62. Les dictionnaires embarqués dans l'APK (§10.1, §10.2) restent la base hors ligne et le point de retour. Un **paquet de dictionnaires signé** peut les remplacer sans réinstaller l'application ; rien d'autre (code, réglage, disposition) ne passe par un paquet.
+
+- **Paquet `.ngpk`** : archive ZIP à plat contenant `manifest.txt` (format, version `yyyyMMddHHmm` UTC strictement croissante, formats binaires du lexique et du modèle de mot suivant, taille et SHA-256 de chaque fichier), `manifest.sig`, les cinq fichiers de données (`fr-lexique.nglx`, `fr-dicollecte.nglx`, `en.nglx`, `fr.ngrm`, `en.ngrm`) et `NOTICE.txt` (attributions CC BY, CC BY-SA, MPL-2.0, SCOWL). Noms de fichiers en liste fermée ; tout nom, doublon ou clé inconnus sont refusés.
+- **Signature** : ECDSA P-256 / SHA-256 (DER) du manifeste, vérifiée avec une des clés publiques de confiance embarquées dans le moteur (deux emplacements, pour la rotation). Ed25519 n'existe qu'à partir d'Android 13 ; P-256 est disponible dès Android 8 (`minSdk` 26) sans dépendance.
+- **Installation** (`nextglyph.engine.pack.PackStore`) : lecture en flux dans un dossier de préparation, avec plafonds sur les octets décompressés (64 Mio par entrée, 160 Mio au total, 16 entrées) ; signature, formats, tailles et empreintes vérifiés ; chaque fichier est chargé à l'essai ; refus d'un paquet qui n'est pas plus récent que celui installé ; bascule atomique (`packs/current`). Tout échec laisse l'état précédent intact. Les refus ont un motif (`SIGNATURE`, `INCOMPATIBLE`, `CORRUPT`, `OUTDATED`, `TOO_LARGE`, `IO`) traduit dans les réglages.
+- **Chargement** (`AssetLexicons`) : par langue, les fichiers du paquet installé (stockage privé non sauvegardé, projection `FileChannel.map`) sinon ceux de l'APK. Si un fichier du paquet échoue, la langue entière repart de l'APK et le service journalise l'échec : le clavier n'est jamais sans dictionnaire. Après une installation ou un retour à l'origine, les réglages incrémentent la préférence `dictionaries_generation` ; le service l'écoute et recharge lexiques et modèles.
+- **Obtention** : le paquet est publié par un workflow GitHub manuel dans la release fixe `dictionnaires` (URL stables, avec `manifest.txt` et `manifest.sig`). Dans les deux variantes (§18.1), « Télécharger dans le navigateur » ouvre l'URL du paquet puis « Importer un fichier… » l'installe (`ACTION_OPEN_DOCUMENT`, aucune permission). Dans la variante `play` seulement, un réglage « Mises à jour en ligne » (désactivé par défaut) donne accès à « Rechercher une mise à jour » : lecture du manifeste et de sa signature, comparaison de la version, annonce de la taille, téléchargement et installation sur confirmation. Réseau uniquement à la demande (aucune tâche de fond, aucune planification), HTTPS vers `github.com`, `User-Agent: Nextglyph`, ni cookie ni identifiant, réponses plafonnées.
+- **Réglages** (§14) : ligne d'état (« Dictionnaires d'origine » ou « Mis à jour le <date> »), téléchargement, import, retour aux dictionnaires d'origine (avec confirmation), et pour `play` l'interrupteur et la recherche.
+
 ---
 
 ## 11. Architecture technique
@@ -611,8 +622,8 @@ docs/        Cette spécification, décisions d'architecture.
 
 ## 12. Confidentialité et sécurité
 
-- Pas de permission `INTERNET`, pas de SDK tiers, pas de télémétrie.
-- Permissions : `READ_CONTACTS` (optionnelle) seulement. `VIBRATE` n'est pas nécessaire : le retour haptique passe par `View.performHapticFeedback`, qui n'en demande pas. `ManifestTest` interdit toute autre permission dangereuse.
+- Pas de permission `INTERNET` dans la variante F-Droid ; la variante Google Play la déclare pour la seule mise à jour des dictionnaires (§10.7), sur opt-in et à la demande, sans donnée personnelle ni identifiant dans la requête. Pas de SDK tiers, pas de télémétrie.
+- Permissions : `READ_CONTACTS` (optionnelle) seulement. `VIBRATE` n'est pas nécessaire : le retour haptique passe par `View.performHapticFeedback`, qui n'en demande pas. `ManifestTest` interdit toute permission réseau dans `fdroid*`, toute permission réseau autre qu'`INTERNET` dans `play*`, et toute autre permission dangereuse.
 - Prédiction du mot suivant (issue #51) : le contexte (les deux derniers mots avant le curseur) n'est lu qu'au moment de la prédiction, par la lecture du contexte du §11 ; il n'est ni stocké, ni journalisé, ni appris : le modèle est un fichier en lecture seule construit hors ligne, qui n'évolue pas avec ce que l'on tape. Aucune séquence de mots n'est conservée.
 - Erreurs d'espace (issue #52) : le mot précédent et les positions des frappes ne sont lus ou gardés en mémoire que le temps de la prédiction ; seule la paire (texte tapé, texte inséré) d'une correction annulée est comptée, avec les autres refus (§5.5, plafonnée et effaçable), et rien n'est appris d'une espace en trop supprimée.
 - Aucune journalisation du texte saisi, y compris en debug pour les profils mot de passe et code PIN.
@@ -653,14 +664,16 @@ docs/        Cette spécification, décisions d'architecture.
 | Noms des contacts | Oui / Non (+ effacer) | Non (jusqu'à l'octroi de la permission) |
 | Aperçu agrandi des touches | Oui / Non / Sauf mots de passe | Sauf mots de passe |
 | Retour haptique | Intensité | Moyen |
+| Dictionnaires (§10.7) | Télécharger dans le navigateur / Importer un fichier / Revenir aux dictionnaires d'origine | Dictionnaires d'origine |
+| Mises à jour en ligne (variante `play` seulement) | Oui / Non ; si oui, « Rechercher une mise à jour » | Non |
 | Données apprises | Exporter / Importer / Effacer | — |
 | Corrections refusées (dans « Données apprises ») | Liste des corrections refusées ; retirer celles que l'on choisit (§10.5) | Aucune |
 
-**Réalisation** (`SettingsActivity`, vues du cadre Android ; `docs/DECISIONS.md`, 2026-11-19) : les réglages sont enregistrés dans des `SharedPreferences` exclues des sauvegardes et appliqués aussitôt par le service, sans redémarrage. Deux réglages du tableau ne sont pas proposés en V1 : **Variante anglaise** (un seul lexique anglais est embarqué, le réglage serait sans effet) et **Aperçu agrandi des touches** (le clavier n'a pas d'aperçu). Retour haptique : Désactivé / Léger / Moyen / Fort (`performHapticFeedback` à l'appui d'une touche, sous réserve du réglage système « Retour tactile »). Export et import du dictionnaire personnel en TSV par le Storage Access Framework (`ACTION_CREATE_DOCUMENT`, `ACTION_OPEN_DOCUMENT`, aucune permission) ; effacement de toutes les données apprises après confirmation.
+**Réalisation** (`SettingsActivity`, vues du cadre Android ; `docs/DECISIONS.md`, 2026-11-19) : les réglages sont enregistrés dans des `SharedPreferences` exclues des sauvegardes et appliqués aussitôt par le service, sans redémarrage. Deux réglages du tableau ne sont pas proposés en V1 : **Variante anglaise** (un seul lexique anglais est embarqué, le réglage serait sans effet) et **Aperçu agrandi des touches** (le clavier n'a pas d'aperçu). Retour haptique : Désactivé / Léger / Moyen / Fort (`performHapticFeedback` à l'appui d'une touche, sous réserve du réglage système « Retour tactile »). Export et import du dictionnaire personnel en TSV par le Storage Access Framework (`ACTION_CREATE_DOCUMENT`, `ACTION_OPEN_DOCUMENT`, aucune permission) ; effacement de toutes les données apprises après confirmation. Section « Dictionnaires » (issue #62, §10.7) : ligne d'état, téléchargement dans le navigateur (`ACTION_VIEW`), import d'un paquet (`ACTION_OPEN_DOCUMENT`, installation sur un fil d'arrière-plan), retour aux dictionnaires d'origine après confirmation ; dans la variante `play`, interrupteur « Mises à jour en ligne » et recherche à la demande. Les erreurs sont traduites par motif (`DictionaryMessages`).
 
 **Langue de l'interface** (issue #47) : l'écran des réglages et les textes propres au clavier suivent la langue du système, ou le français ou l'anglais choisi pour l'application seule. Android 13 et plus : `LocaleManager.applicationLocales` (langue par application, aussi proposée dans les réglages du système, déclarée par `res/xml/locales_config.xml`) ; en dessous : préférence `ui_language` et contexte enrobé dans `attachBaseContext` de l'activité et du service (`AppLocale`), l'activité étant recréée au changement. Ce choix ne modifie ni la disposition par défaut, ni la langue préférée de départ, ni le séparateur décimal, qui restent déduits de la locale du système.
 
-**Explications** (issue #48) : chaque réglage, ainsi que les sections « Données apprises » et « Mesures de saisie », affiche une ligne de résumé sous son titre et un bouton (i) de 48 dp qui ouvre une boîte de dialogue : le nom du réglage, une explication de ce qu'il fait concrètement, de sa valeur par défaut et, le cas échéant, de ses conséquences sur la vie privée. Textes dans `strings_help.xml` (`pref_*_summary`, `pref_*_info`), en anglais et en français ; `StringResourcesTest` vérifie leur présence et la parité des traductions.
+**Explications** (issue #48) : chaque réglage, ainsi que les sections « Dictionnaires », « Données apprises » et « Mesures de saisie », affiche une ligne de résumé sous son titre et un bouton (i) de 48 dp qui ouvre une boîte de dialogue : le nom du réglage, une explication de ce qu'il fait concrètement, de sa valeur par défaut et, le cas échéant, de ses conséquences sur la vie privée. Textes dans `strings_help.xml` (`pref_*_summary`, `pref_*_info`), en anglais et en français ; `StringResourcesTest` vérifie leur présence et la parité des traductions.
 
 ---
 
@@ -754,7 +767,7 @@ Aucune pour l'instant (l'identifiant d'application est tranché au §17.1).
 
 ### 18.1 Contraintes communes
 
-- **Un seul build pour les deux stores.** Aucune dépendance propriétaire : ni Google Play Services, ni Firebase, ni SDK d'analyse ou de publicité. C'est une condition d'entrée sur F-Droid, et c'est cohérent avec le §12.
+- **Un même code, deux variantes** (dimension de produit `distribution`) : `fdroid` (aucune permission réseau) et `play` (permission `INTERNET` déclarée par `src/play/AndroidManifest.xml`, pour la seule mise à jour des dictionnaires, §10.7). Même `applicationId`, même `versionCode`, même clé de signature : on passe de l'une à l'autre sans désinstaller. Seul le code réseau de `src/play/` diffère. Aucune dépendance propriétaire : ni Google Play Services, ni Firebase, ni SDK d'analyse ou de publicité. C'est une condition d'entrée sur F-Droid, et c'est cohérent avec le §12.
 - **Builds reproductibles.** Le même code source doit produire un APK identique à l'octet près (versions de Gradle et du JDK figées, pas d'horodatage ni de chemin absolu dans l'APK). F-Droid peut alors publier l'APK signé par le projet au lieu de le re-signer avec sa propre clé. Résultat : une même signature sur F-Droid, Google Play et GitHub, et des utilisateurs qui peuvent passer d'une source à l'autre sans désinstaller.
 - **Clé de signature** : générée une seule fois, conservée hors du dépôt, avec une sauvegarde hors ligne. Le build la lit dans l'environnement (`NEXTGLYPH_KEYSTORE` et trois variables associées) ; sans elle, l'APK de release n'est pas signé. Sur Google Play, l'inscription à Play App Signing doit utiliser cette même clé comme clé d'application (et non une clé générée par Google), sinon les signatures divergent.
 - **Versionnage** : `versionName` sémantique (`1.2.0`) et `versionCode` strictement croissant, identiques dans les trois canaux.
@@ -762,24 +775,25 @@ Aucune pour l'instant (l'identifiant d'application est tranché au §17.1).
 ### 18.2 GitHub
 
 - Dépôt public ; fichiers `LICENSE` (Apache-2.0), `NOTICE` (attributions des données, cf. §10.2), `README`, `CONTRIBUTING`, `SECURITY`.
-- **Intégration continue** (GitHub Actions) : tests du module `engine`, lint, build de l'APK, vérification de la reproductibilité (deux builds de l'APK de release non signé, depuis deux dossiers et sans cache, comparés à l'octet : `scripts/check-reproducible.sh`).
-- **Publication** : chaque tag `vX.Y.Z` produit une release GitHub avec l'APK signé, son empreinte SHA-256 et son attestation de provenance (SLSA, Sigstore).
+- **Intégration continue** (GitHub Actions) : tests du module `engine`, lint et tests des deux variantes, build des APK de debug, vérification de la reproductibilité (deux builds de l'APK de release non signé de la variante `fdroid`, depuis deux dossiers et sans cache, comparés à l'octet : `scripts/check-reproducible.sh`).
+- **Publication** : chaque tag `vX.Y.Z` produit une release GitHub avec les APK signés `nextglyph-X.Y.Z.apk` (variante `fdroid`, référence du build reproductible) et `nextglyph-X.Y.Z-play.apk`, leurs empreintes SHA-256 et leurs attestations de provenance (SLSA, Sigstore). Les paquets de dictionnaires (§10.7) ont leur propre workflow et leur propre release `dictionnaires`.
 - Les lexiques binaires sont générés par `tools/` pendant le build, pas versionnés. Seules les sources de données (ou un script de téléchargement avec sommes de contrôle) sont dans le dépôt. Chaque source a un miroir figé dans une release du dépôt (`mirrors` dans `tools/data/sources.json`), essayé avant l'URL officielle : un fichier écrasé en place par son auteur ne casse pas le build.
 - Procédure complète (clé, secrets, tags, F-Droid, Play) : [PUBLISHING.md](PUBLISHING.md).
 
 ### 18.3 F-Droid
 
 - Métadonnées dans le dépôt au format fastlane : `fastlane/metadata/android/<locale>/` (titre, descriptions, captures, notes de version), en `fr-FR` et `en-US`.
-- La recette de build F-Droid doit pouvoir construire l'APK depuis les sources, y compris les lexiques. Les sources de données doivent donc être accessibles et sous licences libres (§10.2).
-- Objectif : aucune « anti-fonctionnalité » signalée par F-Droid.
+- La recette de build F-Droid construit la variante `fdroid` (`gradle: [fdroid]`) et doit pouvoir construire l'APK depuis les sources, y compris les lexiques. Les sources de données doivent donc être accessibles et sous licences libres (§10.2).
+- Objectif : aucune « anti-fonctionnalité » signalée par F-Droid. Les dictionnaires s'y mettent à jour par fichier signé importé à la main (§10.7).
 
 ### 18.4 Google Play
 
 - **Cible SDK** : Google Play impose de cibler une version récente d'Android (`targetSdk`), relevée chaque année. La règle exacte est à vérifier à chaque publication.
+- **Variante `play`** : seule à déclarer `INTERNET`, pour la recherche de mise à jour des dictionnaires (opt-in, à la demande, §10.7).
 - **Section « Sécurité des données »** : déclarer qu'aucune donnée n'est collectée ni partagée. Les données traitées uniquement sur l'appareil (texte saisi, contacts, dictionnaire personnel) ne sont en principe pas considérées comme collectées. À confirmer avec la politique en vigueur au moment de la publication.
 - **Contacts** : la permission `READ_CONTACTS` impose une explication claire avant la demande (écran de réglages, §6.1) et une politique de confidentialité publiée.
 - **Politique de confidentialité** : requise par Google Play ; une page courte qui reprend le §12, en français et en anglais : [PRIVACY.md](PRIVACY.md), publiée par le dépôt (ou GitHub Pages).
-- **Format** : Google Play exige un app bundle (`.aab`) pour une nouvelle application ; le workflow de release le produit, signé avec la même clé que l'APK. Play App Signing doit être configuré avec cette clé (« fournir votre propre clé »).
+- **Format** : Google Play exige un app bundle (`.aab`) pour une nouvelle application ; le workflow de release le produit pour la variante `play`, signé avec la même clé que les APK. Play App Signing doit être configuré avec cette clé (« fournir votre propre clé »).
 - Fiche du store en français et en anglais, générée à partir des mêmes textes que les métadonnées fastlane.
 
 ---

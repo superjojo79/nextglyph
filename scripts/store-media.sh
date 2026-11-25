@@ -26,8 +26,8 @@ adb wait-for-device
 adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done'
 
 # --- Installation --------------------------------------------------------------------------------------------
-app_apk="$(ls ime/build/outputs/apk/debug/*.apk 2>/dev/null | head -n 1 || true)"
-test_apk="$(ls ime/build/outputs/apk/androidTest/debug/*.apk 2>/dev/null | head -n 1 || true)"
+app_apk="$(ls ime/build/outputs/apk/fdroid/debug/*.apk 2>/dev/null | head -n 1 || true)"
+test_apk="$(ls ime/build/outputs/apk/androidTest/fdroid/debug/*.apk 2>/dev/null | head -n 1 || true)"
 if [ -n "$app_apk" ] && [ -n "$test_apk" ]; then
   echo "Installation de $app_apk et $test_apk"
   adb install -r -t -g "$app_apk"

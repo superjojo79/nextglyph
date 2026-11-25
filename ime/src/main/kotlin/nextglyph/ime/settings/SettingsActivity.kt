@@ -3,10 +3,12 @@ package nextglyph.ime.settings
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -14,6 +16,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
+import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -28,14 +31,21 @@ import nextglyph.engine.adapt.AdaptationMode
 import nextglyph.engine.layout.LayoutKind
 import nextglyph.engine.learn.ImportReport
 import nextglyph.engine.lexicon.LexiconLanguage
+import nextglyph.engine.pack.PackException
+import nextglyph.engine.pack.PackManifest
 import nextglyph.engine.predict.PredictionConfig
 import nextglyph.engine.predict.Prudence
 import nextglyph.ime.AppServices
 import nextglyph.ime.R
 import nextglyph.ime.contacts.ContactsSource
+import nextglyph.ime.dictionary.DictionaryDownloader
+import nextglyph.ime.dictionary.DictionaryMessages
+import nextglyph.ime.dictionary.DictionaryUrls
+import nextglyph.ime.dictionary.Distribution
 import nextglyph.ime.settings.KeyboardSettings.Companion.AUTO
 import nextglyph.ime.settings.KeyboardSettings.Companion.BOTH
 import nextglyph.ime.settings.KeyboardSettings.Companion.storedName
+import java.io.InputStream
 import java.text.NumberFormat
 
 /**
@@ -47,6 +57,9 @@ import java.text.NumberFormat
  *   l'utilisateur active la fonction ; la couper efface immédiatement les noms de la mémoire du clavier.
  * - **Données apprises** (§10.5, §12) : export et import du dictionnaire personnel en TSV par le Storage Access
  *   Framework (aucune permission), effacement de tout ce qui a été appris, après confirmation.
+ * - **Dictionnaires** (§10.7, issue #62) : paquet signé téléchargé dans le navigateur puis importé par le Storage
+ *   Access Framework, retour aux dictionnaires d'origine ; dans la variante `play` seulement, recherche d'une mise à
+ *   jour à la demande, après l'opt-in « Mises à jour en ligne ». Installations et recherches sur un fil d'arrière-plan.
  */
 class SettingsActivity : Activity() {
 
@@ -57,6 +70,10 @@ class SettingsActivity : Activity() {
     private lateinit var zonesSummary: TextView
     private lateinit var statsSummary: TextView
     private lateinit var contactsSwitch: Switch
+    private lateinit var dictionariesStatus: TextView
+    private lateinit var dictionariesReset: Button
+    private var dictionariesCheck: Button? = null
+    private var dictionariesBusy = false
     private val preferences: SharedPreferences get() = services.preferences
 
     override fun attachBaseContext(newBase: Context) {
@@ -104,6 +121,7 @@ class SettingsActivity : Activity() {
         services.syncContacts()
         updateLearnedSummary()
         updateStatsSummary()
+        refreshDictionaries()
     }
 
     /** Mesures locales de saisie (issue #36) : vitesse et taux, « — » tant qu'il n'y a rien à mesurer. */
@@ -209,6 +227,21 @@ class SettingsActivity : Activity() {
             listOf(AUTO to R.string.pref_preferred_auto, LexiconLanguage.FRENCH to R.string.pref_language_fr, LexiconLanguage.ENGLISH to R.string.pref_language_en),
         )
 
+        section(root, R.string.pref_section_dictionaries, R.string.pref_section_dictionaries_summary, R.string.pref_section_dictionaries_info)
+        dictionariesStatus = text(root, getString(R.string.dictionaries_status_original))
+        button(root, R.string.dictionaries_browser) { openPackInBrowser() }
+        button(root, R.string.dictionaries_import) { startPackImport() }
+        dictionariesReset = button(root, R.string.dictionaries_reset) { confirmResetDictionaries() }.also { it.visibility = View.GONE }
+        if (Distribution.downloader != null) {
+            val online = preferences.getBoolean(KeyboardSettings.KEY_ONLINE_UPDATES, false)
+            toggle(
+                root, R.string.pref_dictionaries_online, R.string.pref_dictionaries_online_summary, R.string.pref_dictionaries_online_info,
+                KeyboardSettings.KEY_ONLINE_UPDATES, online,
+            ) { checked -> dictionariesCheck?.visibility = if (checked) View.VISIBLE else View.GONE }
+            dictionariesCheck = button(root, R.string.dictionaries_check) { checkForUpdate() }
+                .also { it.visibility = if (online) View.VISIBLE else View.GONE }
+        }
+
         section(root, R.string.pref_section_typing)
         toggle(
             root, R.string.pref_autocommit, R.string.pref_autocommit_summary, R.string.pref_autocommit_info,
@@ -307,6 +340,146 @@ class SettingsActivity : Activity() {
         startActivityForResult(intent, REQUEST_EXPORT)
     }
 
+    // Dictionnaires (§10.7).
+
+    /** Met à jour la ligne d'état et le bouton de retour à l'origine d'après le paquet installé (lu hors du fil principal). */
+    private fun refreshDictionaries() {
+        if (!::dictionariesStatus.isInitialized) return
+        Thread({
+            val version = services.packs.current()?.version
+            runOnUiThread { if (!isDestroyed) showDictionaries(version) }
+        }, DICTIONARIES_THREAD).start()
+    }
+
+    private fun showDictionaries(version: Long?) {
+        dictionariesStatus.text = if (version == null) {
+            getString(R.string.dictionaries_status_original)
+        } else {
+            getString(R.string.dictionaries_status_updated, DictionaryMessages.formatVersion(version, resources.configuration.locales[0]))
+        }
+        dictionariesReset.visibility = if (version == null) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * Exécute [work] sur un fil d'arrière-plan (une seule opération à la fois), puis [done] sur le fil principal si
+     * l'écran existe encore. L'état d'avancement [progress] remplace la ligne d'état en attendant.
+     */
+    private fun <T> inBackground(progress: Int, work: () -> T, done: (Result<T>) -> Unit) {
+        if (dictionariesBusy) return
+        dictionariesBusy = true
+        dictionariesStatus.setText(progress)
+        Thread({
+            val outcome: Result<T> = try {
+                Result.success(work())
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+            runOnUiThread {
+                dictionariesBusy = false
+                if (!isDestroyed) done(outcome)
+            }
+        }, DICTIONARIES_THREAD).start()
+    }
+
+    /** Installe le paquet lu dans [open] ; les lexiques du clavier sont rechargés ensuite (compteur de génération). */
+    private fun installPack(open: () -> InputStream) {
+        open().use { services.packs.install(it) }
+        services.notifyDictionariesChanged()
+    }
+
+    private fun showInstallResult(outcome: Result<*>) {
+        val message = outcome.exceptionOrNull()?.let(DictionaryMessages::forError) ?: R.string.dictionaries_installed
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        refreshDictionaries()
+    }
+
+    private fun openPackInBrowser() {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DictionaryUrls.PACK)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.dictionaries_browser_missing, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun startPackImport() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        startActivityForResult(intent, REQUEST_PACK)
+    }
+
+    private fun importPack(uri: Uri) {
+        inBackground(
+            R.string.dictionaries_installing,
+            {
+                installPack {
+                    val stream = try {
+                        contentResolver.openInputStream(uri)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    stream ?: throw PackException(PackException.Reason.IO, "Fichier illisible : impossible de l'ouvrir.")
+                }
+            },
+            ::showInstallResult,
+        )
+    }
+
+    private fun confirmResetDictionaries() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dictionaries_reset)
+            .setMessage(R.string.dictionaries_reset_confirm)
+            .setPositiveButton(R.string.dictionaries_reset_action) { _, _ ->
+                inBackground(
+                    R.string.dictionaries_installing,
+                    {
+                        services.packs.reset()
+                        services.notifyDictionariesChanged()
+                    },
+                ) { outcome ->
+                    val message = outcome.exceptionOrNull()?.let(DictionaryMessages::forError) ?: R.string.dictionaries_reset_done
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    refreshDictionaries()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Variante `play` : lit le manifeste publié, vérifié par le magasin de paquets ; propose le téléchargement s'il est plus récent. */
+    private fun checkForUpdate() {
+        val downloader = Distribution.downloader ?: return
+        inBackground(
+            R.string.dictionaries_checking,
+            {
+                val (manifest, signature) = downloader.fetchManifest()
+                services.packs.checkUpdate(manifest, signature)
+            },
+        ) { outcome ->
+            refreshDictionaries()
+            val error = outcome.exceptionOrNull()
+            val newer = outcome.getOrNull()
+            when {
+                error != null -> Toast.makeText(this, DictionaryMessages.forError(error), Toast.LENGTH_LONG).show()
+                newer == null -> Toast.makeText(this, R.string.dictionaries_up_to_date, Toast.LENGTH_LONG).show()
+                else -> confirmDownload(downloader, newer)
+            }
+        }
+    }
+
+    private fun confirmDownload(downloader: DictionaryDownloader, manifest: PackManifest) {
+        val date = DictionaryMessages.formatVersion(manifest.version, resources.configuration.locales[0])
+        val megabytes = DictionaryMessages.megabytes(manifest.files.sumOf { it.size })
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dictionaries_update_title)
+            .setMessage(getString(R.string.dictionaries_update_available, date, megabytes))
+            .setPositiveButton(R.string.dictionaries_update_download) { _, _ ->
+                inBackground(R.string.dictionaries_downloading, { installPack(downloader::openPack) }, ::showInstallResult)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun startImport() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
@@ -325,6 +498,7 @@ class SettingsActivity : Activity() {
             REQUEST_EXPORT -> services.learned.exportTsv({ contentResolver.openOutputStream(uri, "wt") }) { ok ->
                 Toast.makeText(this, if (ok) R.string.export_done else R.string.export_failed, Toast.LENGTH_SHORT).show()
             }
+            REQUEST_PACK -> importPack(uri)
             REQUEST_IMPORT -> services.learned.importTsv({ contentResolver.openInputStream(uri) }) { report ->
                 Toast.makeText(this, importMessage(report), Toast.LENGTH_LONG).show()
                 updateLearnedSummary()
@@ -559,15 +733,12 @@ class SettingsActivity : Activity() {
         )
     }
 
-    private fun button(root: LinearLayout, title: Int, action: () -> Unit) {
-        root.addView(
-            android.widget.Button(this).apply {
-                setText(title)
-                minHeight = dp(MIN_TOUCH_DP)
-                setOnClickListener { action() }
-            },
-        )
-    }
+    private fun button(root: LinearLayout, title: Int, action: () -> Unit): Button =
+        Button(this).apply {
+            setText(title)
+            minHeight = dp(MIN_TOUCH_DP)
+            setOnClickListener { action() }
+        }.also(root::addView)
 
     private companion object {
         const val DASH = "—"
@@ -577,6 +748,8 @@ class SettingsActivity : Activity() {
         const val REQUEST_CONTACTS = 1
         const val REQUEST_EXPORT = 2
         const val REQUEST_IMPORT = 3
+        const val REQUEST_PACK = 4
+        const val DICTIONARIES_THREAD = "nextglyph-dictionaries"
         const val TSV_TYPE = "text/tab-separated-values"
         const val EXPORT_NAME = "nextglyph-dictionnaire.tsv"
         const val MIN_TOUCH_DP = 48

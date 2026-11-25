@@ -281,3 +281,34 @@ tasks.register<JavaExec>("buildEmoji") {
 pitest {
     excludedClasses.add("nextglyph.tools.emoji.BuildEmojiMainKt")
 }
+
+// ---------------------------------------------------------------------------
+// Paquet de dictionnaires signé (package nextglyph.tools.pack, testé ; docs/PUBLISHING.md).
+// ---------------------------------------------------------------------------
+
+// build/dictionary-pack/nextglyph-dictionnaires.ngpk, manifest.txt et manifest.sig, à partir de build/lexicons
+// (buildLexicons) et du NOTICE du dépôt. La clé privée (PEM PKCS#8) vient de NEXTGLYPH_PACK_KEY ; sans elle la
+// tâche échoue. Version (yyyyMMddHHmm UTC) : -PpackVersion=<version>, par défaut l'heure courante.
+tasks.register<JavaExec>("buildDictionaryPack") {
+    group = "data"
+    description = "Construit le paquet de dictionnaires signé (build/dictionary-pack ; clé dans NEXTGLYPH_PACK_KEY)."
+    dependsOn("buildLexicons")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("nextglyph.tools.pack.BuildDictionaryPackMainKt")
+    val version = providers.gradleProperty("packVersion")
+    args(
+        listOfNotNull(
+            "--lexicons", layout.buildDirectory.dir("lexicons").get().asFile.path,
+            "--notice", rootProject.layout.projectDirectory.file("NOTICE").asFile.path,
+            "--out", layout.buildDirectory.dir("dictionary-pack").get().asFile.path,
+            version.orNull?.let { "--version" },
+            version.orNull,
+        ),
+    )
+    outputs.upToDateWhen { false }
+}
+
+// Point d'entrée sans logique (délègue à BuildDictionaryPackCli), exclu de PIT comme les autres.
+pitest {
+    excludedClasses.add("nextglyph.tools.pack.BuildDictionaryPackMainKt")
+}

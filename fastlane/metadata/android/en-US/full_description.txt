@@ -23,9 +23,10 @@ NextGlyph is an adaptive, free and open source Android keyboard. It keeps an AZE
 
 <b>Your privacy</b>
 <ul>
-<li>No network permission: nothing leaves your phone.</li>
+<li>Nothing you type ever leaves your phone: no network permission in the F-Droid version; the Google Play version uses it only for an optional, on-demand check for new dictionaries.</li>
 <li>The keyboard learns your words and the way you type, on the device only; everything can be erased in one tap.</li>
 <li>Your contacts' names can be suggested if you allow it (optional permission).</li>
+<li>Dictionaries can be updated without reinstalling the app, from a signed file that is verified before use.</li>
 <li>No ads, no analytics, no proprietary library.</li>
 </ul>
 

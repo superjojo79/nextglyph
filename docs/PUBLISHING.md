@@ -10,7 +10,8 @@ Procédure de publication sur GitHub, F-Droid et Google Play, en application du 
 | APK sans bloc de dépendances chiffré ni empreinte du commit | `ime/build.gradle.kts` (`dependenciesInfo`, `vcsInfo`) | 18.1, 18.3 |
 | Contrôle de reproductibilité : deux builds de release depuis deux dossiers, comparés à l'octet | job « Build reproductible » de la CI, `scripts/check-reproducible.sh` | 18.1, 18.2 |
 | Données figées : chaque source a un miroir dans une release du dépôt, essayé avant l'URL officielle | `tools/data/sources.json` (`mirrors`), workflow « Instantané des données » | 18.2, 18.3 |
-| Release sur tag `vX.Y.Z` : APK signé, empreinte SHA-256, notes de version, app bundle pour Play | workflow « Release » | 18.2, 18.4 |
+| Deux variantes d'un même code, `fdroid` (aucune permission réseau) et `play` (INTERNET, mise à jour des dictionnaires sur opt-in) | `ime/build.gradle.kts` (`productFlavors`), `ime/src/play/` | 2.7, 18.1 |
+| Release sur tag `vX.Y.Z` : APK signés (`fdroid`, `-play`), empreintes SHA-256, notes de version, app bundle `play` pour Play | workflow « Release » | 18.2, 18.4 |
 | Métadonnées fastlane `fr-FR` et `en-US` (titre, descriptions, notes de version) | `fastlane/metadata/android/` | 18.3, 18.4 |
 | Politique de confidentialité (français et anglais) | [`docs/PRIVACY.md`](PRIVACY.md) | 18.4 |
 
@@ -56,11 +57,11 @@ keytool -genkeypair -v -keystore nextglyph-release.jks -alias nextglyph \
 
 3. Facultatif : **Settings → Rules** pour protéger les tags `v*` (création réservée aux administrateurs).
 
-Pour signer en local : exporter `NEXTGLYPH_KEYSTORE` (chemin du `.jks`) et les trois autres variables, puis `./gradlew :ime:assembleRelease`. Sans ces variables, l'APK de release n'est pas signé.
+Pour signer en local : exporter `NEXTGLYPH_KEYSTORE` (chemin du `.jks`) et les trois autres variables, puis `./gradlew :ime:assembleFdroidRelease :ime:assemblePlayRelease` (ou `:ime:bundlePlayRelease`). Sans ces variables, les APK de release ne sont pas signés.
 
 ## 4. Préparer une version
 
-1. Dans `ime/build.gradle.kts` : `versionName` sémantique (`0.1.0`), `versionCode` strictement supérieur au précédent (`1`, `2`, `3`…). Les trois canaux utilisent les mêmes valeurs.
+1. Dans `ime/build.gradle.kts` : `versionName` sémantique (`0.1.0`), `versionCode` strictement supérieur au précédent (`1`, `2`, `3`…). Les trois canaux et les deux variantes (`fdroid`, `play`) utilisent les mêmes valeurs : même `applicationId`, même `versionCode`, même clé, pour passer de l'une à l'autre sans désinstaller.
 2. Notes de version : `fastlane/metadata/android/fr-FR/changelogs/<versionCode>.txt` et `en-US/…`, 500 caractères au plus. Le workflow refuse un tag sans elles.
 3. Captures d'écran (une fois, puis quand l'interface change) : PNG de téléphone dans `fastlane/metadata/android/<locale>/images/phoneScreenshots/` (`1.png`, `2.png`…, 2 au minimum pour Play, rapport 9:16 à 9:20). Icône `images/icon.png` 512 × 512 et, pour Play, bannière `images/featureGraphic.png` 1024 × 500. Chaque image doit rester sous 1 Mo (règle du dépôt).
 4. Fusionner sur `main` avec la CI verte (le job « Build reproductible » compris).
@@ -71,7 +72,7 @@ Pour signer en local : exporter `NEXTGLYPH_KEYSTORE` (chemin du `.jks`) et les t
 git tag -a v0.1.0 -m "NextGlyph 0.1.0" && git push origin v0.1.0
 ```
 
-Le workflow **Release** vérifie que le tag égale `versionName`, attend votre accord (environnement `release`), construit l'APK et l'app bundle signés, vérifie la signature (`apksigner`), atteste sa provenance (SLSA, signée via Sigstore), puis crée la release avec `nextglyph-0.1.0.apk`, son `.sha256`, son attestation `.sigstore.json` et les notes de version dans les deux langues. L'app bundle est dans les artefacts du workflow (90 jours).
+Le workflow **Release** vérifie que le tag égale `versionName`, attend votre accord (environnement `release`), construit les APK `fdroid` et `play` et l'app bundle `play`, signés, vérifie la signature (`apksigner`), atteste la provenance des APK (SLSA, signée via Sigstore), puis crée la release avec `nextglyph-0.1.0.apk` (variante `fdroid`, celle du build reproductible), `nextglyph-0.1.0-play.apk`, leurs `.sha256`, leurs attestations `.sigstore.json` et les notes de version dans les deux langues. L'app bundle `play` est dans les artefacts du workflow (90 jours).
 
 Vérifier qu'un APK sort bien de ce workflow, à partir du tag (CLI GitHub) :
 
@@ -81,7 +82,7 @@ gh attestation verify nextglyph-0.1.0.apk --repo superjojo79/nextglyph
 
 ## 6. Publier sur F-Droid
 
-F-Droid construit l'application depuis les sources. Comme l'APK est reproductible, il peut publier **notre** APK signé, à condition que son propre build soit identique (§18.1) : même signature partout.
+F-Droid construit l'application depuis les sources, **variante `fdroid` seulement** (`gradle: [fdroid]`), qui n'a aucune permission réseau. Comme l'APK est reproductible, il peut publier **notre** APK signé, à condition que son propre build soit identique (§18.1) : même signature partout.
 
 1. Compte sur gitlab.com, fork de [`fdroid/fdroiddata`](https://gitlab.com/fdroid/fdroiddata).
 2. Ajouter `metadata/io.github.superjojo79.nextglyph.yml` (brouillon ci-dessous, à ajuster avec les relecteurs).
@@ -111,7 +112,7 @@ Builds:
       - apt-get install -y openjdk-21-jdk-headless
       - update-alternatives --auto java
     gradle:
-      - yes
+      - fdroid
 
 AllowedAPKSigningKeys: <empreinte SHA-256 du certificat, en minuscules, sans « : »>
 
@@ -125,21 +126,60 @@ Points à confirmer avec les relecteurs de F-Droid :
 
 - **Données téléchargées pendant le build** : `:tools:fetchData` récupère ~100 Mo depuis la release `donnees-…` du dépôt (fichiers sous licences libres, empreintes vérifiées). S'ils préfèrent, la commande peut passer dans `prebuild`.
 - **JDK** : Gradle 9.9 et le build demandent un JDK 21 ou plus récent ; la CI utilise le JDK 25. Une différence de JDK peut changer le bytecode produit par D8/R8 et casser la comparaison : en cas d'écart, aligner le JDK de la recette sur celui de la release.
-- **Anti-fonctionnalités** : aucune attendue (pas de réseau, pas de bibliothèque propriétaire, pas de suivi). La permission `READ_CONTACTS` est facultative et expliquée.
+- **Anti-fonctionnalités** : aucune attendue (variante `fdroid` : pas de permission réseau, pas de bibliothèque propriétaire, pas de suivi). Les dictionnaires s'y mettent à jour par fichier signé, téléchargé dans le navigateur puis importé. La permission `READ_CONTACTS` est facultative et expliquée.
 
 ## 7. Publier sur Google Play
 
 1. Compte développeur Play Console (frais uniques de 25 $). **Un compte personnel récent doit faire un test fermé avec au moins 12 testeurs pendant 14 jours** avant de pouvoir publier en production (règle à revérifier au moment de l'inscription).
 2. Créer l'application (nom « NextGlyph », gratuite, application et non jeu).
 3. **Signature** : à l'envoi du premier bundle, choisir de **fournir votre propre clé de signature d'application** (outil PEPK proposé par la console) avec `nextglyph-release.jks`, et non une clé générée par Google (§18.1). La même clé peut servir de clé d'importation.
-4. Envoyer `ime-release.aab` (artefact du workflow Release) dans la piste de test fermé.
+4. Envoyer `ime-play-release.aab` (artefact du workflow Release, variante `play`) dans la piste de test fermé.
 5. **Fiche du store** : textes de `fastlane/metadata/android/fr-FR` et `en-US` (titre ≤ 30, description courte ≤ 80, description complète ≤ 4 000 caractères), captures, icône et bannière.
 6. **Politique de confidentialité** : `https://github.com/superjojo79/nextglyph/blob/main/docs/PRIVACY.md` (ou la même page servie par GitHub Pages).
-7. **Sécurité des données** : « L'application ne collecte ni ne partage aucune donnée utilisateur ». Le texte saisi, le dictionnaire personnel, l'historique du presse-papiers, les mesures de saisie et les noms des contacts sont traités uniquement sur l'appareil et ne sont donc pas « collectés » au sens de Play ; chiffrement en transit : sans objet ; suppression des données : depuis les réglages.
+7. **Sécurité des données** : « L'application ne collecte ni ne partage aucune donnée utilisateur ». La variante `play` déclare la permission INTERNET pour la seule recherche de mise à jour des dictionnaires (opt-in, à la demande) : la requête HTTPS ne contient aucune donnée de l'utilisateur ni identifiant. Le texte saisi, le dictionnaire personnel, l'historique du presse-papiers, les mesures de saisie et les noms des contacts sont traités uniquement sur l'appareil et ne sont donc pas « collectés » au sens de Play ; chiffrement en transit : sans objet ; suppression des données : depuis les réglages.
 8. **Autres déclarations** : pas de publicité ; classification du contenu (questionnaire IARC, aucune catégorie sensible) ; public cible 13 ans et plus ; pas d'application gouvernementale ni financière.
 9. **API cible** : `targetSdk = 37` dépasse l'exigence actuelle de Play ; à revérifier avant chaque publication (§18.4).
 
-## Visuels des stores
+## 8. Paquets de dictionnaires
+
+Un paquet `.ngpk` (archive ZIP signée : lexiques, modèles de mot suivant, `NOTICE.txt`) met à jour les dictionnaires sans nouvelle version de l'application ; le clavier le vérifie (signature, empreintes, chargement à l'essai) avant de l'utiliser. Il est signé avec une clé ECDSA P-256 **distincte** de celle de l'APK.
+
+### Créer la clé (une fois)
+
+Sur un poste de confiance, hors du dépôt :
+
+```sh
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out nextglyph-pack.pem
+openssl pkey -in nextglyph-pack.pem -pubout -outform DER | base64 -w0
+```
+
+- La première commande écrit la clé privée (PEM PKCS#8). **La garder hors ligne en deux copies** (comme `nextglyph-release.jks`) : une clé perdue interdit tout nouveau paquet pour les applications installées, sauf à publier une version de l'application avec une nouvelle clé de confiance.
+- La seconde affiche la clé publique (SPKI DER en base64) : l'ajouter à `PackKeys.TRUSTED` (`engine/src/main/kotlin/nextglyph/engine/pack/PackSignature.kt`), puis publier une version de l'application. Tant que la liste est vide, le clavier refuse tout paquet, et `buildDictionaryPack` échoue (« la clé de signature ne correspond à aucune clé de `PackKeys.TRUSTED` ») : ajouter la clé publique avant de lancer le workflow.
+
+### Configurer GitHub (une fois)
+
+1. **Settings → Environments → New environment** : `dictionnaires`. Cocher **Required reviewers** (vous-même) et n'autoriser que la branche `main` dans **Deployment branches and tags**.
+2. Dans cet environnement, ajouter le secret `NEXTGLYPH_PACK_KEY` : le contenu complet de `nextglyph-pack.pem` (lignes `-----BEGIN PRIVATE KEY-----` et `-----END PRIVATE KEY-----` comprises).
+
+### Publier un paquet
+
+Quand : après une PR fusionnée qui change `tools/data/sources.json` (nouvelles empreintes) ou les outils qui construisent les lexiques et les modèles (`tools/`, `engine/`, format des fichiers). Pas de planification : les sources sont figées, un paquet n'a de raison d'exister que si son contenu change.
+
+1. Onglet **Actions** → **Paquet de dictionnaires** → **Run workflow** sur `main`, puis approuver le déploiement.
+2. Le workflow reconstruit les lexiques, signe le manifeste (la version est la date UTC `yyyyMMddHHmm`), vérifie le paquet par une installation à blanc, atteste sa provenance et publie :
+   - la release `dictionnaires-<version>` (archive : `nextglyph-dictionnaires.ngpk`, `.sha256`, `.sigstore.json`, `manifest.txt`, `manifest.sig`), non marquée « dernière version » ;
+   - la release fixe `dictionnaires` (créée au premier lancement), dont `nextglyph-dictionnaires.ngpk`, `manifest.txt` et `manifest.sig` sont remplacés : `https://github.com/superjojo79/nextglyph/releases/download/dictionnaires/nextglyph-dictionnaires.ngpk` est l'URL stable lue par le clavier.
+3. Si les formats binaires changent (`LexiconFormat.VERSION`, `NgramFormat.VERSION`), les anciennes applications refusent le nouveau paquet (« incompatible ») : publier d'abord la version de l'application qui les lit.
+
+En local : `NEXTGLYPH_PACK_KEY="$(cat nextglyph-pack.pem)" ./gradlew :tools:buildDictionaryPack` (sortie dans `tools/build/dictionary-pack/`, version imposée avec `-PpackVersion=<yyyyMMddHHmm>`).
+
+Vérifier la provenance d'un paquet : `gh attestation verify nextglyph-dictionnaires.ngpk --repo superjojo79/nextglyph`.
+
+### Rotation de la clé
+
+`PackKeys.TRUSTED` accepte deux clés. Pour changer de clé sans casser les applications installées : générer la nouvelle clé, ajouter sa clé publique **à côté** de l'ancienne, publier une version de l'application, attendre qu'elle soit largement installée, puis remplacer le secret `NEXTGLYPH_PACK_KEY` par la nouvelle clé. Retirer l'ancienne clé publique à la version suivante. En cas de compromission, retirer la clé de `TRUSTED` immédiatement, publier une version de l'application et révoquer le secret.
+
+## 9. Visuels des stores
 
 Les captures et la vidéo des stores sont produites automatiquement, en français (AZERTY) et en anglais (QWERTY), sur un émulateur Android 14 de GitHub Actions. Le test instrumenté `StoreMediaTest` (variante debug) tape des scénarios touche par touche dans `ShowcaseActivity`, une fausse messagerie ; `scripts/store-media.sh` règle la barre d'état (09:41, batterie pleine), lance les tests, filme l'écran et récupère les fichiers.
 
@@ -148,7 +188,7 @@ Les captures et la vidéo des stores sont produites automatiquement, en françai
 3. Les images **finales** (annotées, recadrées, avec accroche) vont dans `fastlane/metadata/android/<locale>/images/` (`phoneScreenshots/`, `featureGraphic.png`, `icon.png`). Captures : `node scripts/store-visuals/compose.js <brut> <locale> fastlane/metadata/android/<locale>/images/phoneScreenshots` (Playwright ; légendes dans `scripts/store-visuals/captions.json`, logo dans `docs/brand`).
 4. Vidéo promo (30 s environ, 1080 × 1920, sans musique) : `scripts/store-visuals/make-video.sh <brut> <locale> sortie.mp4 [début-s] [vitesse]` (ffmpeg et Playwright). Elle n'est pas versionnée : Google Play demande une URL YouTube, F-Droid n'affiche pas de vidéo.
 
-Pour lancer à la main sur un appareil dans la bonne langue : `./gradlew :ime:assembleDebug :ime:assembleDebugAndroidTest && bash scripts/store-media.sh sortie`.
+Pour lancer à la main sur un appareil dans la bonne langue : `./gradlew :ime:assembleFdroidDebug :ime:assembleFdroidDebugAndroidTest && bash scripts/store-media.sh sortie`.
 
 ## Avant la première publication
 
