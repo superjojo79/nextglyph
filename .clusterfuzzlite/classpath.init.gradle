@@ -1,0 +1,18 @@
+// Init script de .clusterfuzzlite/build.sh : écrit le classpath d'exécution des tests du moteur
+// (classes compilées + dépendances) pour les lanceurs Jazzer.
+allprojects {
+    if (path == ':engine') {
+        pluginManager.withPlugin('java') {
+            def runtime = sourceSets.test.runtimeClasspath
+            def output = layout.buildDirectory.file('fuzz-classpath.txt')
+            tasks.register('writeFuzzClasspath') {
+                dependsOn 'testClasses'
+                inputs.files(runtime)
+                outputs.file(output)
+                doLast {
+                    output.get().asFile.text = runtime.files.collect { it.absolutePath }.join('\n') + '\n'
+                }
+            }
+        }
+    }
+}
