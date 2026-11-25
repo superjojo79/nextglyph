@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Activité de démonstration des visuels des stores (variante debug uniquement), voir docs/PUBLISHING.md. -->
+<resources>
+    <string name="showcase_label" translatable="false">NextGlyph</string>
+    <string name="showcase_contact" translatable="false">Camille</string>
+    <string name="showcase_status">Online</string>
+    <string name="showcase_hint">Message</string>
+    <string name="showcase_send">Send</string>
+    <string name="showcase_message_1">Hi! Are you free tonight?</string>
+    <string name="showcase_message_2">Yes! I finish work at 6.</string>
+    <string name="showcase_message_3">What time are you coming tonight?</string>
+    <string name="showcase_message_4">Around 7, I\'ll bring dessert.</string>
+
+    <color name="showcase_background">#F3F5F8</color>
+    <color name="showcase_bar">#FFFFFF</color>
+    <color name="showcase_received">#FFFFFF</color>
+    <color name="showcase_sent">#2F5D8A</color>
+    <color name="showcase_text">#1D2733</color>
+    <color name="showcase_muted">#6B7785</color>
+    <color name="showcase_divider">#E1E6ED</color>
+
+    <style name="Theme.Showcase" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/showcase_background</item>
+        <item name="android:statusBarColor">@color/showcase_bar</item>
+        <item name="android:navigationBarColor">@color/showcase_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

@@ -33,7 +33,7 @@ Sur un poste de confiance, hors du dépôt :
 ```sh
 keytool -genkeypair -v -keystore nextglyph-release.jks -alias nextglyph \
   -keyalg RSA -keysize 4096 -validity 36500 \
-  -dname "CN=Nextglyph"
+  -dname "CN=NextGlyph"
 ```
 
 - Garder deux copies hors ligne du fichier `.jks` et des mots de passe (ex. clé USB chiffrée et gestionnaire de mots de passe). **Une clé perdue empêche toute mise à jour** sur F-Droid (APK reproductible) comme sur GitHub.
@@ -69,7 +69,7 @@ Pour signer en local : exporter `NEXTGLYPH_KEYSTORE` (chemin du `.jks`) et les t
 ## 5. Publier sur GitHub
 
 ```sh
-git tag -a v0.1.0 -m "Nextglyph 0.1.0" && git push origin v0.1.0
+git tag -a v0.1.0 -m "NextGlyph 0.1.0" && git push origin v0.1.0
 ```
 
 Le workflow **Release** vérifie que le tag égale `versionName`, attend votre accord (environnement `release`), construit les APK `fdroid` et `play` et l'app bundle `play`, signés, vérifie la signature (`apksigner`), atteste la provenance des APK (SLSA, signée via Sigstore), puis crée la release avec `nextglyph-0.1.0.apk` (variante `fdroid`, celle du build reproductible), `nextglyph-0.1.0-play.apk`, leurs `.sha256`, leurs attestations `.sigstore.json` et les notes de version dans les deux langues. L'app bundle `play` est dans les artefacts du workflow (90 jours).
@@ -96,7 +96,7 @@ SourceCode: https://github.com/superjojo79/nextglyph
 IssueTracker: https://github.com/superjojo79/nextglyph/issues
 Changelog: https://github.com/superjojo79/nextglyph/releases
 
-AutoName: Nextglyph
+AutoName: NextGlyph
 
 RepoType: git
 Repo: https://github.com/superjojo79/nextglyph.git
@@ -131,7 +131,7 @@ Points à confirmer avec les relecteurs de F-Droid :
 ## 7. Publier sur Google Play
 
 1. Compte développeur Play Console (frais uniques de 25 $). **Un compte personnel récent doit faire un test fermé avec au moins 12 testeurs pendant 14 jours** avant de pouvoir publier en production (règle à revérifier au moment de l'inscription).
-2. Créer l'application (nom « Nextglyph », gratuite, application et non jeu).
+2. Créer l'application (nom « NextGlyph », gratuite, application et non jeu).
 3. **Signature** : à l'envoi du premier bundle, choisir de **fournir votre propre clé de signature d'application** (outil PEPK proposé par la console) avec `nextglyph-release.jks`, et non une clé générée par Google (§18.1). La même clé peut servir de clé d'importation.
 4. Envoyer `ime-play-release.aab` (artefact du workflow Release, variante `play`) dans la piste de test fermé.
 5. **Fiche du store** : textes de `fastlane/metadata/android/fr-FR` et `en-US` (titre ≤ 30, description courte ≤ 80, description complète ≤ 4 000 caractères), captures, icône et bannière.
@@ -178,6 +178,17 @@ Vérifier la provenance d'un paquet : `gh attestation verify nextglyph-dictionna
 ### Rotation de la clé
 
 `PackKeys.TRUSTED` accepte deux clés. Pour changer de clé sans casser les applications installées : générer la nouvelle clé, ajouter sa clé publique **à côté** de l'ancienne, publier une version de l'application, attendre qu'elle soit largement installée, puis remplacer le secret `NEXTGLYPH_PACK_KEY` par la nouvelle clé. Retirer l'ancienne clé publique à la version suivante. En cas de compromission, retirer la clé de `TRUSTED` immédiatement, publier une version de l'application et révoquer le secret.
+
+## 9. Visuels des stores
+
+Les captures et la vidéo des stores sont produites automatiquement, en français (AZERTY) et en anglais (QWERTY), sur un émulateur Android 14 de GitHub Actions. Le test instrumenté `StoreMediaTest` (variante debug) tape des scénarios touche par touche dans `ShowcaseActivity`, une fausse messagerie ; `scripts/store-media.sh` règle la barre d'état (09:41, batterie pleine), lance les tests, filme l'écran et récupère les fichiers.
+
+1. Onglet **Actions** → **Visuels des stores** → **Run workflow** (le workflow se lance aussi à chaque push sur une branche `claude/**` qui touche ces fichiers).
+2. Images brutes : artefacts `store-media-fr-FR` et `store-media-en-US` (14 jours), ou, sans passer par GitHub Actions, la branche orpheline **`store-media-raw`** (jamais fusionnée, réécrite à chaque exécution) : dossiers `fr-FR/` et `en-US/` avec `00-repos.png` … `06-carte-de-frappe.png` et `promo.mp4`.
+3. Les images **finales** (annotées, recadrées, avec accroche) vont dans `fastlane/metadata/android/<locale>/images/` (`phoneScreenshots/`, `featureGraphic.png`, `icon.png`). Captures : `node scripts/store-visuals/compose.js <brut> <locale> fastlane/metadata/android/<locale>/images/phoneScreenshots` (Playwright ; légendes dans `scripts/store-visuals/captions.json`, logo dans `docs/brand`).
+4. Vidéo promo (30 s environ, 1080 × 1920, sans musique) : `scripts/store-visuals/make-video.sh <brut> <locale> sortie.mp4 [début-s] [vitesse]` (ffmpeg et Playwright). Elle n'est pas versionnée : Google Play demande une URL YouTube, F-Droid n'affiche pas de vidéo.
+
+Pour lancer à la main sur un appareil dans la bonne langue : `./gradlew :ime:assembleFdroidDebug :ime:assembleFdroidDebugAndroidTest && bash scripts/store-media.sh sortie`.
 
 ## Avant la première publication
 

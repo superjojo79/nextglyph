@@ -370,7 +370,7 @@ class Lexicon private constructor(
             val size = view.remaining()
             val header = HeaderReader(view, start, size)
             for (expected in LexiconFormat.MAGIC) {
-                if (header.u8() != expected.toInt()) throw corrupt("magic invalide : ce n'est pas un lexique Nextglyph")
+                if (header.u8() != expected.toInt()) throw corrupt("magic invalide : ce n'est pas un lexique NextGlyph")
             }
             val version = header.u8() shl 8 or header.u8()
             if (version != LexiconFormat.VERSION) {

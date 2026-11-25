@@ -29,10 +29,10 @@ import java.io.File
 import java.io.FileInputStream
 
 /**
- * Critère du §15.2 : une saisie dans un champ mot de passe, faite avec le clavier Nextglyph, n'écrit rien dans le
+ * Critère du §15.2 : une saisie dans un champ mot de passe, faite avec le clavier NextGlyph, n'écrit rien dans le
  * stockage de l'application (`dataDir` : fichiers, préférences, bases, cache).
  *
- * Le test ouvre le panel « Champs de test » (variante debug), active le clavier Nextglyph (`ime set`), touche les
+ * Le test ouvre le panel « Champs de test » (variante debug), active le clavier NextGlyph (`ime set`), touche les
  * touches de la disposition du mot de passe (géométrie calculée par le moteur) et compare l'état du stockage avant
  * et après. JUnit 4 (AndroidJUnitRunner) n'a pas de `@Nested` : la convention HappyPath / ErrorCases /
  * BoundaryValues est tenue par des classes imbriquées et le lanceur `Enclosed`. Noms de tests sans espaces :
@@ -112,7 +112,7 @@ class PasswordStorageTest {
             scenario = ActivityScenario.launch(FieldTestsActivity::class.java)
             scenario.onActivity { activity -> focusPassword(activity) }
             val keyboard = device.wait(Until.findObject(By.desc(context.getString(R.string.keyboard_content_description))), TIMEOUT_MS)
-            checkNotNull(keyboard) { "Le clavier Nextglyph ne s'est pas affiché." }
+            checkNotNull(keyboard) { "Le clavier NextGlyph ne s'est pas affiché." }
             device.waitForIdle()
         }
 
