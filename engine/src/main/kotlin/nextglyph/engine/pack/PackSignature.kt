@@ -74,9 +74,12 @@ object PackKeys {
     /**
      * Clés publiques de confiance, SPKI DER en base64 (deux emplacements pour la rotation, `docs/PUBLISHING.md`).
      *
-     * TODO : vide tant que la clé du projet n'est pas générée ; aucun paquet n'est accepté dans cet état.
+     * Clé du projet générée le 2026-11-25 (ECDSA P-256) ; la clé privée correspondante est le secret
+     * `NEXTGLYPH_PACK_KEY` de l'environnement GitHub « dictionnaires ».
      */
-    val TRUSTED: List<String> = emptyList()
+    val TRUSTED: List<String> = listOf(
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEm1wmaYVaoKtW+P780nftAO+l0arfMkVeH8hh4AU6HLRjTWuBT4BT+R/sHBxwojft+3ASmhr8WakaeweBukoS0Q==",
+    )
 
     fun trusted(): List<PublicKey> = TRUSTED.map(PackSignature::publicKey)
 }

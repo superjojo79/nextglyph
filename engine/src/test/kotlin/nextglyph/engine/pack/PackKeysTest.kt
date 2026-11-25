@@ -12,13 +12,21 @@ class PackKeysTest {
         fun `fournit autant de clés que de clés déclarées`() {
             assertThat(PackKeys.trusted()).hasSameSizeAs(PackKeys.TRUSTED)
         }
+
+        @Test
+        fun `la clé du projet est déclarée`() {
+            assertThat(PackKeys.TRUSTED).isNotEmpty()
+        }
     }
 
     @Nested
     inner class ErrorCases {
         @Test
         fun `toutes les clés déclarées sont des clés EC valides`() {
-            assertThat(PackKeys.trusted()).allSatisfy { assertThat(it.algorithm).isEqualTo("EC") }
+            assertThat(PackKeys.trusted()).allSatisfy {
+                assertThat(it.algorithm).isEqualTo("EC")
+                assertThat((it as java.security.interfaces.ECPublicKey).params.order.bitLength()).isEqualTo(256)
+            }
         }
     }
 
