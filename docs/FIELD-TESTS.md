@@ -16,7 +16,7 @@ L'écho se lit à l'écran ou par `adb shell uiautomator dump` (texte `<clé> = 
 
 ## Résultats sur Android 16
 
-Émulateur Android 16 (API 36, AVD `nextglyph36`), locale `fr-FR`, 1080 × 2340 px, 440 dpi (392 dp de large), disposition AZERTY. Saisie par touches simulées (`input tap`) sur le clavier Nextglyph, lecture de l'écho par `uiautomator dump`. Date : **2026-11-19**.
+Émulateur Android 16 (API 36, AVD `nextglyph36`), locale `fr-FR`, 1080 × 2340 px, 440 dpi (392 dp de large), disposition AZERTY. Saisie par touches simulées (`input tap`) sur le clavier NextGlyph, lecture de l'écho par `uiautomator dump`. Date : **2026-11-19**.
 
 | # | Champ | `inputType` / `imeOptions` | Disposition attendue | Saisie | Résultat attendu | Observé |
 |---|---|---|---|---|---|---|
@@ -57,7 +57,7 @@ Les champs sans `imeOptions` explicite reçoivent du système `actionNext` (ou `
 
 ## Test instrumenté (§15.2)
 
-`ime/src/androidTest/kotlin/nextglyph/ime/PasswordStorageTest.kt` (AndroidX Test et UI Automator, Apache-2.0) : active Nextglyph, ouvre le panel, tape dans le champ mot de passe sur les touches du clavier (géométrie calculée par le moteur) et vérifie que rien n'est ajouté ni modifié dans le stockage de l'application (`dataDir`, hors `code_cache`). Quatre cas : saisie, effacement, champ vide puis `↵`, et un contrôle que le détecteur repère un fichier écrit.
+`ime/src/androidTest/kotlin/nextglyph/ime/PasswordStorageTest.kt` (AndroidX Test et UI Automator, Apache-2.0) : active NextGlyph, ouvre le panel, tape dans le champ mot de passe sur les touches du clavier (géométrie calculée par le moteur) et vérifie que rien n'est ajouté ni modifié dans le stockage de l'application (`dataDir`, hors `code_cache`). Quatre cas : saisie, effacement, champ vide puis `↵`, et un contrôle que le détecteur repère un fichier écrit.
 
 Lancement local, émulateur ou appareil connecté (le clavier courant est rétabli à la fin) :
 

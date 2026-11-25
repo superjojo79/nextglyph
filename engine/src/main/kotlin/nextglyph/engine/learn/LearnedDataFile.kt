@@ -13,7 +13,7 @@ enum class LoadIssueKind {
     /** Le fichier dépasse [LearningConfig.maxFileBytes]. */
     TOO_LARGE,
 
-    /** L'en-tête n'est pas celui d'un fichier Nextglyph (ou le fichier est vide). */
+    /** L'en-tête n'est pas celui d'un fichier NextGlyph (ou le fichier est vide). */
     BAD_MAGIC,
 
     /** Version de format inconnue (fichier plus récent) : rien n'est lu. */
@@ -120,7 +120,7 @@ object LearnedDataFile {
         }
         if (bytes.size > config.maxFileBytes) return fail(LoadIssueKind.TOO_LARGE, "Fichier de plus de ${config.maxFileBytes} octets.")
         if (bytes.size < HEADER_BYTES || !bytes.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)) {
-            return fail(LoadIssueKind.BAD_MAGIC, "Ce n'est pas un fichier d'état Nextglyph.")
+            return fail(LoadIssueKind.BAD_MAGIC, "Ce n'est pas un fichier d'état NextGlyph.")
         }
         val reader = ByteReader(bytes, MAGIC.size)
         val version = reader.u16()

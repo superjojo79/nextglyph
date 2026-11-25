@@ -1,9 +1,9 @@
-Nextglyph
-Copyright 2026 The Nextglyph contributors
+NextGlyph
+Copyright 2026 The NextGlyph contributors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
-Third-party data (dictionaries, frequency lists) shipped with Nextglyph keeps
+Third-party data (dictionaries, frequency lists) shipped with NextGlyph keeps
 its own license. Each source and its attribution is listed below.
 
 --------------------------------------------------------------------------------
@@ -12,7 +12,7 @@ Lexique 4.10 (French word forms and subtitle frequencies)
   Lexique 4. Behavior Research Methods. https://www.lexique.org/
   License: Creative Commons Attribution-ShareAlike 4.0 International
   https://creativecommons.org/licenses/by-sa/4.0/
-  Nextglyph distributes data derived from it in a separate data file,
+  NextGlyph distributes data derived from it in a separate data file,
   fr-lexique.nglx, that keeps this license and contains no data from any other
   source. Changes: word forms lowercased, frequencies per million scaled to
   integers (x100), conversion to a binary lexicon format.
@@ -20,7 +20,7 @@ Lexique 4.10 (French word forms and subtitle frequencies)
 French spelling dictionaries v7.7 (Dicollecte / Grammalecte)
   Olivier R. and contributors. https://grammalecte.net/
   License: Mozilla Public License 2.0, https://www.mozilla.org/MPL/2.0/
-  Nextglyph distributes data derived from it as a separate data file that keeps
+  NextGlyph distributes data derived from it as a separate data file that keeps
   this license. Changes: conversion to a binary lexicon format.
 
 SCOWL / English Speller Database (en_US Hunspell dictionary, 2026.02.25)
@@ -44,7 +44,7 @@ French inflected forms lexicon v7.7 (Dicollecte / Grammalecte)
   Olivier R. and contributors. https://grammalecte.net/
   License: Mozilla Public License 2.0, https://www.mozilla.org/MPL/2.0/
   Same project and license as the French spelling dictionaries above.
-  Nextglyph distributes the word forms in a separate data file,
+  NextGlyph distributes the word forms in a separate data file,
   fr-dicollecte.nglx, that keeps this license and contains no data from any
   other source (every form has the same floor frequency). Changes: conversion
   to a binary lexicon format. Source: https://www.grammalecte.net/dic/
