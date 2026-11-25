@@ -10,9 +10,9 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * Contrôle le manifeste **fusionné** de la variante testée (fourni par le build via
- * la propriété système `nextglyph.mergedManifest`) : aucune permission réseau (spec §2.7, §12),
- * service de saisie correctement protégé.
+ * Contrôle les manifestes **fusionnés** de toutes les variantes (fournis par le build via les propriétés système
+ * `nextglyph.mergedManifest.<variante>`, ex. `fdroidDebug`, `playRelease`) : aucune permission réseau dans `fdroid*`,
+ * INTERNET seule dans `play*` (spec §2.7, §12), service de saisie correctement protégé.
  */
 class ManifestTest {
 
@@ -46,8 +46,22 @@ class ManifestTest {
 
     private val readContacts = "android.permission.READ_CONTACTS"
 
-    /** Permissions admises (§12) : contacts (optionnelle) et vibration. */
+    private val internet = "android.permission.INTERNET"
+
+    /** Permissions admises dans `fdroid*` (§12) : contacts (optionnelle) et vibration. */
     private val allowed = setOf(readContacts, "android.permission.VIBRATE")
+
+    /** Permissions admises dans `play*` : celles de fdroid, plus INTERNET (mise à jour des dictionnaires, §10.7). */
+    private val allowedPlay = allowed + internet
+
+    private val fdroidVariants = listOf("fdroidDebug", "fdroidRelease")
+    private val playVariants = listOf("playDebug", "playRelease")
+    private val allVariants = fdroidVariants + playVariants
+
+    /** Permissions réseau : toutes interdites dans `fdroid*`, seule INTERNET est admise dans `play*`. */
+    private val network = listOf(
+        "INTERNET", "ACCESS_NETWORK_STATE", "ACCESS_WIFI_STATE", "CHANGE_WIFI_STATE", "CHANGE_NETWORK_STATE", "CHANGE_WIFI_MULTICAST_STATE",
+    ).map { "android.permission.$it" }
 
     /** Permissions dangereuses courantes (niveau `dangerous` d'Android), toutes interdites hormis READ_CONTACTS. */
     private val dangerous = listOf(
@@ -62,59 +76,92 @@ class ManifestTest {
     @Nested
     inner class HappyPath {
         @Test
-        fun `le manifeste fusionné ne déclare aucune permission INTERNET`() {
-            assertThat(permissionsOf(mergedManifest()))
-                .noneMatch { it.endsWith(".INTERNET") }
+        fun `les variantes fdroid ne déclarent aucune permission réseau`() {
+            for (variant in fdroidVariants) {
+                assertThat(permissionsOf(mergedManifest(variant))).`as`(variant).doesNotContainAnyElementsOf(network)
+            }
         }
 
         @Test
-        fun `seule READ_CONTACTS est déclarée, et VIBRATE au plus (§12)`() {
-            for (variant in listOf("debug", "release")) {
+        fun `les variantes play déclarent INTERNET et aucune autre permission réseau`() {
+            for (variant in playVariants) {
+                val permissions = permissionsOf(mergedManifest(variant))
+
+                assertThat(permissions).`as`(variant).contains(internet)
+                assertThat(permissions - internet).`as`(variant).doesNotContainAnyElementsOf(network)
+            }
+        }
+
+        @Test
+        fun `fdroid a READ_CONTACTS et VIBRATE au plus, play y ajoute INTERNET (§12)`() {
+            for (variant in fdroidVariants) {
                 val permissions = permissionsOf(mergedManifest(variant))
 
                 assertThat(permissions).`as`(variant).contains(readContacts)
                 assertThat(permissions).`as`(variant).isSubsetOf(allowed)
             }
+            for (variant in playVariants) {
+                val permissions = permissionsOf(mergedManifest(variant))
+
+                assertThat(permissions).`as`(variant).contains(readContacts)
+                assertThat(permissions).`as`(variant).isSubsetOf(allowedPlay)
+            }
         }
 
         @Test
         fun `aucune autre permission dangereuse`() {
-            assertThat(permissionsOf(mergedManifest()) - readContacts).doesNotContainAnyElementsOf(dangerous)
+            for (variant in allVariants) {
+                assertThat(permissionsOf(mergedManifest(variant)) - readContacts - internet).`as`(variant).doesNotContainAnyElementsOf(dangerous)
+            }
         }
 
         @Test
         fun `le service de saisie est protégé par BIND_INPUT_METHOD et exporté`() {
-            val services = mergedManifest().getElementsByTagName("service")
+            for (variant in allVariants) {
+                val services = mergedManifest(variant).getElementsByTagName("service")
 
-            assertThat(services.length).isEqualTo(1)
-            val service = services.item(0) as Element
-            assertThat(service.getAttributeNS(android, "name")).isEqualTo("nextglyph.ime.NextglyphInputMethodService")
-            assertThat(service.getAttributeNS(android, "permission")).isEqualTo("android.permission.BIND_INPUT_METHOD")
-            assertThat(service.getAttributeNS(android, "exported")).isEqualTo("true")
+                assertThat(services.length).`as`(variant).isEqualTo(1)
+                val service = services.item(0) as Element
+                assertThat(service.getAttributeNS(android, "name")).isEqualTo("nextglyph.ime.NextglyphInputMethodService")
+                assertThat(service.getAttributeNS(android, "permission")).isEqualTo("android.permission.BIND_INPUT_METHOD")
+                assertThat(service.getAttributeNS(android, "exported")).isEqualTo("true")
+            }
         }
 
         @Test
-        fun `le panel des champs de test est dans la variante debug`() {
-            assertThat(activitiesOf(mergedManifest("debug"))).contains(fieldTests, "nextglyph.ime.settings.SettingsActivity", "nextglyph.ime.settings.HeatmapActivity")
+        fun `le manifeste de la variante testée est lu par sa propriété propre`() {
+            assertThat(permissionsOf(mergedManifest())).contains(readContacts)
         }
 
         @Test
-        fun `le panel des champs de test n'est jamais dans la release`() {
-            val release = mergedManifest("release")
+        fun `le panel des champs de test est dans les variantes debug`() {
+            for (variant in listOf("fdroidDebug", "playDebug")) {
+                assertThat(activitiesOf(mergedManifest(variant))).`as`(variant)
+                    .contains(fieldTests, "nextglyph.ime.settings.SettingsActivity", "nextglyph.ime.settings.HeatmapActivity")
+            }
+        }
 
-            assertThat(activitiesOf(release)).containsExactlyInAnyOrder(
-                "nextglyph.ime.settings.SettingsActivity",
-                "nextglyph.ime.settings.HeatmapActivity",
-            )
-            assertThat(activitiesOf(release)).noneMatch { it.contains(".debug.") }
+        @Test
+        fun `le panel des champs de test n'est jamais dans une release`() {
+            for (variant in listOf("fdroidRelease", "playRelease")) {
+                val release = mergedManifest(variant)
+
+                assertThat(activitiesOf(release)).`as`(variant).containsExactlyInAnyOrder(
+                    "nextglyph.ime.settings.SettingsActivity",
+                    "nextglyph.ime.settings.HeatmapActivity",
+                )
+                assertThat(activitiesOf(release)).`as`(variant).noneMatch { it.contains(".debug.") }
+            }
         }
 
         @Test
         fun `l'application déclare les règles de sauvegarde`() {
-            val application = mergedManifest().getElementsByTagName("application").item(0) as Element
+            for (variant in allVariants) {
+                val application = mergedManifest(variant).getElementsByTagName("application").item(0) as Element
 
-            assertThat(application.getAttributeNS(android, "dataExtractionRules")).isNotEmpty()
-            assertThat(application.getAttributeNS(android, "fullBackupContent")).isNotEmpty()
+                assertThat(application.getAttributeNS(android, "dataExtractionRules")).`as`(variant).isNotEmpty()
+                assertThat(application.getAttributeNS(android, "fullBackupContent")).`as`(variant).isNotEmpty()
+            }
         }
     }
 
@@ -167,6 +214,26 @@ class ManifestTest {
         }
 
         @Test
+        fun `une variante inconnue est refusée avec un message clair`() {
+            assertThatThrownBy { mergedManifest("inconnue") }
+                .isInstanceOf(IllegalStateException::class.java)
+                .hasMessageContaining("nextglyph.mergedManifest.inconnue")
+        }
+
+        @Test
+        fun `le contrôle repère ACCESS_NETWORK_STATE, interdite même dans play`() {
+            val document = parse(
+                """<manifest xmlns:android="$android">
+                     <uses-permission android:name="$internet"/>
+                     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+                   </manifest>""",
+            )
+
+            assertThat(permissionsOf(document) - internet).containsAnyElementsOf(network)
+            assertThat(permissionsOf(document)).matches { !allowedPlay.containsAll(it) }
+        }
+
+        @Test
         fun `un XML invalide est rejeté`() {
             assertThatThrownBy { parse("<manifest>") }.isInstanceOf(Exception::class.java)
         }
@@ -177,6 +244,14 @@ class ManifestTest {
         @Test
         fun `un manifeste sans permission donne une liste vide`() {
             assertThat(permissionsOf(parse("""<manifest xmlns:android="$android"/>"""))).isEmpty()
+        }
+
+        @Test
+        fun `INTERNET seule suffit à la variante play, pas à fdroid`() {
+            val permissions = listOf(internet)
+
+            assertThat(allowedPlay.containsAll(permissions)).isTrue()
+            assertThat(allowed.containsAll(permissions)).isFalse()
         }
 
         @Test

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Variante Google Play seulement (spec §2.7, §10.7). Réseau : uniquement pour la mise à jour des dictionnaires,
+        sur opt-in (réglage « Mises à jour en ligne », désactivé par défaut) et à la demande (bouton « Rechercher une
+        mise à jour »). Aucune tâche de fond. La variante F-Droid n'a aucune permission réseau.
+        ManifestTest vérifie que c'est la seule permission réseau et qu'elle est absente de fdroid*.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

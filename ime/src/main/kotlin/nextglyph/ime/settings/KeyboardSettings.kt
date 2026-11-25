@@ -90,6 +90,18 @@ data class KeyboardSettings(
         const val KEY_HAPTICS = "haptics"
         const val KEY_NEXT_WORD = "next_word"
 
+        /**
+         * Réglage « Mises à jour en ligne » (§10.7, variante `play`) : booléen, `false` par défaut. Hors de [KEYS] et de
+         * [KeyboardSettings] : il ne concerne pas le clavier lui-même, seulement l'écran des réglages.
+         */
+        const val KEY_ONLINE_UPDATES = "dictionaries_online_updates"
+
+        /**
+         * Compteur entier incrémenté après chaque installation ou retour à l'origine d'un paquet de dictionnaires
+         * (§10.7) : le service l'écoute et recharge lexiques et modèles. Hors de [KEYS] : ce n'est pas un réglage.
+         */
+        const val KEY_DICTIONARIES_GENERATION = "dictionaries_generation"
+
         /** Valeur « selon la locale » de [KEY_LAYOUT] et [KEY_PREFERRED_LANGUAGE]. */
         const val AUTO = "auto"
 

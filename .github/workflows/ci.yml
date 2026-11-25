@@ -51,11 +51,16 @@ jobs:
           path: "**/build/reports/tests/"
           retention-days: 14
 
+  # Un job par module, en parallèle : PIT sur engine et tools dépassait 30 minutes dans un seul job.
   mutation:
-    name: Tests de mutation (PIT)
+    name: Tests de mutation (PIT, ${{ matrix.module }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [engine, tools]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -71,14 +76,14 @@ jobs:
       - uses: ./.github/actions/android-sdk
 
       - name: Lancer PIT (échoue sous les seuils de mutation et de couverture)
-        run: ./gradlew pitest --console=plain
+        run: ./gradlew :${{ matrix.module }}:pitest --console=plain
 
       - name: Publier le rapport PIT
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: rapport-pitest
-          path: "**/build/reports/pitest/"
+          name: rapport-pitest-${{ matrix.module }}
+          path: ${{ matrix.module }}/build/reports/pitest/
           retention-days: 14
 
   fuzzing:
@@ -140,13 +145,13 @@ jobs:
       - uses: ./.github/actions/android-sdk
 
       - name: Lint, tests unitaires et APK de debug (construit les lexiques)
-        run: ./gradlew :ime:lintDebug :ime:testDebugUnitTest :ime:assembleDebug --console=plain
+        run: ./gradlew :ime:lintFdroidDebug :ime:lintPlayDebug :ime:testFdroidDebugUnitTest :ime:testPlayDebugUnitTest :ime:assembleDebug --console=plain
 
       - name: Publier l'APK de debug
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: apk-debug
-          path: ime/build/outputs/apk/debug/*.apk
+          path: ime/build/outputs/apk/*/debug/*.apk
           if-no-files-found: error
           retention-days: 14
 
