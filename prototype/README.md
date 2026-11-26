@@ -1,4 +1,4 @@
-# Prototype web du clavier Nextglyph
+# Prototype web du clavier NextGlyph
 
 Prototype HTML/JavaScript pour **tester au doigt, sur un vrai téléphone**, le ressenti des modes d'adaptation (SPEC §5) avant d'écrire l'IME Android. Il n'est pas livré aux utilisateurs.
 

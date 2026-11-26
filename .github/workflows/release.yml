@@ -118,7 +118,10 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nextglyph-${{ steps.version.outputs.name }}-google-play
-          path: ime/build/outputs/bundle/playRelease/ime-play-release.aab
+          # mapping.txt : fichier de désobfuscation R8, à joindre au bundle dans la Play Console (plantages lisibles).
+          path: |
+            ime/build/outputs/bundle/playRelease/ime-play-release.aab
+            ime/build/outputs/mapping/playRelease/mapping.txt
           if-no-files-found: error
           retention-days: 90
 
@@ -148,4 +151,4 @@ jobs:
             "dist/nextglyph-$VERSION-play.apk" "dist/nextglyph-$VERSION-play.apk.sha256" \
             "dist/nextglyph-$VERSION-play.apk.sigstore.json" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "Nextglyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+            --title "NextGlyph $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

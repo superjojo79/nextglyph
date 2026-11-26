@@ -165,7 +165,10 @@ jobs:
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
-          java-version: "25"
+          # 21 pour le second build (JDK de la recette F-Droid), 25 par défaut (celui de la release).
+          java-version: |
+            21
+            25
 
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
@@ -176,8 +179,11 @@ jobs:
       - uses: ./.github/actions/android-sdk
 
       # §18.1 : deux builds de l'APK de release (non signé) depuis deux dossiers différents, sans
-      # cache de build, doivent être identiques à l'octet près (lexiques compris).
+      # cache de build, doivent être identiques à l'octet près (lexiques compris). Le second build tourne
+      # avec le JDK 21, comme la recette F-Droid : F-Droid ne publie notre APK signé que si son build est identique.
       - name: Construire deux fois l'APK de release et comparer
+        env:
+          REPRO_JAVA_HOME_2: ${{ env.JAVA_HOME_21_X64 }}
         run: scripts/check-reproducible.sh
 
       - name: Publier les deux APK en cas d'écart

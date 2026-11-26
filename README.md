@@ -1,4 +1,4 @@
-# Nextglyph
+# NextGlyph
 
 Clavier Android adaptatif et open source. Il garde une disposition AZERTY ou QWERTY compacte et facile à reconnaître, et met en avant, à chaque lettre tapée, les lettres qui peuvent encore former un mot valide.
 

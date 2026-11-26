@@ -294,7 +294,7 @@ class NgramModel private constructor(
             val size = view.remaining()
             val reader = HeaderReader(view, base, size)
             for (expected in NgramFormat.MAGIC) {
-                if (reader.u8() != expected.toInt()) throw invalid("magic invalide : ce n'est pas un modèle de mot suivant Nextglyph")
+                if (reader.u8() != expected.toInt()) throw invalid("magic invalide : ce n'est pas un modèle de mot suivant NextGlyph")
             }
             val version = reader.u8() shl 8 or reader.u8()
             if (version != NgramFormat.VERSION) {

@@ -47,7 +47,7 @@
     <string name="pref_section_contacts">Contacts</string>
     <string name="pref_contacts">Noms des contacts</string>
     <string name="pref_contacts_summary">Propose les noms de vos contacts, gardés en mémoire seulement.</string>
-    <string name="contacts_rationale">Pour proposer les prénoms et noms de vos contacts, Nextglyph a besoin de lire votre carnet d\'adresses. Seuls les noms sont lus ; ils ne quittent jamais l\'appareil (Nextglyph n\'a aucun accès au réseau) et ne sont pas enregistrés. Vous pourrez désactiver la fonction à tout moment.</string>
+    <string name="contacts_rationale">Pour proposer les prénoms et noms de vos contacts, NextGlyph a besoin de lire votre carnet d\'adresses. Seuls les noms sont lus ; ils ne quittent jamais l\'appareil (NextGlyph n\'a aucun accès au réseau) et ne sont pas enregistrés. Vous pourrez désactiver la fonction à tout moment.</string>
     <string name="contacts_continue">Continuer</string>
     <string name="contacts_denied">Permission refusée : les noms des contacts ne sont pas proposés.</string>
 

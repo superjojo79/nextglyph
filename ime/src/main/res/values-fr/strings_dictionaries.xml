@@ -3,7 +3,7 @@
     <!-- Mise à jour des dictionnaires (issue #62, spec §10.7). -->
     <string name="pref_section_dictionaries">Dictionnaires</string>
     <string name="pref_section_dictionaries_summary">Listes de mots utilisées pour les suggestions et les corrections.</string>
-    <string name="pref_section_dictionaries_info">Le clavier embarque ses dictionnaires dans l\'application. Un paquet de dictionnaires signé peut les remplacer sans réinstaller l\'application : téléchargez-le dans votre navigateur (ou depuis la page du projet), puis importez le fichier ici. Le paquet est vérifié (signature Nextglyph, compatibilité, empreintes) avant d\'être utilisé ; au moindre problème, rien ne change. Revenir à l\'origine rétablit les dictionnaires embarqués dans l\'application. Rien de ce que vous tapez n\'est jamais envoyé.</string>
+    <string name="pref_section_dictionaries_info">Le clavier embarque ses dictionnaires dans l\'application. Un paquet de dictionnaires signé peut les remplacer sans réinstaller l\'application : téléchargez-le dans votre navigateur (ou depuis la page du projet), puis importez le fichier ici. Le paquet est vérifié (signature NextGlyph, compatibilité, empreintes) avant d\'être utilisé ; au moindre problème, rien ne change. Revenir à l\'origine rétablit les dictionnaires embarqués dans l\'application. Rien de ce que vous tapez n\'est jamais envoyé.</string>
     <string name="dictionaries_status_original">Dictionnaires d\'origine</string>
     <string name="dictionaries_status_updated">Mis à jour le %1$s</string>
     <string name="dictionaries_browser">Télécharger dans le navigateur</string>
@@ -25,7 +25,7 @@
     <string name="pref_dictionaries_online_summary">Permet de rechercher un nouveau paquet de dictionnaires depuis cet écran.</string>
     <string name="pref_dictionaries_online_info">Désactivé par défaut. Une fois activé, le bouton Rechercher une mise à jour contacte GitHub, uniquement quand vous appuyez dessus : aucune vérification en arrière-plan, aucune planification. Aucune donnée personnelle ni identifiant n\'est envoyé, seulement la demande des fichiers publics. Le paquet téléchargé est vérifié comme un paquet importé.</string>
     <string name="dictionaries_check">Rechercher une mise à jour</string>
-    <string name="dictionaries_error_signature">Paquet non signé par Nextglyph.</string>
+    <string name="dictionaries_error_signature">Paquet non signé par NextGlyph.</string>
     <string name="dictionaries_error_incompatible">Paquet prévu pour une autre version du clavier.</string>
     <string name="dictionaries_error_outdated">Ce paquet n\'est pas plus récent que vos dictionnaires.</string>
     <string name="dictionaries_error_corrupt">Paquet endommagé ou invalide.</string>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="showcase_status">En ligne</string>
+    <string name="showcase_hint">Message</string>
+    <string name="showcase_send">Envoyer</string>
+    <string name="showcase_message_1">Salut ! Tu es libre ce soir ?</string>
+    <string name="showcase_message_2">Oui ! Je finis le travail à 18 h.</string>
+    <string name="showcase_message_3">Tu passes à quelle heure ce soir ?</string>
+    <string name="showcase_message_4">Vers 19 h, j\'apporte le dessert.</string>
+</resources>

@@ -3,7 +3,7 @@
     <!-- Mise à jour des dictionnaires (issue #62, spec §10.7). -->
     <string name="pref_section_dictionaries">Dictionaries</string>
     <string name="pref_section_dictionaries_summary">Word lists used for suggestions and corrections.</string>
-    <string name="pref_section_dictionaries_info">The keyboard ships with its dictionaries inside the app. A signed dictionary pack can replace them without reinstalling the app: download it in your browser (or from the project page), then import the file here. The pack is checked (Nextglyph signature, compatibility, checksums) before use; if anything is wrong, nothing changes. Resetting brings back the dictionaries bundled with the app. Nothing you type is ever sent anywhere.</string>
+    <string name="pref_section_dictionaries_info">The keyboard ships with its dictionaries inside the app. A signed dictionary pack can replace them without reinstalling the app: download it in your browser (or from the project page), then import the file here. The pack is checked (NextGlyph signature, compatibility, checksums) before use; if anything is wrong, nothing changes. Resetting brings back the dictionaries bundled with the app. Nothing you type is ever sent anywhere.</string>
     <string name="dictionaries_status_original">Original dictionaries</string>
     <string name="dictionaries_status_updated">Updated on %1$s</string>
     <string name="dictionaries_browser">Download in the browser</string>
@@ -25,7 +25,7 @@
     <string name="pref_dictionaries_online_summary">Lets you look for a new dictionary pack from this screen.</string>
     <string name="pref_dictionaries_online_info">Off by default. When on, the Search for an update button contacts GitHub, and only when you tap it: no background check, no schedule. Nothing personal and no identifier is sent, only the request for the public files. The downloaded pack is verified like an imported one.</string>
     <string name="dictionaries_check">Search for an update</string>
-    <string name="dictionaries_error_signature">Pack not signed by Nextglyph.</string>
+    <string name="dictionaries_error_signature">Pack not signed by NextGlyph.</string>
     <string name="dictionaries_error_incompatible">Pack made for another version of the keyboard.</string>
     <string name="dictionaries_error_outdated">This pack is not newer than your dictionaries.</string>
     <string name="dictionaries_error_corrupt">Damaged or invalid pack.</string>
