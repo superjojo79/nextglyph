@@ -89,38 +89,27 @@ jobs:
   fuzzing:
     name: Fuzzing
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # ClusterFuzzLite (.clusterfuzzlite/) : construit les cibles Jazzer du moteur dans l'image
+      # OSS-Fuzz JVM, puis les fait tourner (docs/TESTING.md, « Tests de fuzzing »).
+      - name: Construire les cibles de fuzzing
+        id: build
+        uses: google/clusterfuzzlite/actions/build_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
         with:
-          persist-credentials: false
+          language: jvm
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
-        with:
-          distribution: temurin
-          java-version: "25"
-
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-
-      # settings.gradle.kts inclut le module ime : sa configuration exige le SDK Android.
-      - uses: ./.github/actions/android-sdk
-
-      # Jazzer (docs/TESTING.md) : une JVM par cible, 30 à 60 s chacune (`maxDuration` des @FuzzTest).
+      # Durée totale répartie entre les cibles (environ une minute chacune).
       - name: Fuzzer les décodeurs de fichiers (Jazzer)
-        run: scripts/fuzz.sh
-
-      - name: Publier les rapports de fuzzing
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: run
+        uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
         with:
-          name: rapports-fuzzing
-          path: |
-            engine/build/reports/tests/
-            engine/.cifuzz-corpus/
-            engine/src/test/resources/**/*Inputs/
-            engine/crash-*
-          if-no-files-found: ignore
-          retention-days: 14
+          mode: code-change
+          fuzz-seconds: 600
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   android:
     name: Application Android

@@ -1,0 +1,2 @@
+# ClusterFuzzLite (https://google.github.io/clusterfuzzlite/) : fuzzing Jazzer du moteur, voir docs/TESTING.md.
+language: jvm
