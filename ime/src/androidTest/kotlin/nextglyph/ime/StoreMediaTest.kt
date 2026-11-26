@@ -194,16 +194,20 @@ class StoreMediaTest {
         protected fun waitForKeyboard() {
             val selector = By.desc(string(R.string.keyboard_content_description))
             var keyboard = device.wait(Until.findObject(selector), TIMEOUT_MS)
-            if (keyboard == null) {
-                // Juste après le changement de clavier, l'émulateur ne l'affiche pas toujours : on le redemande.
+            var attempt = 1
+            while (keyboard == null && attempt < KEYBOARD_ATTEMPTS) {
+                // Juste après le démarrage à froid de l'émulateur ou le changement de clavier, il ne s'affiche pas
+                // toujours : on réaffirme le clavier actif, puis on le redemande (de plus en plus patiemment).
+                attempt++
+                shell("ime set $IME_ID")
                 scenario?.onActivity {
                     val input = it.findViewById<EditText>(R.id.showcase_input)
                     input.requestFocus()
                     it.getSystemService(InputMethodManager::class.java)?.showSoftInput(input, 0)
                 }
-                keyboard = device.wait(Until.findObject(selector), TIMEOUT_MS)
+                keyboard = device.wait(Until.findObject(selector), TIMEOUT_MS * attempt)
             }
-            checkNotNull(keyboard) { "Le clavier NextGlyph ne s'est pas affiché." }
+            checkNotNull(keyboard) { "Le clavier NextGlyph ne s'est pas affiché après $KEYBOARD_ATTEMPTS tentatives." }
         }
 
         protected fun fieldText(): String {
@@ -358,6 +362,7 @@ class StoreMediaTest {
         const val VIDEO_TEST = "video_scenario"
         const val OUTPUT_DIR = "/data/local/tmp/store-media"
         const val TIMEOUT_MS = 10_000L
+        const val KEYBOARD_ATTEMPTS = 4
         const val SETTLE_MS = 1_000L
         const val KEY_PAUSE_MS = 120L
         const val ERASE_PAUSE_MS = 60L
