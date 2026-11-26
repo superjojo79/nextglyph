@@ -1,0 +1,31 @@
+Categories:
+  - Keyboard & IME
+License: Apache-2.0
+SourceCode: https://github.com/superjojo79/nextglyph
+IssueTracker: https://github.com/superjojo79/nextglyph/issues
+Changelog: https://github.com/superjojo79/nextglyph/releases
+
+AutoName: NextGlyph
+
+RepoType: git
+Repo: https://github.com/superjojo79/nextglyph.git
+Binaries: https://github.com/superjojo79/nextglyph/releases/download/v%v/nextglyph-%v.apk
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: ime
+    sudo:
+      - apt-get update
+      - apt-get install -y openjdk-21-jdk-headless
+      - update-alternatives --auto java
+    gradle:
+      - fdroid
+
+AllowedAPKSigningKeys: EMPREINTE_SHA256_DU_CERTIFICAT_EN_MINUSCULES_SANS_DEUX_POINTS
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1

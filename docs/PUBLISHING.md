@@ -14,6 +14,8 @@ Procédure de publication sur GitHub, F-Droid et Google Play, en application du 
 | Release sur tag `vX.Y.Z` : APK signés (`fdroid`, `-play`), empreintes SHA-256, notes de version, app bundle `play` pour Play | workflow « Release » | 18.2, 18.4 |
 | Métadonnées fastlane `fr-FR` et `en-US` (titre, descriptions, notes de version) | `fastlane/metadata/android/` | 18.3, 18.4 |
 | Politique de confidentialité (français et anglais) | [`docs/PRIVACY.md`](PRIVACY.md) | 18.4 |
+| Recette F-Droid prête à copier dans fdroiddata, et build reproductible vérifié entre JDK 21 (F-Droid) et 25 (release) | [`docs/fdroid/`](fdroid/io.github.superjojo79.nextglyph.yml), job « Build reproductible » | 18.1, 18.3 |
+| Réponses aux formulaires de la Play Console (fiche, sécurité des données, IARC, public cible) | [`docs/PLAY-CONSOLE.md`](PLAY-CONSOLE.md) | 18.4 |
 
 ## 1. Figer les données (une fois, juste après la fusion)
 
@@ -85,60 +87,28 @@ gh attestation verify nextglyph-0.1.0.apk --repo superjojo79/nextglyph
 F-Droid construit l'application depuis les sources, **variante `fdroid` seulement** (`gradle: [fdroid]`), qui n'a aucune permission réseau. Comme l'APK est reproductible, il peut publier **notre** APK signé, à condition que son propre build soit identique (§18.1) : même signature partout.
 
 1. Compte sur gitlab.com, fork de [`fdroid/fdroiddata`](https://gitlab.com/fdroid/fdroiddata).
-2. Ajouter `metadata/io.github.superjojo79.nextglyph.yml` (brouillon ci-dessous, à ajuster avec les relecteurs).
-3. Tester en local avec `fdroid build -v -l io.github.superjojo79.nextglyph` (outil `fdroidserver`), puis ouvrir la merge request.
-
-```yaml
-Categories:
-  - Keyboard & IME
-License: Apache-2.0
-SourceCode: https://github.com/superjojo79/nextglyph
-IssueTracker: https://github.com/superjojo79/nextglyph/issues
-Changelog: https://github.com/superjojo79/nextglyph/releases
-
-AutoName: NextGlyph
-
-RepoType: git
-Repo: https://github.com/superjojo79/nextglyph.git
-Binaries: https://github.com/superjojo79/nextglyph/releases/download/v%v/nextglyph-%v.apk
-
-Builds:
-  - versionName: 0.1.0
-    versionCode: 1
-    commit: v0.1.0
-    subdir: ime
-    sudo:
-      - apt-get update
-      - apt-get install -y openjdk-21-jdk-headless
-      - update-alternatives --auto java
-    gradle:
-      - fdroid
-
-AllowedAPKSigningKeys: <empreinte SHA-256 du certificat, en minuscules, sans « : »>
-
-AutoUpdateMode: Version
-UpdateCheckMode: Tags ^v[0-9.]+$
-CurrentVersion: 0.1.0
-CurrentVersionCode: 1
-```
+2. Copier [`docs/fdroid/io.github.superjojo79.nextglyph.yml`](fdroid/io.github.superjojo79.nextglyph.yml) dans `metadata/` du fork et remplacer `AllowedAPKSigningKeys` par l'empreinte SHA-256 du certificat (§2), en minuscules et sans « : ». La recette passe `fdroid lint` et `fdroid rewritemeta` sans modification, et `fdroid scanner` ne signale rien sur les sources (vérifié avec fdroidserver 2.4.6 sur le commit 725af3f).
+3. Attendre la release GitHub `v0.1.0` (§5) : la recette construit le tag `v0.1.0` et compare son APK à `nextglyph-0.1.0.apk` de la release.
+4. Tester en local si possible (`fdroid build -v -l io.github.superjojo79.nextglyph`, demande le SDK Android), puis ouvrir la merge request avec le modèle « App inclusion » de fdroiddata, en cochant les points demandés (licence, pas d'anti-fonctionnalité, auteur du projet).
 
 Points à confirmer avec les relecteurs de F-Droid :
 
 - **Données téléchargées pendant le build** : `:tools:fetchData` récupère ~100 Mo depuis la release `donnees-…` du dépôt (fichiers sous licences libres, empreintes vérifiées). S'ils préfèrent, la commande peut passer dans `prebuild`.
-- **JDK** : Gradle 9.9 et le build demandent un JDK 21 ou plus récent ; la CI utilise le JDK 25. Une différence de JDK peut changer le bytecode produit par D8/R8 et casser la comparaison : en cas d'écart, aligner le JDK de la recette sur celui de la release.
+- **JDK** : Gradle 9.9 et le build demandent un JDK 21 ou plus récent. La recette installe l'OpenJDK 21 de Debian, la release utilise Temurin 25 ; le job « Build reproductible » de la CI fait son second build avec le JDK 21 et vérifie que les deux APK sont identiques.
+- **SDK** : `compileSdk = 37` et build-tools 37.0.0 ; le plugin Android télécharge la plateforme si elle manque sur le serveur de build. Sinon, ajouter `sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'` en `prebuild`.
+- **Gradle** : F-Droid remplace `gradlew` par son propre script, qui doit connaître Gradle 9.9.1 (version du wrapper).
+- **Signature** : F-Droid retire le bloc `signingConfigs` de `ime/build.gradle.kts` avant le build (sans effet : sans `NEXTGLYPH_KEYSTORE`, l'APK n'est pas signé).
 - **Anti-fonctionnalités** : aucune attendue (variante `fdroid` : pas de permission réseau, pas de bibliothèque propriétaire, pas de suivi). Les dictionnaires s'y mettent à jour par fichier signé, téléchargé dans le navigateur puis importé. La permission `READ_CONTACTS` est facultative et expliquée.
 
 ## 7. Publier sur Google Play
 
-1. Compte développeur Play Console (frais uniques de 25 $). **Un compte personnel récent doit faire un test fermé avec au moins 12 testeurs pendant 14 jours** avant de pouvoir publier en production (règle à revérifier au moment de l'inscription).
+1. Compte développeur Play Console (frais uniques de 25 $). **Un compte personnel récent doit faire un test fermé avec au moins 12 testeurs pendant 14 jours** avant de pouvoir publier en production (règle vérifiée le 25 novembre 2026).
 2. Créer l'application (nom « NextGlyph », gratuite, application et non jeu).
 3. **Signature** : à l'envoi du premier bundle, choisir de **fournir votre propre clé de signature d'application** (outil PEPK proposé par la console) avec `nextglyph-release.jks`, et non une clé générée par Google (§18.1). La même clé peut servir de clé d'importation.
-4. Envoyer `ime-play-release.aab` (artefact du workflow Release, variante `play`) dans la piste de test fermé.
-5. **Fiche du store** : textes de `fastlane/metadata/android/fr-FR` et `en-US` (titre ≤ 30, description courte ≤ 80, description complète ≤ 4 000 caractères), captures, icône et bannière.
-6. **Politique de confidentialité** : `https://github.com/superjojo79/nextglyph/blob/main/docs/PRIVACY.md` (ou la même page servie par GitHub Pages).
-7. **Sécurité des données** : « L'application ne collecte ni ne partage aucune donnée utilisateur ». La variante `play` déclare la permission INTERNET pour la seule recherche de mise à jour des dictionnaires (opt-in, à la demande) : la requête HTTPS ne contient aucune donnée de l'utilisateur ni identifiant. Le texte saisi, le dictionnaire personnel, l'historique du presse-papiers, les mesures de saisie et les noms des contacts sont traités uniquement sur l'appareil et ne sont donc pas « collectés » au sens de Play ; chiffrement en transit : sans objet ; suppression des données : depuis les réglages.
-8. **Autres déclarations** : pas de publicité ; classification du contenu (questionnaire IARC, aucune catégorie sensible) ; public cible 13 ans et plus ; pas d'application gouvernementale ni financière.
-9. **API cible** : `targetSdk = 37` dépasse l'exigence actuelle de Play ; à revérifier avant chaque publication (§18.4).
+4. Envoyer `ime-play-release.aab` (artefact `nextglyph-<version>-google-play` du workflow Release, variante `play`) dans la piste de test fermé, avec `mapping.txt` du même artefact comme fichier de désobfuscation.
+5. Remplir la fiche et la section « Contenu de l'application » : toutes les réponses (fiche, sécurité des données, classification IARC, public cible, annonces, identifiant publicitaire, accès à l'application) sont dans [PLAY-CONSOLE.md](PLAY-CONSOLE.md).
+6. Après 14 jours de test fermé avec 12 testeurs, demander l'accès à la production, puis promouvoir la version testée.
+7. **API cible** : `targetSdk = 37` dépasse l'exigence actuelle de Play (API 36 depuis le 31 août 2026) ; à revérifier avant chaque publication (§18.4).
 
 ## 8. Paquets de dictionnaires
 
@@ -192,7 +162,13 @@ Pour lancer à la main sur un appareil dans la bonne langue : `./gradlew :ime:as
 
 ## Avant la première publication
 
-Points ouverts repris de [PROGRESS.md](PROGRESS.md) :
+Ce qui reste, dans l'ordre. Seul le mainteneur peut faire ces étapes (compte, clé, secrets, paiement) :
 
-- Relecture des attributions des lexiques (licences françaises, mention COCA dans le README de SCOWL).
-- Captures d'écran, icône 512 px et bannière Play.
+1. [ ] Relire les attributions des lexiques (licences françaises, mention COCA dans le README de SCOWL), points ouverts de [PROGRESS.md](PROGRESS.md).
+2. [ ] Créer la clé de signature et en garder deux copies hors ligne (§2) ; noter l'empreinte SHA-256 du certificat.
+3. [ ] Créer l'environnement GitHub `release` et ses quatre secrets (§3).
+4. [ ] Pousser le tag `v0.1.0` et approuver le déploiement (§5) ; vérifier la release (deux APK, empreintes, attestations).
+5. [ ] F-Droid : compte gitlab.com, fork de fdroiddata, recette avec l'empreinte, merge request (§6). Délai habituel : quelques semaines de relecture.
+6. [ ] Google Play : compte développeur (25 $, vérification d'identité), adresse e-mail publique de contact, création de l'application, clé importée via PEPK, bundle en test fermé, fiche et formulaires selon [PLAY-CONSOLE.md](PLAY-CONSOLE.md) (§7).
+7. [ ] Recruter 12 testeurs (15 à 20 pour garder de la marge, utilisation réelle conseillée : Google interroge sur le déroulement du test) pour le test fermé, 14 jours sans interruption, puis demander l'accès à la production.
+8. [ ] Facultatif : mettre la vidéo promo sur YouTube pour la fiche Play.

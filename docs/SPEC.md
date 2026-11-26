@@ -775,7 +775,7 @@ Aucune pour l'instant (l'identifiant d'application est tranché au §17.1).
 ### 18.2 GitHub
 
 - Dépôt public ; fichiers `LICENSE` (Apache-2.0), `NOTICE` (attributions des données, cf. §10.2), `README`, `CONTRIBUTING`, `SECURITY`.
-- **Intégration continue** (GitHub Actions) : tests du module `engine`, lint et tests des deux variantes, build des APK de debug, vérification de la reproductibilité (deux builds de l'APK de release non signé de la variante `fdroid`, depuis deux dossiers et sans cache, comparés à l'octet : `scripts/check-reproducible.sh`).
+- **Intégration continue** (GitHub Actions) : tests du module `engine`, lint et tests des deux variantes, build des APK de debug, vérification de la reproductibilité (deux builds de l'APK de release non signé de la variante `fdroid`, depuis deux dossiers et sans cache, le second avec le JDK 21 de la recette F-Droid, comparés à l'octet : `scripts/check-reproducible.sh`).
 - **Publication** : chaque tag `vX.Y.Z` produit une release GitHub avec les APK signés `nextglyph-X.Y.Z.apk` (variante `fdroid`, référence du build reproductible) et `nextglyph-X.Y.Z-play.apk`, leurs empreintes SHA-256 et leurs attestations de provenance (SLSA, Sigstore). Les paquets de dictionnaires (§10.7) ont leur propre workflow et leur propre release `dictionnaires`.
 - Les lexiques binaires sont générés par `tools/` pendant le build, pas versionnés. Seules les sources de données (ou un script de téléchargement avec sommes de contrôle) sont dans le dépôt. Chaque source a un miroir figé dans une release du dépôt (`mirrors` dans `tools/data/sources.json`), essayé avant l'URL officielle : un fichier écrasé en place par son auteur ne casse pas le build.
 - Procédure complète (clé, secrets, tags, F-Droid, Play) : [PUBLISHING.md](PUBLISHING.md).
@@ -783,14 +783,14 @@ Aucune pour l'instant (l'identifiant d'application est tranché au §17.1).
 ### 18.3 F-Droid
 
 - Métadonnées dans le dépôt au format fastlane : `fastlane/metadata/android/<locale>/` (titre, descriptions, captures, notes de version), en `fr-FR` et `en-US`.
-- La recette de build F-Droid construit la variante `fdroid` (`gradle: [fdroid]`) et doit pouvoir construire l'APK depuis les sources, y compris les lexiques. Les sources de données doivent donc être accessibles et sous licences libres (§10.2).
+- La recette de build F-Droid ([`docs/fdroid/`](fdroid/io.github.superjojo79.nextglyph.yml), à copier dans fdroiddata) construit la variante `fdroid` (`gradle: [fdroid]`) et doit pouvoir construire l'APK depuis les sources, y compris les lexiques. Les sources de données doivent donc être accessibles et sous licences libres (§10.2).
 - Objectif : aucune « anti-fonctionnalité » signalée par F-Droid. Les dictionnaires s'y mettent à jour par fichier signé importé à la main (§10.7).
 
 ### 18.4 Google Play
 
 - **Cible SDK** : Google Play impose de cibler une version récente d'Android (`targetSdk`), relevée chaque année. La règle exacte est à vérifier à chaque publication.
 - **Variante `play`** : seule à déclarer `INTERNET`, pour la recherche de mise à jour des dictionnaires (opt-in, à la demande, §10.7).
-- **Section « Sécurité des données »** : déclarer qu'aucune donnée n'est collectée ni partagée. Les données traitées uniquement sur l'appareil (texte saisi, contacts, dictionnaire personnel) ne sont en principe pas considérées comme collectées. À confirmer avec la politique en vigueur au moment de la publication.
+- **Section « Sécurité des données »** : déclarer qu'aucune donnée n'est collectée ni partagée (réponses détaillées de tous les formulaires : [PLAY-CONSOLE.md](PLAY-CONSOLE.md)). Les données traitées uniquement sur l'appareil (texte saisi, contacts, dictionnaire personnel) ne sont en principe pas considérées comme collectées. À confirmer avec la politique en vigueur au moment de la publication.
 - **Contacts** : la permission `READ_CONTACTS` impose une explication claire avant la demande (écran de réglages, §6.1) et une politique de confidentialité publiée.
 - **Politique de confidentialité** : requise par Google Play ; une page courte qui reprend le §12, en français et en anglais : [PRIVACY.md](PRIVACY.md), publiée par le dépôt (ou GitHub Pages).
 - **Format** : Google Play exige un app bundle (`.aab`) pour une nouvelle application ; le workflow de release le produit pour la variante `play`, signé avec la même clé que les APK. Play App Signing doit être configuré avec cette clé (« fournir votre propre clé »).
